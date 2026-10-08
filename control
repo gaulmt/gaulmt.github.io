@@ -8,4 +8,5 @@ Author: gaulmt -Tech
 Section: Utilities
 Depends: firmware (>= 12.0)
 Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Depiction: https://gaulmt.github.io/
 SileoDepiction: https://gaulmt.github.io/depiction.json

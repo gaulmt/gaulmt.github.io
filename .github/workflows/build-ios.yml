@@ -128,6 +128,7 @@ jobs:
                     "title": "gaulmt -Tech v5.4.0 - Giả Lập Hoàn Hảo 37 Model iPhone + IOKit/Metal Hooks"
                   },
                   {
+                    "class": "DepictionMarkdownView",
                     "markdown": "Công cụ **gaulmt -Tech v5.4.0** hỗ trợ cả **Rootless (Dopamine/palera1n)** và **Rootful (Checkra1n/Unc0ver/Odyssey)** trực tiếp qua Sileo.\n\n- **Giả Lập Hoàn Hảo 37 Model iPhone**: Phủ kín từ iPhone 6s/SE đến iPhone 16 Pro Max, hook đồng bộ cả IOKit IORegistry, Metal GPU, CTCarrier, WebKit User-Agent, uname, sysctl, MGCopyAnswer và NSDictionary.\n- **Đổi IP Tự Động (Chế độ máy bay 22s)**: Chu trình ngắt sóng 22s chuẩn trạm phát viễn thông để cấp IP 4G/LTE mới tinh kèm đếm ngược trực quan.\n- **Kho Lưu Trữ Acc Zalo & Proxy**: Tự động xoá cookie Safari & tạo phiên mới khi lưu kho, bơm proxy bảo mật tuyệt đối."
                   }
                 ]

@@ -604,7 +604,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.3";
+    appSub.text = @"Identity & Vault · v5.4";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1187,7 +1187,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     segRow.spacing = 6.0;
     [segRow.heightAnchor constraintEqualToConstant:36.0].active = YES;
 
-    NSArray<NSString *> *segTitles = @[@"Chỉ iPhone 16", @"Đời Cao 14–16", @"Tất cả 8–16"];
+    NSArray<NSString *> *segTitles = @[@"Chỉ iPhone 16", @"Đời Cao 14–16", @"Tất cả (6s–16)"];
     NSArray<NSNumber *> *segTags = @[@(ZTechModelTierIPhone16), @(ZTechModelTierHighEnd), @(ZTechModelTierAll)];
     NSMutableArray<UIButton *> *segBtns = [NSMutableArray array];
 

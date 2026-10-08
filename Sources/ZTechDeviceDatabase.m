@@ -87,8 +87,8 @@ extern char **environ;
         p.machineId = @"iPhone17,2";
     }
     NSString *ver = dict[@"iosVersion"] ?: @"18.2.1";
-    if ([ver integerValue] < 16) {
-        ver = @"16.6.1";
+    if (!ver || [ver integerValue] < 14) {
+        ver = @"17.4.1";
     }
     p.iosVersion = ver;
     p.batteryPercent = [dict[@"batteryPercent"] integerValue] ?: 68;
@@ -109,9 +109,14 @@ extern char **environ;
 
 @implementation ZTechDeviceDatabase
 
-// Strictly iPhone 8 (iPhone10,4) through iPhone 16 Pro Max (iPhone17,2) & iPhone 16e (iPhone17,5), iOS 16.0 - 18.3.2
+// Complete iPhone lineup: iPhone 6s/SE through iPhone 16 Pro Max (37 models)
 + (NSArray<NSDictionary *> *)allDeviceSpecs {
     return @[
+        @{@"name": @"iPhone 6s", @"machine": @"iPhone8,1", @"chip": @"A9", @"ram": @2, @"screen": @"375x667", @"tier": @0, @"ios": @[@"15.8", @"15.8.2", @"15.8.3"]},
+        @{@"name": @"iPhone 6s Plus", @"machine": @"iPhone8,2", @"chip": @"A9", @"ram": @2, @"screen": @"414x736", @"tier": @0, @"ios": @[@"15.8", @"15.8.2", @"15.8.3"]},
+        @{@"name": @"iPhone SE (1st Gen)", @"machine": @"iPhone8,4", @"chip": @"A9", @"ram": @2, @"screen": @"320x568", @"tier": @0, @"ios": @[@"15.8", @"15.8.2", @"15.8.3"]},
+        @{@"name": @"iPhone 7", @"machine": @"iPhone9,3", @"chip": @"A10 Fusion", @"ram": @2, @"screen": @"375x667", @"tier": @0, @"ios": @[@"15.8", @"15.8.2", @"15.8.3"]},
+        @{@"name": @"iPhone 7 Plus", @"machine": @"iPhone9,4", @"chip": @"A10 Fusion", @"ram": @3, @"screen": @"414x736", @"tier": @0, @"ios": @[@"15.8", @"15.8.2", @"15.8.3"]},
         @{@"name": @"iPhone 8", @"machine": @"iPhone10,4", @"chip": @"A11 Bionic", @"ram": @2, @"screen": @"375x667", @"tier": @0, @"ios": @[@"16.4.1", @"16.6.1", @"16.7.5", @"16.7.8"]},
         @{@"name": @"iPhone 8 Plus", @"machine": @"iPhone10,5", @"chip": @"A11 Bionic", @"ram": @3, @"screen": @"414x736", @"tier": @0, @"ios": @[@"16.5.1", @"16.6.1", @"16.7.5", @"16.7.8"]},
         @{@"name": @"iPhone X", @"machine": @"iPhone10,6", @"chip": @"A11 Bionic", @"ram": @3, @"screen": @"375x812", @"tier": @0, @"ios": @[@"16.5.1", @"16.6.1", @"16.7.5", @"16.7.8"]},
@@ -119,16 +124,18 @@ extern char **environ;
         @{@"name": @"iPhone XS", @"machine": @"iPhone11,2", @"chip": @"A12 Bionic", @"ram": @4, @"screen": @"375x812", @"tier": @0, @"ios": @[@"16.6.1", @"17.1.2", @"17.4.1", @"17.6.1"]},
         @{@"name": @"iPhone XS Max", @"machine": @"iPhone11,6", @"chip": @"A12 Bionic", @"ram": @4, @"screen": @"414x896", @"tier": @0, @"ios": @[@"16.6.1", @"17.1.2", @"17.4.1", @"17.6.1"]},
         @{@"name": @"iPhone SE (2020)", @"machine": @"iPhone12,8", @"chip": @"A13 Bionic", @"ram": @3, @"screen": @"375x667", @"tier": @0, @"ios": @[@"16.6.1", @"17.1.2", @"17.4.1", @"17.6.1"]},
-        @{@"name": @"iPhone SE (2022)", @"machine": @"iPhone14,6", @"chip": @"A15 Bionic", @"ram": @4, @"screen": @"375x667", @"tier": @0, @"ios": @[@"16.6.1", @"17.2.1", @"17.5.1", @"18.1.1"]},
         @{@"name": @"iPhone 11", @"machine": @"iPhone12,1", @"chip": @"A13 Bionic", @"ram": @4, @"screen": @"414x896", @"tier": @0, @"ios": @[@"16.6.1", @"17.2.1", @"17.5.1", @"18.1.1"]},
         @{@"name": @"iPhone 11 Pro", @"machine": @"iPhone12,3", @"chip": @"A13 Bionic", @"ram": @4, @"screen": @"375x812", @"tier": @0, @"ios": @[@"16.6.1", @"17.2.1", @"17.5.1", @"18.1.1"]},
         @{@"name": @"iPhone 11 Pro Max", @"machine": @"iPhone12,5", @"chip": @"A13 Bionic", @"ram": @4, @"screen": @"414x896", @"tier": @0, @"ios": @[@"16.6.1", @"17.2.1", @"17.5.1", @"18.1.1"]},
+        @{@"name": @"iPhone 12 mini", @"machine": @"iPhone13,1", @"chip": @"A14 Bionic", @"ram": @4, @"screen": @"375x812", @"tier": @0, @"ios": @[@"16.6.1", @"17.3.1", @"17.6.1", @"18.1.1"]},
         @{@"name": @"iPhone 12", @"machine": @"iPhone13,2", @"chip": @"A14 Bionic", @"ram": @4, @"screen": @"390x844", @"tier": @0, @"ios": @[@"16.6.1", @"17.3.1", @"17.6.1", @"18.1.1"]},
         @{@"name": @"iPhone 12 Pro", @"machine": @"iPhone13,3", @"chip": @"A14 Bionic", @"ram": @6, @"screen": @"390x844", @"tier": @0, @"ios": @[@"16.6.1", @"17.3.1", @"17.6.1", @"18.1.1"]},
         @{@"name": @"iPhone 12 Pro Max", @"machine": @"iPhone13,4", @"chip": @"A14 Bionic", @"ram": @6, @"screen": @"428x926", @"tier": @0, @"ios": @[@"16.6.1", @"17.3.1", @"17.6.1", @"18.1.1"]},
+        @{@"name": @"iPhone 13 mini", @"machine": @"iPhone14,4", @"chip": @"A15 Bionic", @"ram": @4, @"screen": @"375x812", @"tier": @0, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
         @{@"name": @"iPhone 13", @"machine": @"iPhone14,5", @"chip": @"A15 Bionic", @"ram": @4, @"screen": @"390x844", @"tier": @0, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
         @{@"name": @"iPhone 13 Pro", @"machine": @"iPhone14,2", @"chip": @"A15 Bionic", @"ram": @6, @"screen": @"390x844", @"tier": @0, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
         @{@"name": @"iPhone 13 Pro Max", @"machine": @"iPhone14,3", @"chip": @"A15 Bionic", @"ram": @6, @"screen": @"428x926", @"tier": @0, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
+        @{@"name": @"iPhone SE (2022)", @"machine": @"iPhone14,6", @"chip": @"A15 Bionic", @"ram": @4, @"screen": @"375x667", @"tier": @0, @"ios": @[@"16.6.1", @"17.2.1", @"17.5.1", @"18.1.1"]},
         @{@"name": @"iPhone 14", @"machine": @"iPhone14,7", @"chip": @"A15 Bionic", @"ram": @6, @"screen": @"390x844", @"tier": @1, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
         @{@"name": @"iPhone 14 Plus", @"machine": @"iPhone14,8", @"chip": @"A15 Bionic", @"ram": @6, @"screen": @"428x926", @"tier": @1, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
         @{@"name": @"iPhone 14 Pro", @"machine": @"iPhone15,2", @"chip": @"A16 Bionic", @"ram": @6, @"screen": @"393x852", @"tier": @1, @"ios": @[@"16.6.1", @"17.4.1", @"17.6.1", @"18.2.1"]},
@@ -152,9 +159,6 @@ extern char **environ;
     NSString *machine = [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
     if (!machine || ![machine hasPrefix:@"iPhone"]) {
         return @"iPhone17,2";
-    }
-    if ([machine hasPrefix:@"iPhone9,"] || [machine hasPrefix:@"iPhone8,"] || [machine hasPrefix:@"iPhone7,"]) {
-        return @"iPhone10,4";
     }
     return machine;
 }

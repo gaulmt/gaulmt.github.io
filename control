@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.3.0
+Version: 5.4.0
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.3.0 - Nang Cap Nut Doi IP 22s Che Do May Bay Tu Dong + Bo Dem Thoi Gian Truc Quan + Tu Dong Nhan IP 4G/LTE Moi
+Description: gaulmt -Tech v5.4.0 - Gia Lap Hoan Hao 37 Model iPhone (SE/6s - 16 Pro Max) + IOKit/Metal/Carrier Hooks Chuyen Sau
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

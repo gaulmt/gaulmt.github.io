@@ -53,7 +53,7 @@ struct zt_rebinding {
     void *raw_target;
 };
 
-static struct zt_rebinding gRebindings[12];
+static struct zt_rebinding gRebindings[20];
 static size_t gRebindingsCount = 0;
 
 static inline uintptr_t zt_strip_ptr(const void *p) {
@@ -215,6 +215,7 @@ static NSString *gModelNameObj = @"iPhone 16 Pro Max";
 static NSString *gMachineIdObj = @"iPhone17,2";
 static NSString *gIosVersionObj = @"18.2.1";
 static NSString *gUuidObj = @"7BD46FDA-D93D-45BD-9158-7178669502DD";
+static NSString *gCarrierNameObj = @"Viettel";
 static NSString *gActiveProxyObj = @"";
 static float gBatteryFloat = 0.76f;
 
@@ -401,7 +402,7 @@ static NSDictionary *ZTechNormalizeProfile(NSDictionary *raw) {
         m[@"modelName"] = @"iPhone 16 Pro Max";
     }
     NSString *ios = m[@"iosVersion"];
-    if (!ios || [ios integerValue] < 16) {
+    if (!ios || [ios integerValue] < 14) {
         m[@"iosVersion"] = @"18.2.1";
     }
     if (!m[@"ramGB"] || [m[@"ramGB"] integerValue] < 2) {
@@ -412,6 +413,9 @@ static NSDictionary *ZTechNormalizeProfile(NSDictionary *raw) {
     }
     if (!m[@"identifier"] || [m[@"identifier"] length] == 0) {
         m[@"identifier"] = @"7BD46FDA-D93D-45BD-9158-7178669502DD";
+    }
+    if (!m[@"carrier"] || [m[@"carrier"] length] == 0) {
+        m[@"carrier"] = @"Viettel";
     }
     if (!m[@"activeProxy"]) {
         m[@"activeProxy"] = @"";
@@ -426,6 +430,7 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     gMachineIdObj = [prof[@"machineId"] ?: @"iPhone17,2" copy];
     gIosVersionObj = [prof[@"iosVersion"] ?: @"18.2.1" copy];
     gUuidObj = [prof[@"identifier"] ?: @"7BD46FDA-D93D-45BD-9158-7178669502DD" copy];
+    gCarrierNameObj = [prof[@"carrier"] ?: @"Viettel" copy];
     gActiveProxyObj = [prof[@"activeProxy"] ?: @"" copy];
 
     const char *mc = [gMachineIdObj UTF8String];
@@ -731,14 +736,44 @@ static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     return orig_MGCopyAnswer ? orig_MGCopyAnswer(prop) : NULL;
 }
 
-#pragma mark - Universal iPhone 16 Spoofing Across NSDictionary, UILabel, NSAttributedString, JSON & WKWebView
+static CFTypeRef (*orig_IORegistryEntryCreateCFProperty)(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) = NULL;
+static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
+    CFTypeRef res = orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
+    if (key != NULL) {
+        if (CFStringCompare(key, CFSTR("IOPlatformSerialNumber"), 0) == kCFCompareEqualTo) {
+            if (res) CFRelease(res);
+            return gCFUuid ? CFRetain(gCFUuid) : NULL;
+        } else if (CFStringCompare(key, CFSTR("serial-number"), 0) == kCFCompareEqualTo) {
+            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
+                CFRelease(res);
+                const char *s = [gUuidObj UTF8String] ?: "F17X890ABCDE";
+                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)s, strlen(s) + 1);
+            }
+            if (res) CFRelease(res);
+            return gCFUuid ? CFRetain(gCFUuid) : NULL;
+        } else if (CFStringCompare(key, CFSTR("product-name"), 0) == kCFCompareEqualTo ||
+                   CFStringCompare(key, CFSTR("model"), 0) == kCFCompareEqualTo ||
+                   CFStringCompare(key, CFSTR("compatible"), 0) == kCFCompareEqualTo) {
+            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
+                CFRelease(res);
+                const char *s = [gMachineIdObj UTF8String] ?: "iPhone17,2";
+                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)s, strlen(s) + 1);
+            }
+            if (res) CFRelease(res);
+            return gCFMachineId ? CFRetain(gCFMachineId) : NULL;
+        }
+    }
+    return res;
+}
+
+#pragma mark - Universal iPhone Lineup Spoofing Across NSDictionary, UILabel, NSAttributedString, JSON & WKWebView
 
 static NSRegularExpression *gIPhoneModelRegex = nil;
 
 static void ZTechInitRegexOnce(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSString *pattern = @"iPhone(?:\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|mini|\\(\\d+[a-z]*\\s*generation\\)|\\(\\d{4}\\)))?|\\d+,\\d+)";
+        NSString *pattern = @"iPhone(?:\\d+,\\d+|\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|Max|mini|\\(\\d+[a-z]*\\s*(?:generation|gen\\.?)\\)|\\(\\d{4}\\)))?)";
         gIPhoneModelRegex = [NSRegularExpression regularExpressionWithPattern:pattern
                                                                       options:NSRegularExpressionCaseInsensitive
                                                                         error:nil];
@@ -767,7 +802,7 @@ static inline NSString *ZTechReplaceIPhoneStringIfNeeded(NSString *input) {
         return [gIPhoneModelRegex stringByReplacingMatchesInString:input
                                                            options:0
                                                              range:NSMakeRange(0, input.length)
-                                                      withTemplate:targetModel];
+                                                        withTemplate:targetModel];
     }
     return input;
 }
@@ -784,11 +819,12 @@ static id swizzled_NSDict_objectForKey(id self, SEL _cmd, id aKey) {
     id val = orig_NSDict_objectForKey ? orig_NSDict_objectForKey(self, _cmd, aKey) : nil;
     if (val == nil && [aKey isKindOfClass:[NSString class]]) {
         NSString *k = (NSString *)aKey;
-        if ([k hasPrefix:@"iPhone17,"] || [k hasPrefix:@"iPhone16,"] || [k hasPrefix:@"iPhone15,"] || [k hasPrefix:@"iPhone14,"] || [k hasPrefix:@"iPhone12,"]) {
+        if ([k hasPrefix:@"iPhone"]) {
             // Check if this dictionary is a hardware machineId -> Marketing Name map
             if (orig_NSDict_objectForKey(self, _cmd, @"iPhone10,1") != nil ||
                 orig_NSDict_objectForKey(self, _cmd, @"iPhone11,2") != nil ||
-                orig_NSDict_objectForKey(self, _cmd, @"iPhone9,1") != nil) {
+                orig_NSDict_objectForKey(self, _cmd, @"iPhone9,1") != nil ||
+                orig_NSDict_objectForKey(self, _cmd, @"iPhone8,1") != nil) {
                 return gModelNameObj ?: @"iPhone 16 Pro Max";
             }
         }
@@ -807,15 +843,61 @@ static id swizzled_NSDict_objectForKeyedSubscript(id self, SEL _cmd, id aKey) {
     id val = orig_NSDict_objectForKeyedSubscript ? orig_NSDict_objectForKeyedSubscript(self, _cmd, aKey) : nil;
     if (val == nil && [aKey isKindOfClass:[NSString class]]) {
         NSString *k = (NSString *)aKey;
-        if ([k hasPrefix:@"iPhone17,"] || [k hasPrefix:@"iPhone16,"] || [k hasPrefix:@"iPhone15,"] || [k hasPrefix:@"iPhone14,"] || [k hasPrefix:@"iPhone12,"]) {
+        if ([k hasPrefix:@"iPhone"]) {
             if (orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone10,1") != nil ||
                 orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone11,2") != nil ||
-                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone9,1") != nil) {
+                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone9,1") != nil ||
+                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone8,1") != nil) {
                 return gModelNameObj ?: @"iPhone 16 Pro Max";
             }
         }
     }
     return val;
+}
+
+static NSString *ZTechGPUNameForMachine(NSString *machine) {
+    if (!machine || machine.length == 0) return @"Apple A18 Pro GPU";
+    if ([machine hasPrefix:@"iPhone17,1"] || [machine hasPrefix:@"iPhone17,2"]) return @"Apple A18 Pro GPU";
+    if ([machine hasPrefix:@"iPhone17,"]) return @"Apple A18 GPU";
+    if ([machine hasPrefix:@"iPhone16,"]) return @"Apple A17 Pro GPU";
+    if ([machine hasPrefix:@"iPhone15,2"] || [machine hasPrefix:@"iPhone15,3"]) return @"Apple A16 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone15,"]) return @"Apple A15 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone14,"]) return @"Apple A15 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone13,"]) return @"Apple A14 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone12,"]) return @"Apple A13 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone11,"]) return @"Apple A12 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone10,"]) return @"Apple A11 Bionic GPU";
+    if ([machine hasPrefix:@"iPhone9,"]) return @"Apple A10 Fusion GPU";
+    if ([machine hasPrefix:@"iPhone8,"]) return @"Apple A9 GPU";
+    return @"Apple A18 Pro GPU";
+}
+
+static NSString *(*orig_MTLDevice_name)(id, SEL) = NULL;
+static NSString *swizzled_MTLDevice_name(id self, SEL _cmd) {
+    return ZTechGPUNameForMachine(gMachineIdObj);
+}
+
+static NSString *(*orig_carrierName)(id, SEL) = NULL;
+static NSString *swizzled_carrierName(id self, SEL _cmd) {
+    return gCarrierNameObj ?: @"Viettel";
+}
+
+static NSString *(*orig_isoCountryCode)(id, SEL) = NULL;
+static NSString *swizzled_isoCountryCode(id self, SEL _cmd) {
+    return @"vn";
+}
+
+static NSString *(*orig_mobileCountryCode)(id, SEL) = NULL;
+static NSString *swizzled_mobileCountryCode(id self, SEL _cmd) {
+    return @"452";
+}
+
+static NSString *(*orig_mobileNetworkCode)(id, SEL) = NULL;
+static NSString *swizzled_mobileNetworkCode(id self, SEL _cmd) {
+    if ([gCarrierNameObj isEqualToString:@"MobiFone"]) return @"01";
+    if ([gCarrierNameObj isEqualToString:@"Vinaphone"]) return @"02";
+    if ([gCarrierNameObj isEqualToString:@"Vietnamobile"]) return @"05";
+    return @"04";
 }
 
 static NSString *(*orig_systemVersion)(id, SEL) = NULL;
@@ -978,10 +1060,14 @@ static id swizzled_WKWebView_initWithFrameConfig(id self, SEL _cmd, CGRect frame
                     }
 
                     NSString *safeModel = [(gModelNameObj ?: @"iPhone 16 Pro Max") stringByReplacingOccurrencesOfString:@"'" withString:@""];
+                    NSString *osVerUnderscore = [(gIosVersionObj ?: @"18.2.1") stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+                    NSString *customUA = [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148", osVerUnderscore];
                     NSString *js = [NSString stringWithFormat:
                         @"(function(){"
                         @"var m='%@';"
-                        @"var re=/iPhone(?:\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|mini))?|\\d+,\\d+)/gi;"
+                        @"var ua='%@';"
+                        @"try{Object.defineProperty(navigator,'userAgent',{get:function(){return ua;}});}catch(e){}"
+                        @"var re=/iPhone(?:\\d+,\\d+|\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|Max|mini|\\(\\d+[a-z]*\\s*(?:generation|gen\\.?)\\)|\\(\\d{4}\\)))?)/gi;"
                         @"function fix(){"
                         @"if(!document.body||!document.body.innerText||document.body.innerText.indexOf('iPhone')===-1)return;"
                         @"var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false),n;"
@@ -992,7 +1078,7 @@ static id swizzled_WKWebView_initWithFrameConfig(id self, SEL _cmd, CGRect frame
                         @"}"
                         @"}"
                         @"setTimeout(fix,150);setTimeout(fix,500);setInterval(fix,900);"
-                        @"})();", safeModel];
+                        @"})();", safeModel, customUA];
 
                     id s1 = ((id (*)(id, SEL))objc_msgSend)(usrScriptCls, allocSel);
                     if (s1 && [s1 respondsToSelector:initSel]) {
@@ -1003,7 +1089,13 @@ static id swizzled_WKWebView_initWithFrameConfig(id self, SEL _cmd, CGRect frame
             }
         }
     } @catch (NSException *e) {}
-    return orig_WKWebView_initWithFrameConfig ? orig_WKWebView_initWithFrameConfig(self, _cmd, frame, configuration) : nil;
+    id webView = orig_WKWebView_initWithFrameConfig ? orig_WKWebView_initWithFrameConfig(self, _cmd, frame, configuration) : nil;
+    if (webView && [webView respondsToSelector:sel_registerName("setCustomUserAgent:")]) {
+        NSString *osVerUnderscore = [(gIosVersionObj ?: @"18.2.1") stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+        NSString *customUA = [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148", osVerUnderscore];
+        ((void (*)(id, SEL, id))objc_msgSend)(webView, sel_registerName("setCustomUserAgent:"), customUA);
+    }
+    return webView;
 }
 
 #pragma mark - Safe Container Repair, Vault Snapshot/Restore & In-Process Reset
@@ -1508,7 +1600,55 @@ static void ZTechHookInit(void) {
             }
         }
 
-        // 3. Safe Mach-O Symbol Rebinding (Covers __got, __auth_got, __la_symbol_ptr, __nl_symbol_ptr)
+        // 3. GPU (Metal) & Carrier Swizzles
+        Class mtlDevCls = NSClassFromString(@"_MTLDevice");
+        if (!mtlDevCls) mtlDevCls = NSClassFromString(@"MTLDevice");
+        if (mtlDevCls) {
+            Method mGpu = class_getInstanceMethod(mtlDevCls, @selector(name));
+            if (mGpu) {
+                orig_MTLDevice_name = (void *)method_getImplementation(mGpu);
+                method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
+            }
+        }
+        void *raw_MTL = dlsym(RTLD_DEFAULT, "MTLCreateSystemDefaultDevice");
+        if (raw_MTL) {
+            id (*createDev)(void) = (id (*)(void))raw_MTL;
+            id dev = createDev();
+            if (dev) {
+                Class instCls = [dev class];
+                Method mGpu = class_getInstanceMethod(instCls, @selector(name));
+                if (mGpu && method_getImplementation(mGpu) != (IMP)swizzled_MTLDevice_name) {
+                    orig_MTLDevice_name = (void *)method_getImplementation(mGpu);
+                    method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
+                }
+            }
+        }
+
+        Class ctCarrierCls = NSClassFromString(@"CTCarrier");
+        if (ctCarrierCls) {
+            Method mCarrier = class_getInstanceMethod(ctCarrierCls, @selector(carrierName));
+            if (mCarrier) {
+                orig_carrierName = (void *)method_getImplementation(mCarrier);
+                method_setImplementation(mCarrier, (IMP)swizzled_carrierName);
+            }
+            Method mIso = class_getInstanceMethod(ctCarrierCls, @selector(isoCountryCode));
+            if (mIso) {
+                orig_isoCountryCode = (void *)method_getImplementation(mIso);
+                method_setImplementation(mIso, (IMP)swizzled_isoCountryCode);
+            }
+            Method mMcc = class_getInstanceMethod(ctCarrierCls, @selector(mobileCountryCode));
+            if (mMcc) {
+                orig_mobileCountryCode = (void *)method_getImplementation(mMcc);
+                method_setImplementation(mMcc, (IMP)swizzled_mobileCountryCode);
+            }
+            Method mMnc = class_getInstanceMethod(ctCarrierCls, @selector(mobileNetworkCode));
+            if (mMnc) {
+                orig_mobileNetworkCode = (void *)method_getImplementation(mMnc);
+                method_setImplementation(mMnc, (IMP)swizzled_mobileNetworkCode);
+            }
+        }
+
+        // 4. Safe Mach-O Symbol Rebinding (Covers __got, __auth_got, __la_symbol_ptr, __nl_symbol_ptr)
         void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
         void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
         void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
@@ -1517,6 +1657,7 @@ static void ZTechHookInit(void) {
         void *raw_CFProxiesForURL = dlsym(RTLD_DEFAULT, "CFNetworkCopyProxiesForURL");
         void *raw_CFStreamSocket = dlsym(RTLD_DEFAULT, "CFStreamCreatePairWithSocketToHost");
         void *raw_getifaddrs = dlsym(RTLD_DEFAULT, "getifaddrs");
+        void *raw_IORegistry = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
 
         orig_uname = raw_uname;
         orig_sysctlbyname = raw_sysctlbyname;
@@ -1526,6 +1667,9 @@ static void ZTechHookInit(void) {
         orig_CFNetworkCopyProxiesForURL = raw_CFProxiesForURL;
         orig_CFStreamCreatePairWithSocketToHost = raw_CFStreamSocket;
         orig_getifaddrs = raw_getifaddrs;
+        if (raw_IORegistry) {
+            orig_IORegistryEntryCreateCFProperty = raw_IORegistry;
+        }
 
         gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
         gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};
@@ -1536,6 +1680,9 @@ static void ZTechHookInit(void) {
         gRebindings[6] = (struct zt_rebinding){"CFStreamCreatePairWithSocketToHost", (void *)hooked_CFStreamCreatePairWithSocketToHost, raw_CFStreamSocket};
         gRebindings[7] = (struct zt_rebinding){"getifaddrs", (void *)hooked_getifaddrs, raw_getifaddrs};
         gRebindingsCount = 8;
+        if (raw_IORegistry) {
+            gRebindings[gRebindingsCount++] = (struct zt_rebinding){"IORegistryEntryCreateCFProperty", (void *)hooked_IORegistryEntryCreateCFProperty, raw_IORegistry};
+        }
 
         _dyld_register_func_for_add_image(rebind_symbols_for_image);
     }

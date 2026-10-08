@@ -2,7 +2,7 @@
 #import <UIKit/UIKit.h>
 
 typedef NS_ENUM(NSInteger, ZTechModelTierFilter) {
-    ZTechModelTierAll = 0,        // iPhone 8 -> iPhone 16 Pro Max
+    ZTechModelTierAll = 0,        // iPhone 6s/SE -> iPhone 16 Pro Max (37 models)
     ZTechModelTierHighEnd = 1,    // iPhone 14 -> iPhone 16 Pro Max
     ZTechModelTierIPhone16 = 2    // Only iPhone 16 / 16 Plus / 16 Pro / 16 Pro Max / 16e
 };

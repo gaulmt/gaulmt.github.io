@@ -1431,10 +1431,7 @@ static void ZTechHookInit(void) {
             return;
         }
 
-        // Matches any iPhone marketing name (iPhone 6..16 Pro Max) OR raw machine ID (iPhone9,3 / iPhone17,2)
-        gIPhoneModelRegex = [NSRegularExpression regularExpressionWithPattern:@"iPhone(?:\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|mini))?|\\d+,\\d+)"
-                                                                      options:NSRegularExpressionCaseInsensitive
-                                                                        error:nil];
+        ZTechInitRegexOnce();
 
         ZTechLoadProfileOnce();
         ZTechCheckAndPerformInAppReset(bundleId);

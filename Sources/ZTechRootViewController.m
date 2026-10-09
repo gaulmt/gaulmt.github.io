@@ -2720,27 +2720,34 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [gen impactOccurred];
 
-    self.currentProfile = [ZTechDeviceDatabase generateProfileWithLockRealModel:self.lockModelSwitch.isOn
-                                                                     sameScreen:self.sameScreenSwitch.isOn
-                                                                      matchChip:self.matchChipSwitch.isOn
-                                                                      modelTier:self.currentModelTier
-                                                                    currentCity:self.currentProfile.city];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    [self showLoadingWithTitle:@"ĐANG ĐỔI THIẾT BỊ" subtitle:@"Đang tạo cấu hình máy ảo & đồng bộ phần cứng..."];
+
+    BOOL lockOn = self.lockModelSwitch.isOn;
+    BOOL screenOn = self.sameScreenSwitch.isOn;
+    BOOL chipOn = self.matchChipSwitch.isOn;
+    ZTechModelTierFilter tier = self.currentModelTier;
+    NSString *city = self.currentProfile.city;
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        ZTechDeviceProfile *newProf = [ZTechDeviceDatabase generateProfileWithLockRealModel:lockOn
+                                                                                 sameScreen:screenOn
+                                                                                  matchChip:chipOn
+                                                                                  modelTier:tier
+                                                                                currentCity:city];
         [ZTechVaultManager killZaloProcess];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self hideLoadingOverlayAfterDelay:0.12];
+            self.currentProfile = newProf;
+            [self refreshUIWithCurrentProfile];
+            [self showToast:[NSString stringWithFormat:@"Đã đổi sang: %@ (iOS %@)", newProf.modelName, newProf.iosVersion] isError:NO];
+            if (self.respringSwitch.isOn) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [ZTechDeviceDatabase performRespringIfPossible];
+                });
+            }
+        });
     });
-    [UIView transitionWithView:self.tabFeaturesStack
-                      duration:0.18
-                       options:UIViewAnimationOptionTransitionCrossDissolve
-                    animations:^{
-        [self refreshUIWithCurrentProfile];
-    } completion:^(BOOL finished) {
-        [self showToast:[NSString stringWithFormat:@"Đã đổi sang: %@ (iOS %@)", self.currentProfile.modelName, self.currentProfile.iosVersion] isError:NO];
-        if (self.respringSwitch.isOn) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [ZTechDeviceDatabase performRespringIfPossible];
-            });
-        }
-    }];
 }
 
 - (void)onTapCleanReset {

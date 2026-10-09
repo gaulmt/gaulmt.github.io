@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.3
+Version: 5.4.4
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.3 - Universal Multi-Container Sync + Native IOKit/BoardID/Sysctl Benchmark Spoof
+Description: gaulmt -Tech v5.4.4 - Instant Vault Restore + Anti-Crash Keychain SafeGuard
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

@@ -467,7 +467,10 @@ extern char **environ;
         [fm createDirectoryAtPath:dstDir withIntermediateDirectories:YES attributes:nil error:nil];
         if (fixOwner) {
             chown([dstDir UTF8String], 501, 501);
+            chmod([dstDir UTF8String], 0777);
         }
+    } else if (fixOwner) {
+        chown([dstDir UTF8String], 501, 501);
         chmod([dstDir UTF8String], 0777);
     }
 
@@ -492,7 +495,11 @@ extern char **environ;
         [fm copyItemAtPath:srcPath toPath:dstPath error:nil];
 
         if (fixOwner) {
-            [self recursivelyFixMobileOwnershipAtPath:dstPath fileManager:fm];
+            chown([dstPath UTF8String], 501, 501);
+            BOOL isDir = NO;
+            if ([fm fileExistsAtPath:dstPath isDirectory:&isDir] && isDir) {
+                chmod([dstPath UTF8String], 0777);
+            }
         }
     }
 }
@@ -502,16 +509,6 @@ extern char **environ;
     BOOL isDir = NO;
     if ([fm fileExistsAtPath:path isDirectory:&isDir] && isDir) {
         chmod([path UTF8String], 0777);
-        NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:path];
-        NSString *relPath = nil;
-        while ((relPath = [enumerator nextObject])) {
-            NSString *full = [path stringByAppendingPathComponent:relPath];
-            lchown([full UTF8String], 501, 501);
-            BOOL subDir = NO;
-            if ([fm fileExistsAtPath:full isDirectory:&subDir]) {
-                chmod([full UTF8String], subDir ? 0777 : 0666);
-            }
-        }
     } else {
         chmod([path UTF8String], 0666);
     }
@@ -703,6 +700,10 @@ extern char **environ;
 
     // 6. Write restore trigger & active profile directly into Zalo Documents so ZTechHook.dylib imports them inside sandbox
     NSString *docsDir = [zaloContainer stringByAppendingPathComponent:@"Documents"];
+    [fm createDirectoryAtPath:docsDir withIntermediateDirectories:YES attributes:nil error:nil];
+    chown([docsDir UTF8String], 501, 501);
+    chmod([docsDir UTF8String], 0777);
+
     NSString *triggerFile = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
     [account.accountId writeToFile:triggerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
     chown([triggerFile UTF8String], 501, 501);
@@ -725,8 +726,11 @@ extern char **environ;
         lchown([globalPrefsLink UTF8String], 501, 501);
     }
 
+    // Flush dirty buffers to filesystem before launching Zalo
+    sync();
+
     // 7. Launch Zalo automatically!
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self launchZaloApp];
     });
 

@@ -1307,6 +1307,9 @@ static void ZTechSnapshotZaloKeychainAndPrefsAsync(NSString *bundleId) {
                                 [item[(__bridge id)kSecAttrGeneric] isKindOfClass:[NSString class]]) {
                                 entry[@"gena"] = item[(__bridge id)kSecAttrGeneric];
                             }
+                            if ([item[(__bridge id)kSecAttrAccessGroup] isKindOfClass:[NSString class]]) {
+                                entry[@"agrp"] = item[(__bridge id)kSecAttrAccessGroup];
+                            }
                             if ([item[(__bridge id)kSecValueData] isKindOfClass:[NSData class]]) {
                                 entry[@"v_Data"] = item[(__bridge id)kSecValueData];
                             }
@@ -1325,14 +1328,14 @@ static void ZTechSnapshotZaloKeychainAndPrefsAsync(NSString *bundleId) {
     });
 }
 
-static void ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
+static BOOL ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
     @try {
         NSString *home = NSHomeDirectory();
         NSString *docsDir = [home stringByAppendingPathComponent:@"Documents"];
         NSString *triggerFile = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
         NSFileManager *fm = [NSFileManager defaultManager];
         if (![fm fileExistsAtPath:triggerFile]) {
-            return;
+            return NO;
         }
 
         [fm removeItemAtPath:triggerFile error:nil];
@@ -1342,6 +1345,7 @@ static void ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
             NSString *globalToken = [(__bridge NSString *)cfToken copy];
             NSString *tokenFile = [docsDir stringByAppendingPathComponent:@"_zt_last_reset_token.txt"];
             [globalToken writeToFile:tokenFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            chmod([tokenFile UTF8String], 0666);
         }
         if (cfToken) CFRelease(cfToken);
 
@@ -1354,7 +1358,7 @@ static void ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
 
         NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
         NSArray *savedKc = [NSArray arrayWithContentsOfFile:kcSnapPath];
-        if (savedKc && [savedKc isKindOfClass:[NSArray class]]) {
+        if (savedKc && [savedKc isKindOfClass:[NSArray class]] && savedKc.count > 0) {
             NSArray *secClasses = @[
                 (__bridge id)kSecClassGenericPassword,
                 (__bridge id)kSecClassInternetPassword
@@ -1375,10 +1379,14 @@ static void ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
                 if (entry[@"acct"]) addItem[(__bridge id)kSecAttrAccount] = entry[@"acct"];
                 if (entry[@"svce"]) addItem[(__bridge id)kSecAttrService] = entry[@"svce"];
                 if (entry[@"gena"]) addItem[(__bridge id)kSecAttrGeneric] = entry[@"gena"];
+                if (entry[@"agrp"]) addItem[(__bridge id)kSecAttrAccessGroup] = entry[@"agrp"];
                 SecItemAdd((__bridge CFDictionaryRef)addItem, NULL);
             }
         }
-    } @catch (NSException *e) {}
+        return YES;
+    } @catch (NSException *e) {
+        return NO;
+    }
 }
 
 static void ZTechWipeSubfolderContentsOnly(NSString *folderPath) {
@@ -1420,7 +1428,10 @@ static void ZTechCheckAndPerformInAppReset(NSString *bundleId) {
             chmod([markerPath UTF8String], 0666);
         }
 
-        ZTechCheckAndPerformInAppRestore(bundleId);
+        // If this launch is an account restore from Vault, apply restore and NEVER wipe!
+        if (ZTechCheckAndPerformInAppRestore(bundleId)) {
+            return;
+        }
 
         CFTypeRef cfToken = CFPreferencesCopyAppValue(CFSTR("ZTechResetToken"), kCFPreferencesAnyApplication);
         NSString *globalToken = nil;

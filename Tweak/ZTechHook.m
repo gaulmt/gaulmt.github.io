@@ -726,6 +726,8 @@ static void ZTechHookInit(void) {
             if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
             if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
             if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
             if (hElle) {
                 pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
             }

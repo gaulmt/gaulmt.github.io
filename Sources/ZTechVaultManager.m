@@ -467,7 +467,14 @@ extern char **environ;
     if (!cpath) return;
 
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray<NSString *> *chownBins = @[@"/usr/sbin/chown", @"/bin/chown", @"/var/jb/usr/sbin/chown", @"/var/jb/bin/chown"];
+    NSArray<NSString *> *chownBins = @[
+        @"/usr/sbin/chown",
+        @"/usr/bin/chown",
+        @"/bin/chown",
+        @"/var/jb/usr/sbin/chown",
+        @"/var/jb/usr/bin/chown",
+        @"/var/jb/bin/chown"
+    ];
     for (NSString *bin in chownBins) {
         if ([fm isExecutableFileAtPath:bin]) {
             pid_t pid;

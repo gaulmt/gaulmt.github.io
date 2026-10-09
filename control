@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.7
+Version: 5.4.8
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.7 - Instant Vault Restore & Purge Dyld SecItem Hangs
+Description: gaulmt -Tech v5.4.8 - Fix Triet De Zalo Crash Phiên Mới & PAC Native ElleKit
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

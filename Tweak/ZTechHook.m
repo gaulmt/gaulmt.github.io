@@ -26,199 +26,6 @@
 #import <ptrauth.h>
 #endif
 
-#pragma mark - Safe Embedded Fishhook (Supports Chained Fixups __got + Lazy/Non-Lazy Symbol Pointers)
-
-#ifdef __LP64__
-typedef struct mach_header_64 mach_header_t;
-typedef struct segment_command_64 segment_command_t;
-typedef struct section_64 section_t;
-typedef struct nlist_64 nlist_t;
-#define LC_SEGMENT_ARCH_DEPENDENT LC_SEGMENT_64
-#else
-typedef struct mach_header mach_header_t;
-typedef struct segment_command segment_command_t;
-typedef struct section section_t;
-typedef struct nlist nlist_t;
-#define LC_SEGMENT_ARCH_DEPENDENT LC_SEGMENT
-#endif
-
-#ifndef SEG_DATA_CONST
-#define SEG_DATA_CONST "__DATA_CONST"
-#endif
-
-#ifndef SEG_AUTH_CONST
-#define SEG_AUTH_CONST "__AUTH_CONST"
-#endif
-
-struct zt_rebinding {
-    const char *name;
-    void *replacement;
-    void *raw_target;
-};
-
-static struct zt_rebinding gRebindings[20];
-static size_t gRebindingsCount = 0;
-
-static inline uintptr_t zt_strip_ptr(const void *p) {
-    return ((uintptr_t)p) & 0x0000000FFFFFFFFFULL;
-}
-
-static void perform_rebinding_with_section(section_t *section,
-                                           intptr_t slide,
-                                           nlist_t *symtab,
-                                           char *strtab,
-                                           uint32_t *indirect_symtab,
-                                           uint32_t nindirectsyms,
-                                           BOOL allowSymbolTableIndexMatch) {
-    if (section->size < sizeof(void *)) return;
-    void **indirect_symbol_bindings = (void **)((uintptr_t)slide + section->addr);
-
-    vm_address_t page_start = (vm_address_t)indirect_symbol_bindings & ~(vm_address_t)(PAGE_SIZE - 1);
-    vm_size_t page_len = (((vm_address_t)indirect_symbol_bindings + section->size) - page_start + PAGE_SIZE - 1) & ~(vm_size_t)(PAGE_SIZE - 1);
-    kern_return_t kr = vm_protect(mach_task_self(), page_start, page_len, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
-    if (kr != KERN_SUCCESS) {
-        kr = vm_protect(mach_task_self(), page_start, page_len, FALSE, VM_PROT_READ | VM_PROT_WRITE);
-        if (kr != KERN_SUCCESS) {
-            return;
-        }
-    }
-
-    uint32_t *indirect_symbol_indices = (allowSymbolTableIndexMatch && indirect_symtab && section->reserved1 < nindirectsyms)
-        ? (indirect_symtab + section->reserved1)
-        : NULL;
-
-    uint count = (uint)(section->size / sizeof(void *));
-    for (uint i = 0; i < count; i++) {
-        void *cur_ptr = indirect_symbol_bindings[i];
-        uintptr_t cur_stripped = zt_strip_ptr(cur_ptr);
-        BOOL rebound = NO;
-
-        // 1. Direct resolved pointer match (safe for S_REGULAR __got / __auth_got in LC_DYLD_CHAINED_FIXUPS)
-        if (cur_stripped != 0) {
-            for (size_t j = 0; j < gRebindingsCount; j++) {
-                if (gRebindings[j].raw_target != NULL &&
-                    cur_stripped == zt_strip_ptr(gRebindings[j].raw_target) &&
-                    cur_stripped != zt_strip_ptr(gRebindings[j].replacement)) {
-#if __has_feature(ptrauth_calls)
-                    indirect_symbol_bindings[i] = ptrauth_sign_unauthenticated(gRebindings[j].replacement, ptrauth_key_function_pointer, 0);
-#else
-                    indirect_symbol_bindings[i] = gRebindings[j].replacement;
-#endif
-                    rebound = YES;
-                    break;
-                }
-            }
-        }
-        if (rebound || !allowSymbolTableIndexMatch) continue;
-
-        // 2. Classic indirect symbol table match (strictly only for S_LAZY_SYMBOL_POINTERS & S_NON_LAZY_SYMBOL_POINTERS)
-        if (indirect_symbol_indices && symtab && strtab && (section->reserved1 + i) < nindirectsyms) {
-            uint32_t symtab_index = indirect_symbol_indices[i];
-            if (symtab_index == INDIRECT_SYMBOL_ABS || symtab_index == INDIRECT_SYMBOL_LOCAL ||
-                symtab_index == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS)) {
-                continue;
-            }
-            uint32_t strtab_offset = symtab[symtab_index].n_un.n_strx;
-            char *symbol_name = strtab + strtab_offset;
-            if (symbol_name[0] == '\0') continue;
-            for (size_t j = 0; j < gRebindingsCount; j++) {
-                if (strcmp(&symbol_name[1], gRebindings[j].name) == 0) {
-#if __has_feature(ptrauth_calls)
-                    indirect_symbol_bindings[i] = ptrauth_sign_unauthenticated(gRebindings[j].replacement, ptrauth_key_function_pointer, 0);
-#else
-                    indirect_symbol_bindings[i] = gRebindings[j].replacement;
-#endif
-                    break;
-                }
-            }
-        }
-    }
-}
-
-static void rebind_symbols_for_image(const struct mach_header *header, intptr_t slide) {
-    Dl_info info;
-    if (dladdr(header, &info) == 0 || !info.dli_fname) return;
-
-    // Never rebind our own tweak or low-level libsystem/dyld/objc/CoreFoundation images
-    if (strstr(info.dli_fname, "ZTechHook") != NULL ||
-        strstr(info.dli_fname, "libsystem") != NULL ||
-        strstr(info.dli_fname, "libdyld") != NULL ||
-        strstr(info.dli_fname, "libobjc") != NULL ||
-        strstr(info.dli_fname, "CoreFoundation") != NULL ||
-        strstr(info.dli_fname, "libMobileGestalt") != NULL) {
-        return;
-    }
-
-    // Rebind app binary, embedded frameworks, and high-level UIKit/WebKit/CFNetwork frameworks
-    BOOL isAppImage = (strstr(info.dli_fname, "/Application/") != NULL ||
-                       strstr(info.dli_fname, "/Applications/") != NULL ||
-                       strstr(info.dli_fname, "Zalo") != NULL ||
-                       strstr(info.dli_fname, "aida64") != NULL ||
-                       strstr(info.dli_fname, "AIDA64") != NULL);
-    BOOL isTargetSysFramework = (strstr(info.dli_fname, "/UIKit") != NULL ||
-                                 strstr(info.dli_fname, "/WebKit") != NULL ||
-                                 strstr(info.dli_fname, "/CFNetwork") != NULL);
-    if (!isAppImage && !isTargetSysFramework) {
-        return;
-    }
-
-    segment_command_t *cur_seg_cmd;
-    segment_command_t *linkedit_segment = NULL;
-    struct symtab_command *symtab_cmd = NULL;
-    struct dysymtab_command *dysymtab_cmd = NULL;
-
-    uintptr_t cur = (uintptr_t)header + sizeof(mach_header_t);
-    for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
-        cur_seg_cmd = (segment_command_t *)cur;
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-            if (strcmp(cur_seg_cmd->segname, SEG_LINKEDIT) == 0) {
-                linkedit_segment = cur_seg_cmd;
-            }
-        } else if (cur_seg_cmd->cmd == LC_SYMTAB) {
-            symtab_cmd = (struct symtab_command *)cur_seg_cmd;
-        } else if (cur_seg_cmd->cmd == LC_DYSYMTAB) {
-            dysymtab_cmd = (struct dysymtab_command *)cur_seg_cmd;
-        }
-    }
-
-    nlist_t *symtab = NULL;
-    char *strtab = NULL;
-    uint32_t *indirect_symtab = NULL;
-    uint32_t nindirectsyms = 0;
-
-    if (symtab_cmd && dysymtab_cmd && linkedit_segment && dysymtab_cmd->nindirectsyms > 0) {
-        uintptr_t linkedit_base = (uintptr_t)slide + linkedit_segment->vmaddr - linkedit_segment->fileoff;
-        symtab = (nlist_t *)(linkedit_base + symtab_cmd->symoff);
-        strtab = (char *)(linkedit_base + symtab_cmd->stroff);
-        indirect_symtab = (uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
-        nindirectsyms = dysymtab_cmd->nindirectsyms;
-    }
-
-    cur = (uintptr_t)header + sizeof(mach_header_t);
-    for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
-        cur_seg_cmd = (segment_command_t *)cur;
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-            if (strcmp(cur_seg_cmd->segname, SEG_DATA) != 0 &&
-                strcmp(cur_seg_cmd->segname, SEG_DATA_CONST) != 0 &&
-                strcmp(cur_seg_cmd->segname, SEG_AUTH_CONST) != 0) {
-                continue;
-            }
-            for (uint j = 0; j < cur_seg_cmd->nsects; j++) {
-                section_t *sect = (section_t *)(cur + sizeof(segment_command_t)) + j;
-                uint32_t flags = sect->flags & SECTION_TYPE;
-                BOOL isSymPtrSect = (flags == S_LAZY_SYMBOL_POINTERS || flags == S_NON_LAZY_SYMBOL_POINTERS);
-                BOOL isChainedGotSect = (strncmp(sect->sectname, "__got", 5) == 0 ||
-                                         strncmp(sect->sectname, "__auth_got", 10) == 0 ||
-                                         strncmp(sect->sectname, "__la_symbol_ptr", 15) == 0 ||
-                                         strncmp(sect->sectname, "__nl_symbol_ptr", 15) == 0);
-                if (isSymPtrSect || isChainedGotSect) {
-                    perform_rebinding_with_section(sect, slide, symtab, strtab, indirect_symtab, nindirectsyms, isSymPtrSect);
-                }
-            }
-        }
-    }
-}
-
 #pragma mark - Lock-Free Pre-Cached Profile, Pure C Buffers & Pre-Parsed Proxy State
 
 static NSDictionary *gCachedProfile = nil;
@@ -233,11 +40,7 @@ static NSString *gCarrierNameObj = @"Viettel";
 static NSString *gActiveProxyObj = @"";
 static float gBatteryFloat = 0.76f;
 
-// Pre-created CFStringRefs for 100% Lock-Free MGCopyAnswer
-static CFStringRef gCFMachineId = NULL;
-static CFStringRef gCFModelName = NULL;
-static CFStringRef gCFIosVersion = NULL;
-static CFStringRef gCFUuid = NULL;
+
 
 // Pre-cached Proxy Structures for Zero-Latency / Zero-Leak Networking Enforcement
 static volatile int gProxyEnabled = 0;
@@ -459,15 +262,6 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     NSInteger pct = [prof[@"batteryPercent"] integerValue];
     gBatteryFloat = (pct > 0 && pct <= 100) ? ((float)pct / 100.0f) : 0.76f;
 
-    if (gCFMachineId) CFRelease(gCFMachineId);
-    if (gCFModelName) CFRelease(gCFModelName);
-    if (gCFIosVersion) CFRelease(gCFIosVersion);
-    if (gCFUuid) CFRelease(gCFUuid);
-
-    gCFMachineId = CFStringCreateWithCString(kCFAllocatorDefault, [gMachineIdObj UTF8String], kCFStringEncodingUTF8);
-    gCFModelName = CFStringCreateWithCString(kCFAllocatorDefault, [gModelNameObj UTF8String], kCFStringEncodingUTF8);
-    gCFIosVersion = CFStringCreateWithCString(kCFAllocatorDefault, [gIosVersionObj UTF8String], kCFStringEncodingUTF8);
-    gCFUuid = CFStringCreateWithCString(kCFAllocatorDefault, [gUuidObj UTF8String], kCFStringEncodingUTF8);
 
     ZTechRebuildCachedProxyState(gActiveProxyObj);
 }
@@ -560,7 +354,7 @@ static NSString *ZTechBoardIdForMachine(NSString *m) {
 
 static int (*orig_uname)(struct utsname *buf) = NULL;
 static int hooked_uname(struct utsname *buf) {
-    int ret = orig_uname ? orig_uname(buf) : 0;
+    int ret = orig_uname ? orig_uname(buf) : uname(buf);
     if (buf != NULL) {
         strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
         buf->machine[sizeof(buf->machine) - 1] = '\0';
@@ -634,133 +428,11 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
-static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name != NULL && namelen == 2 && name[0] == CTL_HW) {
-        if (name[1] == HW_MACHINE) {
-            size_t len = strlen(gMachineCStr) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gMachineCStr, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
-        } else if (name[1] == HW_MODEL) {
-            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
-            const char *board = [b UTF8String] ?: "D94AP";
-            size_t len = strlen(board) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, board, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
-        } else if (name[1] == HW_MEMSIZE) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
-                    memcpy(oldp, &gRamBytes, copyLen);
-                }
-                *oldlenp = sizeof(uint64_t);
-                return 0;
-            }
-        } else if (name[1] == HW_PHYSMEM) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    if (*oldlenp >= sizeof(uint64_t)) {
-                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
-                        *oldlenp = sizeof(uint64_t);
-                    } else {
-                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
-                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
-                        memcpy(oldp, &ram32, copyLen);
-                        *oldlenp = sizeof(uint32_t);
-                    }
-                } else {
-                    *oldlenp = sizeof(uint64_t);
-                }
-                return 0;
-            }
-        } else if (name[1] == HW_NCPU) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    int cores = 6;
-                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
-                    memcpy(oldp, &cores, copyLen);
-                }
-                *oldlenp = sizeof(int);
-                return 0;
-            }
-        }
-    }
-    return orig_sysctl ? orig_sysctl(name, namelen, oldp, oldlenp, newp, newlen) : -1;
-}
 
-static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef prop) = NULL;
-static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
-    if (prop != NULL && CFGetTypeID(prop) == CFStringGetTypeID()) {
-        if (CFStringCompare(prop, CFSTR("ProductType"), 0) == kCFCompareEqualTo) {
-            if (gCFMachineId) return CFRetain(gCFMachineId);
-        } else if (CFStringCompare(prop, CFSTR("HWModelStr"), 0) == kCFCompareEqualTo) {
-            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
-            CFStringRef cfBoard = CFStringCreateWithCString(kCFAllocatorDefault, [b UTF8String] ?: "D94AP", kCFStringEncodingUTF8);
-            if (cfBoard) return cfBoard;
-            if (gCFMachineId) return CFRetain(gCFMachineId);
-        } else if (CFStringCompare(prop, CFSTR("MarketingName"), 0) == kCFCompareEqualTo ||
-                   CFStringCompare(prop, CFSTR("DeviceName"), 0) == kCFCompareEqualTo ||
-                   CFStringCompare(prop, CFSTR("UserAssignedDeviceName"), 0) == kCFCompareEqualTo) {
-            if (gCFModelName) return CFRetain(gCFModelName);
-        } else if (CFStringCompare(prop, CFSTR("ProductVersion"), 0) == kCFCompareEqualTo) {
-            if (gCFIosVersion) return CFRetain(gCFIosVersion);
-        } else if (CFStringCompare(prop, CFSTR("UniqueDeviceID"), 0) == kCFCompareEqualTo) {
-            if (gCFUuid) return CFRetain(gCFUuid);
-        }
-    }
-    return orig_MGCopyAnswer ? orig_MGCopyAnswer(prop) : NULL;
-}
 
-static CFTypeRef (*orig_IORegistryEntryCreateCFProperty)(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) = NULL;
-static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
-    CFTypeRef res = orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
-    if (key != NULL && CFGetTypeID(key) == CFStringGetTypeID()) {
-        if (CFStringCompare(key, CFSTR("IOPlatformSerialNumber"), 0) == kCFCompareEqualTo) {
-            if (res) CFRelease(res);
-            return gCFUuid ? CFRetain(gCFUuid) : NULL;
-        } else if (CFStringCompare(key, CFSTR("serial-number"), 0) == kCFCompareEqualTo) {
-            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
-                CFRelease(res);
-                const char *s = [gUuidObj UTF8String] ?: "F17X890ABCDE";
-                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)s, strlen(s) + 1);
-            }
-            if (res) CFRelease(res);
-            return gCFUuid ? CFRetain(gCFUuid) : NULL;
-        } else if (CFStringCompare(key, CFSTR("product-name"), 0) == kCFCompareEqualTo ||
-                   CFStringCompare(key, CFSTR("model"), 0) == kCFCompareEqualTo ||
-                   CFStringCompare(key, CFSTR("compatible"), 0) == kCFCompareEqualTo) {
-            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
-                CFRelease(res);
-                const char *s = [gMachineIdObj UTF8String] ?: "iPhone17,2";
-                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)s, strlen(s) + 1);
-            }
-            if (res) CFRelease(res);
-            return gCFMachineId ? CFRetain(gCFMachineId) : NULL;
-        } else if (CFStringCompare(key, CFSTR("board-id"), 0) == kCFCompareEqualTo) {
-            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
-            const char *board = [b UTF8String] ?: "D94AP";
-            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
-                CFRelease(res);
-                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)board, strlen(board) + 1);
-            }
-            if (res) CFRelease(res);
-            return CFStringCreateWithCString(kCFAllocatorDefault, board, kCFStringEncodingUTF8);
-        }
-    }
-    return res;
-}
+
+
+
 
 static NSString *ZTechGPUNameForMachine(NSString *machine) {
     if (!machine || machine.length == 0) return @"Apple A18 Pro GPU";
@@ -1046,21 +718,7 @@ static void ZTechHookInit(void) {
             }
         }
 
-        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname, sysctl, MGCopyAnswer, IORegistryEntryCreateCFProperty)
-        void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
-        void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
-        void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
-        void *raw_MGCopyAnswer = dlsym(RTLD_DEFAULT, "MGCopyAnswer");
-        void *raw_IORegistry = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
-
-        orig_uname = raw_uname;
-        orig_sysctlbyname = raw_sysctlbyname;
-        orig_sysctl = raw_sysctl;
-        orig_MGCopyAnswer = raw_MGCopyAnswer;
-        if (raw_IORegistry) {
-            orig_IORegistryEntryCreateCFProperty = raw_IORegistry;
-        }
-
+        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname via ElleKit / Substrate)
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
         zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
         if (!pMSHook) {
@@ -1073,22 +731,10 @@ static void ZTechHookInit(void) {
             }
         }
         if (pMSHook) {
+            void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
+            void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
             if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
             if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
-            if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
-            if (raw_MGCopyAnswer) pMSHook(raw_MGCopyAnswer, (void *)hooked_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
-            if (raw_IORegistry) pMSHook(raw_IORegistry, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
-        } else {
-            gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
-            gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};
-            gRebindings[2] = (struct zt_rebinding){"sysctl", (void *)hooked_sysctl, raw_sysctl};
-            gRebindings[3] = (struct zt_rebinding){"MGCopyAnswer", (void *)hooked_MGCopyAnswer, raw_MGCopyAnswer};
-            gRebindingsCount = 4;
-            if (raw_IORegistry) {
-                gRebindings[gRebindingsCount++] = (struct zt_rebinding){"IORegistryEntryCreateCFProperty", (void *)hooked_IORegistryEntryCreateCFProperty, raw_IORegistry};
-            }
-
-            _dyld_register_func_for_add_image(rebind_symbols_for_image);
         }
     }
 }

@@ -578,7 +578,9 @@ extern char **environ;
             }
         }
         [self repairContainerStructureAtPath:containerPath fileManager:fm];
+        [ZTechVaultManager runFastChownAndChmod:containerPath];
     }
+    sync();
 
     NSString *dir = [self storageDirectoryPath];
     NSArray *files = [fm contentsOfDirectoryAtPath:dir error:nil];

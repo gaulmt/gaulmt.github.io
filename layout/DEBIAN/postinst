@@ -5,6 +5,16 @@ mkdir -p /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShare
 chmod 0777 /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShared >/dev/null 2>&1 || true
 chmod 0755 /usr/bin/ztech-diag /var/jb/usr/bin/ztech-diag >/dev/null 2>&1 || true
 
+if [ -d "/var/jb/Library/MobileSubstrate/DynamicLibraries" ]; then
+    mkdir -p /var/jb/usr/lib/TweakInject >/dev/null 2>&1 || true
+    for F in /var/jb/Library/MobileSubstrate/DynamicLibraries/*; do
+        if [ -f "$F" ]; then
+            BASE=$(basename "$F")
+            ln -sf "$F" "/var/jb/usr/lib/TweakInject/$BASE" >/dev/null 2>&1 || true
+        fi
+    done
+fi
+
 # Auto-repair any app data containers (e.g., Zalo) whose subdirectories or permissions were affected
 for ROOT_DIR in "/var/mobile/Containers/Data/Application" "/var/mobile/Containers/Shared/AppGroup"; do
     if [ -d "$ROOT_DIR" ]; then

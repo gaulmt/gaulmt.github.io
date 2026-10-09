@@ -59,6 +59,7 @@ jobs:
           cp control control.bak
           sed -i '' 's/^Package: com.ztech.devicechanger/Package: com.ztech.devicechanger.rootless/' control
           sed -i '' 's/^Name: gaulmt -Tech/Name: gaulmt -Tech (Rootless)/' control
+          sed -i '' 's/^Depends: .*/Depends: firmware (>= 12.0), ellekit/' control
           chmod 0755 layout/DEBIAN/postinst
           rm -rf packages .theos
           make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless

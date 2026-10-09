@@ -115,10 +115,19 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         [outStr appendFormat:@"  * %@: %@\n", hl, ex ? @"[TỒN TẠI - OK]" : @"[Không có]"];
     }
 
+    if (hasVarJb && ![fm fileExistsAtPath:@"/var/jb/usr/lib/libellekit.dylib"] && ![fm fileExistsAtPath:@"/var/jb/usr/lib/libsubstrate.dylib"]) {
+        [outStr appendString:@"\n  ⚠️ CẢNH BÁO QUAN TRỌNG:\n"];
+        [outStr appendString:@"  Máy đang Jailbreak Dopamine nhưng CHƯA CÀI ĐẶT THƯ VIỆN 'ElleKit'!\n"];
+        [outStr appendString:@"  ➜ Nguyên nhân AIDA64 và Zalo chưa nhận fake là do máy thiếu ElleKit.\n"];
+        [outStr appendString:@"  ➜ KHẮC PHỤC: Mở Sileo, tìm kiếm gói 'ElleKit' ➜ Cài đặt rồi Respring là 100% HOẠT ĐỘNG NGAY!\n\n"];
+    }
+
     // Tweak dylib & plist
     NSArray<NSString *> *tweakPaths = @[
         @"/var/jb/usr/lib/TweakInject/ZTechHook.dylib",
         @"/var/jb/usr/lib/TweakInject/ZTechHook.plist",
+        @"/var/jb/Library/MobileSubstrate/DynamicLibraries/ZTechHook.dylib",
+        @"/var/jb/Library/MobileSubstrate/DynamicLibraries/ZTechHook.plist",
         @"/Library/MobileSubstrate/DynamicLibraries/ZTechHook.dylib",
         @"/Library/MobileSubstrate/DynamicLibraries/ZTechHook.plist"
     ];

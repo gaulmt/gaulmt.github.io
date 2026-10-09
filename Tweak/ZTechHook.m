@@ -837,7 +837,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
 
 static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef prop) = NULL;
 static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
-    if (prop != NULL) {
+    if (prop != NULL && CFGetTypeID(prop) == CFStringGetTypeID()) {
         if (CFStringCompare(prop, CFSTR("ProductType"), 0) == kCFCompareEqualTo) {
             if (gCFMachineId) return CFRetain(gCFMachineId);
         } else if (CFStringCompare(prop, CFSTR("HWModelStr"), 0) == kCFCompareEqualTo) {
@@ -861,7 +861,7 @@ static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
 static CFTypeRef (*orig_IORegistryEntryCreateCFProperty)(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) = NULL;
 static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
     CFTypeRef res = orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
-    if (key != NULL) {
+    if (key != NULL && CFGetTypeID(key) == CFStringGetTypeID()) {
         if (CFStringCompare(key, CFSTR("IOPlatformSerialNumber"), 0) == kCFCompareEqualTo) {
             if (res) CFRelease(res);
             return gCFUuid ? CFRetain(gCFUuid) : NULL;
@@ -895,95 +895,6 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
         }
     }
     return res;
-}
-
-#pragma mark - Universal iPhone Lineup Spoofing Across NSDictionary, UILabel, NSAttributedString, JSON & WKWebView
-
-static NSRegularExpression *gIPhoneModelRegex = nil;
-
-static void ZTechInitRegexOnce(void) {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSString *pattern = @"iPhone(?:\\d+,\\d+|\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|Max|mini|\\(\\d+[a-z]*\\s*(?:generation|gen\\.?)\\)|\\(\\d{4}\\)))?)";
-        gIPhoneModelRegex = [NSRegularExpression regularExpressionWithPattern:pattern
-                                                                      options:NSRegularExpressionCaseInsensitive
-                                                                        error:nil];
-    });
-}
-
-static inline NSString *ZTechReplaceIPhoneStringIfNeeded(NSString *input) {
-    if (![input isKindOfClass:[NSString class]] || input.length < 7) return input;
-    if ([input rangeOfString:@"iPhone" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        return input;
-    }
-    NSString *targetModel = gModelNameObj ?: @"iPhone 16 Pro Max";
-    if ([input isEqualToString:targetModel]) {
-        return input;
-    }
-    // Do not alter URLs, file paths, or bundle identifiers
-    if ([input containsString:@"/"] || [input containsString:@"_"] || [input containsString:@"com."]) {
-        return input;
-    }
-    // Exact match for raw machine IDs (e.g. "iPhone17,2", "iPhone12,8", "iPhone14,6", "iPhone9,3")
-    if (gMachineIdObj.length > 0 && [input isEqualToString:gMachineIdObj]) {
-        return targetModel;
-    }
-    ZTechInitRegexOnce();
-    if (gIPhoneModelRegex != nil) {
-        return [gIPhoneModelRegex stringByReplacingMatchesInString:input
-                                                           options:0
-                                                             range:NSMakeRange(0, input.length)
-                                                        withTemplate:targetModel];
-    }
-    return input;
-}
-
-// Intercept NSDictionary lookups for machineId in Zalo's internal device mapping dictionary!
-static id (*orig_NSDict_objectForKey)(id, SEL, id) = NULL;
-static id swizzled_NSDict_objectForKey(id self, SEL _cmd, id aKey) {
-    if ([aKey isKindOfClass:[NSString class]]) {
-        NSString *k = (NSString *)aKey;
-        if (gMachineIdObj.length > 0 && [k isEqualToString:gMachineIdObj]) {
-            return gModelNameObj ?: @"iPhone 16 Pro Max";
-        }
-    }
-    id val = orig_NSDict_objectForKey ? orig_NSDict_objectForKey(self, _cmd, aKey) : nil;
-    if (val == nil && [aKey isKindOfClass:[NSString class]]) {
-        NSString *k = (NSString *)aKey;
-        if ([k hasPrefix:@"iPhone"]) {
-            // Check if this dictionary is a hardware machineId -> Marketing Name map
-            if (orig_NSDict_objectForKey(self, _cmd, @"iPhone10,1") != nil ||
-                orig_NSDict_objectForKey(self, _cmd, @"iPhone11,2") != nil ||
-                orig_NSDict_objectForKey(self, _cmd, @"iPhone9,1") != nil ||
-                orig_NSDict_objectForKey(self, _cmd, @"iPhone8,1") != nil) {
-                return gModelNameObj ?: @"iPhone 16 Pro Max";
-            }
-        }
-    }
-    return val;
-}
-
-static id (*orig_NSDict_objectForKeyedSubscript)(id, SEL, id) = NULL;
-static id swizzled_NSDict_objectForKeyedSubscript(id self, SEL _cmd, id aKey) {
-    if ([aKey isKindOfClass:[NSString class]]) {
-        NSString *k = (NSString *)aKey;
-        if (gMachineIdObj.length > 0 && [k isEqualToString:gMachineIdObj]) {
-            return gModelNameObj ?: @"iPhone 16 Pro Max";
-        }
-    }
-    id val = orig_NSDict_objectForKeyedSubscript ? orig_NSDict_objectForKeyedSubscript(self, _cmd, aKey) : nil;
-    if (val == nil && [aKey isKindOfClass:[NSString class]]) {
-        NSString *k = (NSString *)aKey;
-        if ([k hasPrefix:@"iPhone"]) {
-            if (orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone10,1") != nil ||
-                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone11,2") != nil ||
-                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone9,1") != nil ||
-                orig_NSDict_objectForKeyedSubscript(self, _cmd, @"iPhone8,1") != nil) {
-                return gModelNameObj ?: @"iPhone 16 Pro Max";
-            }
-        }
-    }
-    return val;
 }
 
 static NSString *ZTechGPUNameForMachine(NSString *machine) {
@@ -1073,89 +984,6 @@ static NSString *swizzled_osVersionString(id self, SEL _cmd) {
 static unsigned long long (*orig_physicalMemory)(id, SEL) = NULL;
 static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
     return (unsigned long long)gRamBytes;
-}
-
-static void (*orig_UILabel_setText)(id, SEL, NSString *) = NULL;
-static void swizzled_UILabel_setText(id self, SEL _cmd, NSString *text) {
-    text = ZTechReplaceIPhoneStringIfNeeded(text);
-    if (orig_UILabel_setText) {
-        orig_UILabel_setText(self, _cmd, text);
-    }
-}
-
-static void (*orig_UILabel_setAttributedText)(id, SEL, NSAttributedString *) = NULL;
-static void swizzled_UILabel_setAttributedText(id self, SEL _cmd, NSAttributedString *attrText) {
-    if ([attrText isKindOfClass:[NSAttributedString class]] && attrText.length >= 7) {
-        NSString *rawStr = attrText.string;
-        if ([rawStr rangeOfString:@"iPhone" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-            NSString *replaced = ZTechReplaceIPhoneStringIfNeeded(rawStr);
-            if (![replaced isEqualToString:rawStr]) {
-                NSMutableAttributedString *mut = [attrText mutableCopy];
-                [mut.mutableString setString:replaced];
-                attrText = mut;
-            }
-        }
-    }
-    if (orig_UILabel_setAttributedText) {
-        orig_UILabel_setAttributedText(self, _cmd, attrText);
-    }
-}
-
-// Covers Texture / AsyncDisplayKit (ASTextNode), YYLabel, CATextLayer, and CoreText in Zalo!
-static id (*orig_NSAttrStr_initWithString)(id, SEL, NSString *) = NULL;
-static id swizzled_NSAttrStr_initWithString(id self, SEL _cmd, NSString *str) {
-    str = ZTechReplaceIPhoneStringIfNeeded(str);
-    return orig_NSAttrStr_initWithString ? orig_NSAttrStr_initWithString(self, _cmd, str) : nil;
-}
-
-static id (*orig_NSAttrStr_initWithStringAttrs)(id, SEL, NSString *, NSDictionary *) = NULL;
-static id swizzled_NSAttrStr_initWithStringAttrs(id self, SEL _cmd, NSString *str, NSDictionary *attrs) {
-    str = ZTechReplaceIPhoneStringIfNeeded(str);
-    return orig_NSAttrStr_initWithStringAttrs ? orig_NSAttrStr_initWithStringAttrs(self, _cmd, str, attrs) : nil;
-}
-
-// Recursively sanitize parsed JSON objects if raw JSON data contained "iPhone"
-static id ZTechSanitizeJSONObject(id obj, int depth) {
-    if (!obj || depth > 8) return obj;
-    if ([obj isKindOfClass:[NSString class]]) {
-        return ZTechReplaceIPhoneStringIfNeeded((NSString *)obj);
-    } else if ([obj isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *dict = (NSDictionary *)obj;
-        NSMutableDictionary *mut = nil;
-        for (id k in dict) {
-            id v = dict[k];
-            id newV = ZTechSanitizeJSONObject(v, depth + 1);
-            if (newV != v) {
-                if (!mut) mut = [dict mutableCopy];
-                mut[k] = newV;
-            }
-        }
-        return mut ?: dict;
-    } else if ([obj isKindOfClass:[NSArray class]]) {
-        NSArray *arr = (NSArray *)obj;
-        NSMutableArray *mut = nil;
-        for (NSUInteger i = 0; i < arr.count; i++) {
-            id v = arr[i];
-            id newV = ZTechSanitizeJSONObject(v, depth + 1);
-            if (newV != v) {
-                if (!mut) mut = [arr mutableCopy];
-                mut[i] = newV;
-            }
-        }
-        return mut ?: arr;
-    }
-    return obj;
-}
-
-static id (*orig_JSONObjectWithData)(id, SEL, NSData *, NSJSONReadingOptions, NSError **) = NULL;
-static id swizzled_JSONObjectWithData(id self, SEL _cmd, NSData *data, NSJSONReadingOptions opt, NSError **error) {
-    id res = orig_JSONObjectWithData ? orig_JSONObjectWithData(self, _cmd, data, opt, error) : nil;
-    if (res && [data isKindOfClass:[NSData class]] && data.length >= 6 && data.length < 524288) {
-        if (memmem(data.bytes, data.length, "iPhone", 6) != NULL) {
-            res = ZTechSanitizeJSONObject(res, 0);
-        }
-    }
-    return res;
 }
 
 static id (*orig_WKWebView_initWithFrameConfig)(id, SEL, CGRect, id) = NULL;
@@ -1567,8 +1395,6 @@ static void ZTechHookInit(void) {
 
         ZTechEnsureContainerDirectoriesExist(NSHomeDirectory());
 
-        ZTechInitRegexOnce();
-
         ZTechLoadProfileOnce();
         ZTechCheckAndPerformInAppReset(bundleId);
 
@@ -1677,52 +1503,8 @@ static void ZTechHookInit(void) {
             method_setImplementation(mDataTaskReqComp, (IMP)swizzled_dataTaskWithRequestCompletion);
         }
 
-        // 2. Zalo-Specific Deep Hooks (NSDictionary machineId Lookup, UILabel, NSAttributedString/ASTextNode, JSON & WKWebView)
+        // 2. Zalo WKWebView WebRTC Proxy Leak Protection
         if ([lowerBundle containsString:@"zalo"] || [lowerBundle containsString:@"vng"]) {
-            ZTechInitRegexOnce();
-            Class dictCls = NSClassFromString(@"__NSDictionaryI") ?: [NSDictionary class];
-            Method mObjKey = class_getInstanceMethod(dictCls, @selector(objectForKey:));
-            if (mObjKey) {
-                orig_NSDict_objectForKey = (void *)method_getImplementation(mObjKey);
-                method_setImplementation(mObjKey, (IMP)swizzled_NSDict_objectForKey);
-            }
-            Method mObjSub = class_getInstanceMethod(dictCls, @selector(objectForKeyedSubscript:));
-            if (mObjSub) {
-                orig_NSDict_objectForKeyedSubscript = (void *)method_getImplementation(mObjSub);
-                method_setImplementation(mObjSub, (IMP)swizzled_NSDict_objectForKeyedSubscript);
-            }
-
-            Class lblCls = [UILabel class];
-            Method mSetTxt = class_getInstanceMethod(lblCls, @selector(setText:));
-            if (mSetTxt) {
-                orig_UILabel_setText = (void *)method_getImplementation(mSetTxt);
-                method_setImplementation(mSetTxt, (IMP)swizzled_UILabel_setText);
-            }
-            Method mSetAttrTxt = class_getInstanceMethod(lblCls, @selector(setAttributedText:));
-            if (mSetAttrTxt) {
-                orig_UILabel_setAttributedText = (void *)method_getImplementation(mSetAttrTxt);
-                method_setImplementation(mSetAttrTxt, (IMP)swizzled_UILabel_setAttributedText);
-            }
-
-            Class attrStrCls = NSClassFromString(@"NSConcreteAttributedString") ?: [NSAttributedString class];
-            Method mAttrInit1 = class_getInstanceMethod(attrStrCls, @selector(initWithString:));
-            if (mAttrInit1) {
-                orig_NSAttrStr_initWithString = (void *)method_getImplementation(mAttrInit1);
-                method_setImplementation(mAttrInit1, (IMP)swizzled_NSAttrStr_initWithString);
-            }
-            Method mAttrInit2 = class_getInstanceMethod(attrStrCls, @selector(initWithString:attributes:));
-            if (mAttrInit2) {
-                orig_NSAttrStr_initWithStringAttrs = (void *)method_getImplementation(mAttrInit2);
-                method_setImplementation(mAttrInit2, (IMP)swizzled_NSAttrStr_initWithStringAttrs);
-            }
-
-            Class jsonCls = [NSJSONSerialization class];
-            Method mJsonData = class_getClassMethod(jsonCls, @selector(JSONObjectWithData:options:error:));
-            if (mJsonData) {
-                orig_JSONObjectWithData = (void *)method_getImplementation(mJsonData);
-                method_setImplementation(mJsonData, (IMP)swizzled_JSONObjectWithData);
-            }
-
             Class wkCls = NSClassFromString(@"WKWebView");
             if (wkCls) {
                 Method mWkInit = class_getInstanceMethod(wkCls, sel_registerName("initWithFrame:configuration:"));

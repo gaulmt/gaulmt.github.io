@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.4
+Version: 5.4.5
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.4 - Instant Vault Restore + Anti-Crash Keychain SafeGuard
+Description: gaulmt -Tech v5.4.5 - Fix Zalo Crash, Remove Unstable Hooks & Ultra Fast Vault
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

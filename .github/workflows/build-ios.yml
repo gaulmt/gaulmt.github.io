@@ -106,11 +106,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.4.4
+          Version: 5.4.5
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.4.4 truc tiep tren Sileo & Zebra (Instant Vault Restore + Anti-Crash SafeGuard)
+          Description: Nguon cai dat gaulmt -Tech v5.4.5 truc tiep tren Sileo & Zebra (Fix Zalo Crash + Ultra Fast Vault)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -125,11 +125,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.4.4 - Instant Vault Restore + Anti-Crash SafeGuard"
+                    "title": "gaulmt -Tech v5.4.5 - Fix Zalo Crash, Remove Unstable Hooks & Ultra Fast Vault"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Công cụ **gaulmt -Tech v5.4.4** tương thích hoàn hảo cả **Rootless (Dopamine A12-A18)** và **Rootful (Checkra1n/palera1n)** trực tiếp qua Sileo.\n\n- **Mở Acc Kho Tức Thì (<0.3s)**: Tối ưu hoá thuật toán clonefile/copy container, loại bỏ hoàn toàn hiện tượng lag/đơ khi khôi phục acc Zalo từ kho.\n- **Bảo Vệ Keychain & Ngăn Chặn Crash (Anti-Crash SafeGuard)**: Ngăn chặn triệt để tình trạng xoá nhầm Keychain/token đăng nhập và reset đè container khi mở Zalo, đảm bảo 100% vào thẳng phiên đã lưu.\n- **Đồng Bộ Đa Container Tự Động (Multi-Container Sync)**: Ghi profile giả lập đồng thời vào toàn bộ Sandbox của Zalo & AIDA64.\n- **Hook Sâu Benchmark & Phần Cứng**: Giả lập hoàn hảo chip A13-A18, IOKit board-id, sysctl hw.model/hw.targettype."
+                    "markdown": "Công cụ **gaulmt -Tech v5.4.5** tương thích hoàn hảo cả **Rootless (Dopamine A12-A18)** và **Rootful (Checkra1n/palera1n)** trực tiếp qua Sileo.\n\n- **Khắc Phục Triệt Để Crash Zalo**: Loại bỏ hoàn toàn các hook can thiệp nội bộ Foundation (NSDictionary, JSON, UILabel) gây lỗi bộ nhớ và crash Zalo trên mọi dòng máy.\n- **Tối Ưu Tốc Độ Nạp/Lưu Acc Cực Nhanh**: Loại bỏ quét toàn bộ máy, chỉ đồng bộ mục tiêu chính xác giúp thao tác lưu và bơm acc diễn ra tức thì.\n- **Bảo Vệ AppGroup & Keychain An Toàn**: Tuyệt đối không xóa rỗng AppGroup nếu chưa có dữ liệu lưu trữ, giữ trọn vẹn session đăng nhập.\n- **Hook Sâu Benchmark & Phần Cứng**: Giả lập hoàn hảo chip A13-A18, IOKit board-id, sysctl hw.model/hw.targettype."
                   }
                 ]
               }
@@ -160,7 +160,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.4.4 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.4.5 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -185,7 +185,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.4"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.5"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

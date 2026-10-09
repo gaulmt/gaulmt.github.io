@@ -680,16 +680,16 @@ extern char **environ;
     NSDictionary<NSString *, NSString *> *appGroups = [self findZaloAppGroupContainers];
     for (NSString *groupId in appGroups) {
         NSString *liveGroupPath = appGroups[groupId];
-        for (NSString *sub in cleanSubs) {
-            NSString *dirPath = [liveGroupPath stringByAppendingPathComponent:sub];
-            NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
-            for (NSString *item in items) {
-                if ([item hasPrefix:@".GlobalPreferences"] || [item hasPrefix:@".com.apple."]) continue;
-                [fm removeItemAtPath:[dirPath stringByAppendingPathComponent:item] error:nil];
-            }
-        }
         NSString *savedGroupPath = [groupBackupDir stringByAppendingPathComponent:groupId];
         if ([fm fileExistsAtPath:savedGroupPath]) {
+            for (NSString *sub in cleanSubs) {
+                NSString *dirPath = [liveGroupPath stringByAppendingPathComponent:sub];
+                NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
+                for (NSString *item in items) {
+                    if ([item hasPrefix:@".GlobalPreferences"] || [item hasPrefix:@".com.apple."]) continue;
+                    [fm removeItemAtPath:[dirPath stringByAppendingPathComponent:item] error:nil];
+                }
+            }
             for (NSString *sub in restoreSubs) {
                 NSString *src = [savedGroupPath stringByAppendingPathComponent:sub];
                 NSString *dst = [liveGroupPath stringByAppendingPathComponent:sub];

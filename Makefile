@@ -1,5 +1,5 @@
-TARGET := iphone:clang:latest:12.0
-ARCHS := arm64
+TARGET := iphone:clang:latest:14.0
+ARCHS := arm64 arm64e
 
 INSTALL_TARGET_PROCESSES = ZTech
 

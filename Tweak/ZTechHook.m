@@ -22,6 +22,9 @@
 #import <mach-o/nlist.h>
 #import <string.h>
 #import <notify.h>
+#if __has_feature(ptrauth_calls)
+#import <ptrauth.h>
+#endif
 
 #pragma mark - Safe Embedded Fishhook (Supports Chained Fixups __got + Lazy/Non-Lazy Symbol Pointers)
 
@@ -96,7 +99,11 @@ static void perform_rebinding_with_section(section_t *section,
                 if (gRebindings[j].raw_target != NULL &&
                     cur_stripped == zt_strip_ptr(gRebindings[j].raw_target) &&
                     cur_stripped != zt_strip_ptr(gRebindings[j].replacement)) {
+#if __has_feature(ptrauth_calls)
+                    indirect_symbol_bindings[i] = ptrauth_sign_unauthenticated(gRebindings[j].replacement, ptrauth_key_function_pointer, 0);
+#else
                     indirect_symbol_bindings[i] = gRebindings[j].replacement;
+#endif
                     rebound = YES;
                     break;
                 }
@@ -116,7 +123,11 @@ static void perform_rebinding_with_section(section_t *section,
             if (symbol_name[0] == '\0') continue;
             for (size_t j = 0; j < gRebindingsCount; j++) {
                 if (strcmp(&symbol_name[1], gRebindings[j].name) == 0) {
+#if __has_feature(ptrauth_calls)
+                    indirect_symbol_bindings[i] = ptrauth_sign_unauthenticated(gRebindings[j].replacement, ptrauth_key_function_pointer, 0);
+#else
                     indirect_symbol_bindings[i] = gRebindings[j].replacement;
+#endif
                     break;
                 }
             }
@@ -1738,6 +1749,32 @@ static void ZTechHookInit(void) {
         if (raw_IORegistry) {
             orig_IORegistryEntryCreateCFProperty = raw_IORegistry;
         }
+
+        // 4. ElleKit / Substrate Direct Native Hooking (Native for arm64e Dopamine & arm64)
+        typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
+        zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
+        if (!pMSHook) {
+            void *hElle = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (hElle) {
+                pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
+            }
+        }
+        if (pMSHook) {
+            if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
+            if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
+            if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
+            if (raw_MGCopyAnswer) pMSHook(raw_MGCopyAnswer, (void *)hooked_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
+            if (raw_getifaddrs) pMSHook(raw_getifaddrs, (void *)hooked_getifaddrs, (void **)&orig_getifaddrs);
+            if (raw_IORegistry) pMSHook(raw_IORegistry, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
+            if (raw_CFProxy) pMSHook(raw_CFProxy, (void *)hooked_CFNetworkCopySystemProxySettings, (void **)&orig_CFNetworkCopySystemProxySettings);
+            if (raw_CFProxiesForURL) pMSHook(raw_CFProxiesForURL, (void *)hooked_CFNetworkCopyProxiesForURL, (void **)&orig_CFNetworkCopyProxiesForURL);
+            if (raw_CFStreamSocket) pMSHook(raw_CFStreamSocket, (void *)hooked_CFStreamCreatePairWithSocketToHost, (void **)&orig_CFStreamCreatePairWithSocketToHost);
+        }
+
+        // 5. Safe Mach-O Symbol Rebinding (Covers __got, __auth_got, __la_symbol_ptr, __nl_symbol_ptr)
 
         gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
         gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};

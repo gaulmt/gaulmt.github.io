@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.apple.UIKit", "com.finalwire.aida64", "vn.com.vng.zalo", "com.vng.zalo" ); }; }
+{ Filter = { Bundles = ( "com.apple.UIKit", "com.finalwire.aida64", "com.zing.zalo", "com.vng.zalo", "vn.com.vng.zalo", "com.zing.zalo.enterprise" ); }; }

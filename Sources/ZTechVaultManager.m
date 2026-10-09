@@ -398,6 +398,17 @@ extern char **environ;
                 sCachedAIDA64 = container;
                 return sCachedAIDA64;
             }
+            NSArray<NSString *> *subDirsToCheck = @[@"Library/Preferences", @"Library/Caches", @"Documents"];
+            for (NSString *sub in subDirsToCheck) {
+                NSString *dir = [container stringByAppendingPathComponent:sub];
+                NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:dir error:nil];
+                for (NSString *item in items) {
+                    if ([[item lowercaseString] containsString:@"aida64"] || [[item lowercaseString] containsString:@"finalwire"]) {
+                        sCachedAIDA64 = container;
+                        return sCachedAIDA64;
+                    }
+                }
+            }
         }
     }
 

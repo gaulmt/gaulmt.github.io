@@ -1,0 +1,39 @@
+#!/bin/sh
+export PATH="/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+echo "========================================================"
+echo "   🔍 GAULMT -TECH BÁO CÁO CHẨN ĐOÁN THIẾT BỊ (CLI)"
+echo "========================================================"
+echo ""
+echo "1. THÔNG SỐ THIẾT BỊ GỐC:"
+echo "- uname -a: $(uname -a 2>/dev/null)"
+echo "- uname -m: $(uname -m 2>/dev/null)"
+echo "- hw.machine: $(sysctl -n hw.machine 2>/dev/null)"
+echo "- hw.model: $(sysctl -n hw.model 2>/dev/null)"
+echo "- hw.memsize: $(sysctl -n hw.memsize 2>/dev/null)"
+echo "- hw.ncpu: $(sysctl -n hw.ncpu 2>/dev/null)"
+echo ""
+echo "2. MÔI TRƯỜNG JAILBREAK:"
+if [ -d "/var/jb" ]; then
+    echo "- Rootless (/var/jb): CÓ"
+    if [ -d "/var/jb/basebin" ]; then
+        echo "- Jailbreak: Dopamine"
+    elif [ -f "/var/jb/.palera1n" ]; then
+        echo "- Jailbreak: palera1n rootless"
+    fi
+else
+    echo "- Rootless (/var/jb): KHÔNG (Rootful / Jailed)"
+fi
+echo "- Thư viện Hook:"
+ls -la /var/jb/usr/lib/libellekit.dylib /var/jb/usr/lib/libsubstrate.dylib /usr/lib/libsubstrate.dylib 2>/dev/null || true
+echo "- Tweak ZTechHook:"
+ls -la /var/jb/usr/lib/TweakInject/ZTechHook.* /Library/MobileSubstrate/DynamicLibraries/ZTechHook.* 2>/dev/null || true
+echo ""
+echo "3. ỨNG DỤNG ZALO & CONTAINER:"
+find /var/mobile/Containers/Data/Application -name "*zalo*" -maxdepth 3 2>/dev/null || true
+find /var/mobile/Containers/Shared/AppGroup -name "*zalo*" -maxdepth 2 2>/dev/null || true
+echo ""
+echo "4. CẤU HÌNH ĐANG LƯU:"
+cat /var/mobile/Library/Preferences/com.ztech.profile.plist 2>/dev/null || cat /var/jb/var/mobile/Library/Preferences/com.ztech.profile.plist 2>/dev/null || echo "[Chưa có profile]"
+echo ""
+echo "========================================================"

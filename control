@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.9
+Version: 5.5.0
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.9 - Fake Hoan Hao AIDA64 (sysctl & POSIX Native) & Zalo Smooth
+Description: gaulmt -Tech v5.5.0 - Tich Hop Chan Doan He Thong & Fake Hoan Hao AIDA64 / Zalo
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

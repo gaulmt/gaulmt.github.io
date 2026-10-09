@@ -3,6 +3,7 @@ export PATH="/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:
 
 mkdir -p /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShared >/dev/null 2>&1 || true
 chmod 0777 /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShared >/dev/null 2>&1 || true
+chmod 0755 /usr/bin/ztech-diag /var/jb/usr/bin/ztech-diag >/dev/null 2>&1 || true
 
 # Auto-repair any app data containers (e.g., Zalo) whose subdirectories or permissions were affected
 for ROOT_DIR in "/var/mobile/Containers/Data/Application" "/var/mobile/Containers/Shared/AppGroup"; do

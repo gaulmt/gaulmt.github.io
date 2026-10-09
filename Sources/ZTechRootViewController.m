@@ -3,6 +3,7 @@
 #import "ZTechLicenseManager.h"
 #import "ZTechVaultManager.h"
 #import "ZTechVectorIcons.h"
+#import "ZTechDiagnostics.h"
 
 #pragma mark - Crash-Proof Native TextField & Multi-Fallback Clipboard Reader
 
@@ -604,7 +605,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.4.9";
+    appSub.text = @"Identity & Vault · v5.5.0";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1075,7 +1076,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     self.btnCopyReport.layer.borderColor = [self borderSubtleColor].CGColor;
     self.btnCopyReport.contentEdgeInsets = UIEdgeInsetsMake(5.0, 10.0, 5.0, 10.0);
     [self styleButton:self.btnCopyReport
-                title:@"Sao chép"
+                title:@"Chẩn đoán & Copy"
              iconType:ZTechIconCopyClone
             tintColor:[self goldAccentColor]
                  font:[UIFont systemFontOfSize:11.5 weight:UIFontWeightBold]];
@@ -3071,13 +3072,16 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
 - (void)onTapCopyReport {
     @try {
-        NSString *report = [self.currentProfile fullReportTextWithFlags:self.lockModelSwitch.isOn
-                                                          respringAfter:self.respringSwitch.isOn
-                                                             sameScreen:self.sameScreenSwitch.isOn
-                                                              matchChip:self.matchChipSwitch.isOn];
+        NSString *report = [ZTechDiagnostics generateFullSystemDiagnosticReport];
         [UIPasteboard generalPasteboard].string = report;
+
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🔍 Chẩn Đoán Thiết Bị & Môi Trường"
+                                                                       message:@"Đã sao chép toàn bộ thông tin hệ thống (Jailbreak, TweakInject, Container Zalo, AIDA64) vào bộ nhớ tạm!\n\nBạn có thể dán (Paste) để gửi báo cáo này."
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Đã hiểu" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
     } @catch (NSException *e) {}
-    [self showToast:@"Đã sao chép báo cáo cấu hình vào bộ nhớ tạm!" isError:NO];
+    [self showToast:@"Đã sao chép báo cáo chẩn đoán toàn diện!" isError:NO];
 }
 
 @end

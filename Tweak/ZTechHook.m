@@ -358,8 +358,76 @@ static int hooked_uname(struct utsname *buf) {
     if (buf != NULL) {
         strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
         buf->machine[sizeof(buf->machine) - 1] = '\0';
+        strncpy(buf->nodename, [gModelNameObj UTF8String] ?: "iPhone", sizeof(buf->nodename) - 1);
+        buf->nodename[sizeof(buf->nodename) - 1] = '\0';
     }
     return ret;
+}
+
+static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
+static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
+    if (name != NULL && namelen >= 2) {
+        if (name[0] == CTL_HW && name[1] == HW_MACHINE) {
+            size_t len = strlen(gMachineCStr) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, gMachineCStr, copyLen);
+            }
+            if (oldlenp != NULL) {
+                *oldlenp = len;
+            }
+            return 0;
+        } else if (name[0] == CTL_HW && name[1] == HW_MODEL) {
+            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
+            const char *board = [b UTF8String] ?: "D94AP";
+            size_t len = strlen(board) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, board, copyLen);
+            }
+            if (oldlenp != NULL) {
+                *oldlenp = len;
+            }
+            return 0;
+        } else if (name[0] == CTL_HW && name[1] == HW_MEMSIZE) {
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
+                    memcpy(oldp, &gRamBytes, copyLen);
+                }
+                *oldlenp = sizeof(uint64_t);
+                return 0;
+            }
+        } else if (name[0] == CTL_HW && name[1] == HW_PHYSMEM) {
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    if (*oldlenp >= sizeof(uint64_t)) {
+                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                        *oldlenp = sizeof(uint64_t);
+                    } else {
+                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
+                        memcpy(oldp, &ram32, copyLen);
+                        *oldlenp = sizeof(uint32_t);
+                    }
+                } else {
+                    *oldlenp = sizeof(uint64_t);
+                }
+                return 0;
+            }
+        } else if (name[0] == CTL_HW && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    int cores = 6;
+                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
+                    memcpy(oldp, &cores, copyLen);
+                }
+                *oldlenp = sizeof(int);
+                return 0;
+            }
+        }
+    }
+    return orig_sysctl ? orig_sysctl(name, namelen, oldp, oldlenp, newp, newlen) : sysctl(name, namelen, oldp, oldlenp, newp, newlen);
 }
 
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
@@ -423,9 +491,20 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = sizeof(int);
                 return 0;
             }
+        } else if (strcmp(name, "machdep.cpu.brand_string") == 0) {
+            const char *soc = "Apple A18 Pro";
+            size_t len = strlen(soc) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, soc, copyLen);
+            }
+            if (oldlenp != NULL) {
+                *oldlenp = len;
+            }
+            return 0;
         }
     }
-    return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+    return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : sysctlbyname(name, oldp, oldlenp, newp, newlen);
 }
 
 
@@ -617,11 +696,13 @@ static void ZTechHookInit(void) {
             return;
         }
 
-        if (!bundleId || !bundlePath ||
-            [bundleId isEqualToString:@"com.ztech.devicechanger"] ||
-            [bundleId hasPrefix:@"com.apple."] ||
-            ![bundlePath containsString:@"/Application"] ||
-            ![bundlePath hasSuffix:@".app"]) {
+        NSString *procName = [[NSProcessInfo processInfo] processName];
+        BOOL isAida = (bundleId && [bundleId localizedCaseInsensitiveContainsString:@"aida64"]) ||
+                      (procName && [procName localizedCaseInsensitiveContainsString:@"aida64"]);
+        BOOL isZalo = (bundleId && [bundleId localizedCaseInsensitiveContainsString:@"zalo"]) ||
+                      (procName && [procName localizedCaseInsensitiveContainsString:@"zalo"]);
+
+        if (!isAida && !isZalo) {
             return;
         }
 
@@ -735,8 +816,10 @@ static void ZTechHookInit(void) {
         if (pMSHook) {
             void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
             void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
+            void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
             if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
             if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
+            if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
         }
     }
 }

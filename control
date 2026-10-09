@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.8
+Version: 5.4.9
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.8 - Fix Triet De Zalo Crash Phiên Mới & PAC Native ElleKit
+Description: gaulmt -Tech v5.4.9 - Fake Hoan Hao AIDA64 (sysctl & POSIX Native) & Zalo Smooth
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

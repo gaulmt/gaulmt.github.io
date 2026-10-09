@@ -373,12 +373,17 @@ extern char **environ;
     @try {
         Class proxyCls = NSClassFromString(@"LSApplicationProxy");
         if (proxyCls && [proxyCls respondsToSelector:sel_registerName("applicationProxyForIdentifier:")]) {
-            id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, sel_registerName("applicationProxyForIdentifier:"), @"com.finalwire.aida64");
-            if (proxy && [proxy respondsToSelector:sel_registerName("dataContainerURL")]) {
-                NSURL *url = ((NSURL *(*)(id, SEL))objc_msgSend)(proxy, sel_registerName("dataContainerURL"));
-                if ([url isKindOfClass:[NSURL class]] && url.path.length > 0 && [fm fileExistsAtPath:url.path]) {
-                    sCachedAIDA64 = url.path;
-                    return sCachedAIDA64;
+            SEL selProxy = sel_registerName("applicationProxyForIdentifier:");
+            SEL selData = sel_registerName("dataContainerURL");
+            NSArray<NSString *> *candidates = @[@"com.finalwire.aida64", @"com.finalwire.AIDA64", @"hu.finalwire.aida64"];
+            for (NSString *cand in candidates) {
+                id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, selProxy, cand);
+                if (proxy && [proxy respondsToSelector:selData]) {
+                    NSURL *url = ((NSURL *(*)(id, SEL))objc_msgSend)(proxy, selData);
+                    if ([url isKindOfClass:[NSURL class]] && url.path.length > 0 && [fm fileExistsAtPath:url.path]) {
+                        sCachedAIDA64 = url.path;
+                        return sCachedAIDA64;
+                    }
                 }
             }
         }

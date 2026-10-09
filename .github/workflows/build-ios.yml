@@ -106,11 +106,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.4.8
+          Version: 5.4.9
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.4.8 truc tiep tren Sileo & Zebra (Fix Triet De Crash Zalo & Clean Profile)
+          Description: Nguon cai dat gaulmt -Tech v5.4.9 truc tiep tren Sileo & Zebra (Hoan Hao Fake AIDA64 & Zalo)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -125,11 +125,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.4.8 - Triệt Để Fix Crash Zalo Cả Khi Tạo Phiên Mới & Bơm Acc"
+                    "title": "gaulmt -Tech v5.4.9 - Fake Hoàn Hảo AIDA64 & Zalo Mượt Tuyệt Đối"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản cập nhật **gaulmt -Tech v5.4.8** giải quyết triệt để lỗi crash Zalo trên mọi tình huống (tạo phiên mới, bơm acc, iPhone 7 đến iPhone 16 Pro Max):\n\n- **Loại Bỏ Xung Đột Hook MGCopyAnswer & Fishhook PAC**: Xóa bỏ hoàn toàn cơ chế can thiệp `MGCopyAnswer` và fishhook đè ký salt-0, ngăn chặn 100% mã lỗi `EXC_BAD_INSTRUCTION` (SIGILL) và lỗi phần cứng PAC trên CPU arm64e (iPhone 11).\n- **Khắc Phục Lỗi Tạo Phiên Mới Bị Crash**: Đồng bộ quyền hạn `posix_spawn chown -R 501:501` và `chmod -R 0777` trên toàn bộ container Zalo và AppGroup khi tạo phiên mới, đảm bảo Zalo có toàn quyền tạo mới SQLite DB mà không bị văng.\n- **Lọc Bundle Chuẩn Xác**: Gỡ bỏ filter `com.apple.UIKit` để tránh inject nhầm vào tiến trình hệ thống, chỉ inject trực tiếp vào Zalo và AIDA64.\n- **Fake Phần Cứng Hoàn Hảo 100%**: Native ElleKit `uname` và `sysctlbyname` cùng bộ swizzle Objective-C giúp AIDA64 và Zalo nhận chuẩn 100% iPhone 16 Pro Max (17,2) nhanh và mượt tuyệt đối."
+                    "markdown": "Bản cập nhật **gaulmt -Tech v5.4.9** khắc phục triệt để lỗi AIDA64 không nhận fake trên máy khách:\n\n- **Hook Đầy Đủ Tầng Kernel sysctl & sysctlbyname**: Bổ sung hook POSIX `sysctl` (`CTL_HW, HW_MACHINE/HW_MODEL/HW_MEMSIZE/HW_NCPU`) và `machdep.cpu.brand_string`, chặn đứng 100% việc AIDA64 đọc phần cứng gốc.\n- **Bộ Lọc Executables Đa Năng Cho AIDA64**: Thêm `Executables = ( 'AIDA64', 'aida64', 'Zalo' )` vào filter của Tweak, bảo đảm Substrate / ElleKit luôn inject chuẩn xác vào AIDA64 bất kể bundle identifier.\n- **Tự Động Cấp Quyền Mobile Cho Sandbox AIDA64**: Khi đổi máy, profile được ghi trực tiếp vào container Documents của AIDA64 và phân quyền `mobile (501:501)` ngay lập tức.\n- **Zalo Chạy Mượt Mà Không Văng**: Tiếp tục duy trì hiệu năng khởi động tức thì (<0.5s) và bơm acc chớp mắt (<0.2s) không lo crash."
                   }
                 ]
               }
@@ -160,7 +160,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.4.8 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.4.9 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -185,7 +185,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.8"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.9"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

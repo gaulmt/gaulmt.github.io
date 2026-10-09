@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.apple.springboard", "com.finalwire.aida64", "com.zing.zalo", "com.vng.zalo", "vn.com.vng.zalo", "com.zing.zalo.enterprise" ); }; }
+{ Filter = { Bundles = ( "com.apple.springboard", "com.finalwire.aida64", "com.finalwire.AIDA64", "hu.finalwire.aida64", "com.zing.zalo", "com.vng.zalo", "vn.com.vng.zalo", "com.zing.zalo.enterprise" ); Executables = ( "AIDA64", "aida64", "Zalo" ); }; }

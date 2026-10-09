@@ -493,6 +493,7 @@ extern char **environ;
                 chmod([aPrefPath UTF8String], 0666);
             }
         }
+        [ZTechVaultManager runFastChownAndChmod:aidaContainer];
     }
 
     profile.writtenFilesCount = written;

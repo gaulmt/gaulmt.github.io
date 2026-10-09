@@ -726,7 +726,7 @@ static int hooked_uname(struct utsname *buf) {
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (name != NULL) {
-        if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0 || strcmp(name, "hw.targettype") == 0) {
+        if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0) {
             size_t len = strlen(gMachineCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
@@ -736,7 +736,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = len;
             }
             return 0;
-        } else if (strcmp(name, "hw.model") == 0) {
+        } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
             NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
             const char *board = [b UTF8String] ?: "D94AP";
             size_t len = strlen(board) + 1;
@@ -748,10 +748,30 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = len;
             }
             return 0;
-        } else if (strcmp(name, "hw.memsize") == 0 || strcmp(name, "hw.physmem") == 0) {
+        } else if (strcmp(name, "hw.memsize") == 0) {
             if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(uint64_t)) {
                 memcpy(oldp, &gRamBytes, sizeof(uint64_t));
                 *oldlenp = sizeof(uint64_t);
+                return 0;
+            }
+        } else if (strcmp(name, "hw.physmem") == 0) {
+            if (oldp != NULL && oldlenp != NULL) {
+                if (*oldlenp >= sizeof(uint64_t)) {
+                    memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                    *oldlenp = sizeof(uint64_t);
+                    return 0;
+                } else if (*oldlenp >= sizeof(uint32_t)) {
+                    uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                    memcpy(oldp, &ram32, sizeof(uint32_t));
+                    *oldlenp = sizeof(uint32_t);
+                    return 0;
+                }
+            }
+        } else if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
+            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(int)) {
+                int cores = 6;
+                memcpy(oldp, &cores, sizeof(int));
+                *oldlenp = sizeof(int);
                 return 0;
             }
         }
@@ -784,10 +804,30 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                 *oldlenp = len;
             }
             return 0;
-        } else if (name[1] == HW_MEMSIZE || name[1] == HW_PHYSMEM) {
+        } else if (name[1] == HW_MEMSIZE) {
             if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(uint64_t)) {
                 memcpy(oldp, &gRamBytes, sizeof(uint64_t));
                 *oldlenp = sizeof(uint64_t);
+                return 0;
+            }
+        } else if (name[1] == HW_PHYSMEM) {
+            if (oldp != NULL && oldlenp != NULL) {
+                if (*oldlenp >= sizeof(uint64_t)) {
+                    memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                    *oldlenp = sizeof(uint64_t);
+                    return 0;
+                } else if (*oldlenp >= sizeof(uint32_t)) {
+                    uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                    memcpy(oldp, &ram32, sizeof(uint32_t));
+                    *oldlenp = sizeof(uint32_t);
+                    return 0;
+                }
+            }
+        } else if (name[1] == HW_NCPU) {
+            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(int)) {
+                int cores = 6;
+                memcpy(oldp, &cores, sizeof(int));
+                *oldlenp = sizeof(int);
                 return 0;
             }
         }
@@ -843,6 +883,15 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
             }
             if (res) CFRelease(res);
             return gCFMachineId ? CFRetain(gCFMachineId) : NULL;
+        } else if (CFStringCompare(key, CFSTR("board-id"), 0) == kCFCompareEqualTo) {
+            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
+            const char *board = [b UTF8String] ?: "D94AP";
+            if (res && CFGetTypeID(res) == CFDataGetTypeID()) {
+                CFRelease(res);
+                return (CFTypeRef)CFDataCreate(kCFAllocatorDefault, (const UInt8 *)board, strlen(board) + 1);
+            }
+            if (res) CFRelease(res);
+            return CFStringCreateWithCString(kCFAllocatorDefault, board, kCFStringEncodingUTF8);
         }
     }
     return res;
@@ -1506,12 +1555,6 @@ static void ZTechHookInit(void) {
         }
 
         ZTechEnsureContainerDirectoriesExist(NSHomeDirectory());
-
-        Boolean keyExists = false;
-        Boolean isLicenseValid = CFPreferencesGetAppBooleanValue(CFSTR("ZTechLicenseValid"), kCFPreferencesAnyApplication, &keyExists);
-        if (keyExists && !isLicenseValid) {
-            return;
-        }
 
         ZTechInitRegexOnce();
 

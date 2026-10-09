@@ -484,15 +484,36 @@ extern char **environ;
         }
         NSString *aProfPath = [aDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
         if ([sharedDict writeToFile:aProfPath atomically:YES]) {
-            chown([aProfPath UTF8String], 501, 501);
             chmod([aProfPath UTF8String], 0666);
         }
         NSString *aPrefDir = [aidaContainer stringByAppendingPathComponent:@"Library/Preferences"];
         if ([fm fileExistsAtPath:aPrefDir]) {
             NSString *aPrefPath = [aPrefDir stringByAppendingPathComponent:@"com.ztech.profile.plist"];
             if ([sharedDict writeToFile:aPrefPath atomically:YES]) {
-                chown([aPrefPath UTF8String], 501, 501);
                 chmod([aPrefPath UTF8String], 0666);
+            }
+        }
+    }
+
+    // Universal multi-container sync across all installed apps in /var/mobile/Containers/Data/Application
+    NSArray<NSString *> *appRoots = @[@"/var/mobile/Containers/Data/Application", @"/private/var/mobile/Containers/Data/Application"];
+    for (NSString *appRoot in appRoots) {
+        NSArray<NSString *> *appGuids = [fm contentsOfDirectoryAtPath:appRoot error:nil];
+        for (NSString *aguid in appGuids) {
+            NSString *cPath = [appRoot stringByAppendingPathComponent:aguid];
+            NSString *cDocs = [cPath stringByAppendingPathComponent:@"Documents"];
+            if ([fm fileExistsAtPath:cDocs]) {
+                NSString *cProf = [cDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
+                if ([sharedDict writeToFile:cProf atomically:YES]) {
+                    chmod([cProf UTF8String], 0666);
+                }
+            }
+            NSString *cPref = [cPath stringByAppendingPathComponent:@"Library/Preferences"];
+            if ([fm fileExistsAtPath:cPref]) {
+                NSString *cPrefProf = [cPref stringByAppendingPathComponent:@"com.ztech.profile.plist"];
+                if ([sharedDict writeToFile:cPrefProf atomically:YES]) {
+                    chmod([cPrefProf UTF8String], 0666);
+                }
             }
         }
     }

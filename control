@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.2
+Version: 5.4.3
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.2 - Ho Tro Toan Dien iPhone 11-16 (arm64e PAC + Dopamine ElleKit) & iPhone 6s-X (arm64)
+Description: gaulmt -Tech v5.4.3 - Universal Multi-Container Sync + Native IOKit/BoardID/Sysctl Benchmark Spoof
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

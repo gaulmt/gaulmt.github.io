@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.0
+Version: 5.4.1
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.0 - Gia Lap Hoan Hao 37 Model iPhone (SE/6s - 16 Pro Max) + IOKit/Metal/Carrier Hooks Chuyen Sau
+Description: gaulmt -Tech v5.4.1 - Gia Lap Hoan Hao 37 Model iPhone (SE/6s - 16 Pro Max) + Ho Tro AIDA64 Benchmark + IOKit/Metal/Carrier Hooks
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

@@ -137,11 +137,15 @@ extern char **environ;
     NSArray<NSString *> *killBins = @[@"/var/jb/usr/bin/killall", @"/usr/bin/killall"];
     for (NSString *bin in killBins) {
         if ([fm isExecutableFileAtPath:bin]) {
-            pid_t pid1, pid2;
+            pid_t pid1, pid2, pid3, pid4;
             const char *args1[] = { [bin UTF8String], "-9", "Zalo", NULL };
             posix_spawn(&pid1, [bin UTF8String], NULL, NULL, (char *const *)args1, environ);
             const char *args2[] = { [bin UTF8String], "-9", "vn.com.vng.zalo", NULL };
             posix_spawn(&pid2, [bin UTF8String], NULL, NULL, (char *const *)args2, environ);
+            const char *args3[] = { [bin UTF8String], "-9", "AIDA64", NULL };
+            posix_spawn(&pid3, [bin UTF8String], NULL, NULL, (char *const *)args3, environ);
+            const char *args4[] = { [bin UTF8String], "-9", "aida64", NULL };
+            posix_spawn(&pid4, [bin UTF8String], NULL, NULL, (char *const *)args4, environ);
             break;
         }
     }
@@ -355,6 +359,47 @@ extern char **environ;
             }
         }
     } @catch (NSException *e) {}
+
+    return nil;
+}
+
++ (nullable NSString *)findAIDA64DataContainerPath {
+    static NSString *sCachedAIDA64 = nil;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (sCachedAIDA64 && [fm fileExistsAtPath:sCachedAIDA64]) {
+        return sCachedAIDA64;
+    }
+
+    @try {
+        Class proxyCls = NSClassFromString(@"LSApplicationProxy");
+        if (proxyCls && [proxyCls respondsToSelector:sel_registerName("applicationProxyForIdentifier:")]) {
+            id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, sel_registerName("applicationProxyForIdentifier:"), @"com.finalwire.aida64");
+            if (proxy && [proxy respondsToSelector:sel_registerName("dataContainerURL")]) {
+                NSURL *url = ((NSURL *(*)(id, SEL))objc_msgSend)(proxy, sel_registerName("dataContainerURL"));
+                if ([url isKindOfClass:[NSURL class]] && url.path.length > 0 && [fm fileExistsAtPath:url.path]) {
+                    sCachedAIDA64 = url.path;
+                    return sCachedAIDA64;
+                }
+            }
+        }
+    } @catch (NSException *e) {}
+
+    NSArray<NSString *> *roots = @[
+        @"/var/mobile/Containers/Data/Application",
+        @"/private/var/mobile/Containers/Data/Application"
+    ];
+    for (NSString *root in roots) {
+        NSArray<NSString *> *uuids = [fm contentsOfDirectoryAtPath:root error:nil];
+        for (NSString *uuid in uuids) {
+            NSString *container = [root stringByAppendingPathComponent:uuid];
+            NSString *metaPath = [container stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+            NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+            if (meta && [[meta[@"MCMMetadataIdentifier"] lowercaseString] containsString:@"aida64"]) {
+                sCachedAIDA64 = container;
+                return sCachedAIDA64;
+            }
+        }
+    }
 
     return nil;
 }

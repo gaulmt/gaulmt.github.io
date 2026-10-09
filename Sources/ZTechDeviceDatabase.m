@@ -475,6 +475,28 @@ extern char **environ;
         }
     }
 
+    // Also write _zt_active_profile.plist directly inside AIDA64's Data Container if installed
+    NSString *aidaContainer = [ZTechVaultManager findAIDA64DataContainerPath];
+    if (aidaContainer.length > 0) {
+        NSString *aDocs = [aidaContainer stringByAppendingPathComponent:@"Documents"];
+        if (![fm fileExistsAtPath:aDocs]) {
+            [fm createDirectoryAtPath:aDocs withIntermediateDirectories:YES attributes:nil error:nil];
+        }
+        NSString *aProfPath = [aDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
+        if ([sharedDict writeToFile:aProfPath atomically:YES]) {
+            chown([aProfPath UTF8String], 501, 501);
+            chmod([aProfPath UTF8String], 0666);
+        }
+        NSString *aPrefDir = [aidaContainer stringByAppendingPathComponent:@"Library/Preferences"];
+        if ([fm fileExistsAtPath:aPrefDir]) {
+            NSString *aPrefPath = [aPrefDir stringByAppendingPathComponent:@"com.ztech.profile.plist"];
+            if ([sharedDict writeToFile:aPrefPath atomically:YES]) {
+                chown([aPrefPath UTF8String], 501, 501);
+                chmod([aPrefPath UTF8String], 0666);
+            }
+        }
+    }
+
     profile.writtenFilesCount = written;
     profile.successItemsCount = (written == 7) ? 10 : (written * 10 / 7);
     return (written == 7);

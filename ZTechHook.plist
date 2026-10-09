@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.apple.UIKit" ); }; }
+{ Filter = { Bundles = ( "com.apple.UIKit", "com.finalwire.aida64", "vn.com.vng.zalo", "com.vng.zalo" ); }; }

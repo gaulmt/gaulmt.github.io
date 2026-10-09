@@ -106,11 +106,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.4.0
+          Version: 5.4.1
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.4.0 truc tiep tren Sileo & Zebra (Gia Lap 37 Model iPhone + IOKit/Metal/Carrier Hooks + Doi IP 22s)
+          Description: Nguon cai dat gaulmt -Tech v5.4.1 truc tiep tren Sileo & Zebra (Gia Lap 37 Model iPhone + Ho Tro AIDA64 Benchmark + IOKit/Metal/Carrier Hooks + Doi IP 22s)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -125,11 +125,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.4.0 - Giả Lập Hoàn Hảo 37 Model iPhone + IOKit/Metal Hooks"
+                    "title": "gaulmt -Tech v5.4.1 - Giả Lập Hoàn Hảo 37 Model iPhone + Hỗ Trợ AIDA64 Benchmark"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Công cụ **gaulmt -Tech v5.4.0** hỗ trợ cả **Rootless (Dopamine/palera1n)** và **Rootful (Checkra1n/Unc0ver/Odyssey)** trực tiếp qua Sileo.\n\n- **Giả Lập Hoàn Hảo 37 Model iPhone**: Phủ kín từ iPhone 6s/SE đến iPhone 16 Pro Max, hook đồng bộ cả IOKit IORegistry, Metal GPU, CTCarrier, WebKit User-Agent, uname, sysctl, MGCopyAnswer và NSDictionary.\n- **Đổi IP Tự Động (Chế độ máy bay 22s)**: Chu trình ngắt sóng 22s chuẩn trạm phát viễn thông để cấp IP 4G/LTE mới tinh kèm đếm ngược trực quan.\n- **Kho Lưu Trữ Acc Zalo & Proxy**: Tự động xoá cookie Safari & tạo phiên mới khi lưu kho, bơm proxy bảo mật tuyệt đối."
+                    "markdown": "Công cụ **gaulmt -Tech v5.4.1** hỗ trợ cả **Rootless (Dopamine/palera1n)** và **Rootful (Checkra1n/Unc0ver/Odyssey)** trực tiếp qua Sileo.\n\n- **Hỗ Trợ Benchmark & AIDA64 Toàn Diện**: Hook sâu Board Model ID, sysctl hw.model/hw.targettype, IOKit registry, sandbox container AIDA64.\n- **Giả Lập Hoàn Hảo 37 Model iPhone**: Phủ kín từ iPhone 6s/SE đến iPhone 16 Pro Max, hook đồng bộ cả IOKit IORegistry, Metal GPU, CTCarrier, WebKit User-Agent, uname, sysctl, MGCopyAnswer và NSDictionary.\n- **Đổi IP Tự Động (Chế độ máy bay 22s)**: Chu trình ngắt sóng 22s chuẩn trạm phát viễn thông để cấp IP 4G/LTE mới tinh kèm đếm ngược trực quan.\n- **Kho Lưu Trữ Acc Zalo & Proxy**: Tự động xoá cookie Safari & tạo phiên mới khi lưu kho, bơm proxy bảo mật tuyệt đối."
                   }
                 ]
               }
@@ -160,7 +160,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.4.0 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.4.1 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -185,7 +185,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.0"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.4.1"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

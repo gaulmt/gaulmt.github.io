@@ -140,7 +140,10 @@ static void rebind_symbols_for_image(const struct mach_header *header, intptr_t 
 
     // Rebind app binary, embedded frameworks, and high-level UIKit/WebKit/CFNetwork frameworks
     BOOL isAppImage = (strstr(info.dli_fname, "/Application/") != NULL ||
-                       strstr(info.dli_fname, "Zalo") != NULL);
+                       strstr(info.dli_fname, "/Applications/") != NULL ||
+                       strstr(info.dli_fname, "Zalo") != NULL ||
+                       strstr(info.dli_fname, "aida64") != NULL ||
+                       strstr(info.dli_fname, "AIDA64") != NULL);
     BOOL isTargetSysFramework = (strstr(info.dli_fname, "/UIKit") != NULL ||
                                  strstr(info.dli_fname, "/WebKit") != NULL ||
                                  strstr(info.dli_fname, "/CFNetwork") != NULL);
@@ -659,6 +662,46 @@ static int hooked_getifaddrs(struct ifaddrs **ifap) {
 
 #pragma mark - Lock-Free Pure C Function Hooks (uname, sysctlbyname, sysctl, MGCopyAnswer)
 
+static NSString *ZTechBoardIdForMachine(NSString *m) {
+    if (!m) return @"D94AP";
+    if ([m isEqualToString:@"iPhone17,2"]) return @"D94AP"; // 16 Pro Max
+    if ([m isEqualToString:@"iPhone17,1"]) return @"D93AP"; // 16 Pro
+    if ([m isEqualToString:@"iPhone17,3"]) return @"D47AP"; // 16
+    if ([m isEqualToString:@"iPhone17,4"]) return @"D48AP"; // 16 Plus
+    if ([m isEqualToString:@"iPhone17,5"]) return @"D49AP"; // 16e
+    if ([m isEqualToString:@"iPhone16,2"]) return @"D84AP"; // 15 Pro Max
+    if ([m isEqualToString:@"iPhone16,1"]) return @"D83AP"; // 15 Pro
+    if ([m isEqualToString:@"iPhone15,3"]) return @"D74AP"; // 14 Pro Max
+    if ([m isEqualToString:@"iPhone15,2"]) return @"D73AP"; // 14 Pro
+    if ([m isEqualToString:@"iPhone15,5"]) return @"D28AP"; // 14 Plus
+    if ([m isEqualToString:@"iPhone15,4"]) return @"D27AP"; // 14
+    if ([m isEqualToString:@"iPhone14,3"]) return @"D28AP"; // 13 Pro Max
+    if ([m isEqualToString:@"iPhone14,2"]) return @"D27AP"; // 13 Pro
+    if ([m isEqualToString:@"iPhone14,5"]) return @"D17AP"; // 13
+    if ([m isEqualToString:@"iPhone14,4"]) return @"D16AP"; // 13 mini
+    if ([m isEqualToString:@"iPhone14,6"]) return @"D49AP"; // SE 2022
+    if ([m isEqualToString:@"iPhone13,4"]) return @"D54pAP"; // 12 Pro Max
+    if ([m isEqualToString:@"iPhone13,3"]) return @"D53pAP"; // 12 Pro
+    if ([m isEqualToString:@"iPhone13,2"]) return @"D53gAP"; // 12
+    if ([m isEqualToString:@"iPhone13,1"]) return @"D52gAP"; // 12 mini
+    if ([m isEqualToString:@"iPhone12,8"]) return @"D79AP"; // SE 2020
+    if ([m isEqualToString:@"iPhone12,5"]) return @"D431AP"; // 11 Pro Max
+    if ([m isEqualToString:@"iPhone12,3"]) return @"D421AP"; // 11 Pro
+    if ([m isEqualToString:@"iPhone12,1"]) return @"N104AP"; // 11
+    if ([m isEqualToString:@"iPhone11,8"]) return @"N841AP"; // XR
+    if ([m isEqualToString:@"iPhone11,6"]) return @"D331pAP"; // XS Max
+    if ([m isEqualToString:@"iPhone11,2"]) return @"D321AP"; // XS
+    if ([m isEqualToString:@"iPhone10,6"] || [m isEqualToString:@"iPhone10,3"]) return @"D22AP"; // X
+    if ([m isEqualToString:@"iPhone10,5"] || [m isEqualToString:@"iPhone10,2"]) return @"D21AP"; // 8 Plus
+    if ([m isEqualToString:@"iPhone10,4"] || [m isEqualToString:@"iPhone10,1"]) return @"D20AP"; // 8
+    if ([m isEqualToString:@"iPhone9,4"] || [m isEqualToString:@"iPhone9,2"]) return @"D11AP"; // 7 Plus
+    if ([m isEqualToString:@"iPhone9,3"] || [m isEqualToString:@"iPhone9,1"]) return @"D10AP"; // 7
+    if ([m isEqualToString:@"iPhone8,4"]) return @"N69uAP"; // SE 1st Gen
+    if ([m isEqualToString:@"iPhone8,2"]) return @"N66AP"; // 6s Plus
+    if ([m isEqualToString:@"iPhone8,1"]) return @"N71AP"; // 6s
+    return @"D94AP";
+}
+
 static int (*orig_uname)(struct utsname *buf) = NULL;
 static int hooked_uname(struct utsname *buf) {
     int ret = orig_uname ? orig_uname(buf) : 0;
@@ -672,11 +715,23 @@ static int hooked_uname(struct utsname *buf) {
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (name != NULL) {
-        if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0 || strcmp(name, "hw.model") == 0) {
+        if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0 || strcmp(name, "hw.targettype") == 0) {
             size_t len = strlen(gMachineCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, gMachineCStr, copyLen);
+            }
+            if (oldlenp != NULL) {
+                *oldlenp = len;
+            }
+            return 0;
+        } else if (strcmp(name, "hw.model") == 0) {
+            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
+            const char *board = [b UTF8String] ?: "D94AP";
+            size_t len = strlen(board) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, board, copyLen);
             }
             if (oldlenp != NULL) {
                 *oldlenp = len;
@@ -696,11 +751,23 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
 static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (name != NULL && namelen == 2 && name[0] == CTL_HW) {
-        if (name[1] == HW_MACHINE || name[1] == HW_MODEL) {
+        if (name[1] == HW_MACHINE) {
             size_t len = strlen(gMachineCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, gMachineCStr, copyLen);
+            }
+            if (oldlenp != NULL) {
+                *oldlenp = len;
+            }
+            return 0;
+        } else if (name[1] == HW_MODEL) {
+            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
+            const char *board = [b UTF8String] ?: "D94AP";
+            size_t len = strlen(board) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, board, copyLen);
             }
             if (oldlenp != NULL) {
                 *oldlenp = len;
@@ -720,8 +787,12 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
 static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef prop) = NULL;
 static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     if (prop != NULL) {
-        if (CFStringCompare(prop, CFSTR("ProductType"), 0) == kCFCompareEqualTo ||
-            CFStringCompare(prop, CFSTR("HWModelStr"), 0) == kCFCompareEqualTo) {
+        if (CFStringCompare(prop, CFSTR("ProductType"), 0) == kCFCompareEqualTo) {
+            if (gCFMachineId) return CFRetain(gCFMachineId);
+        } else if (CFStringCompare(prop, CFSTR("HWModelStr"), 0) == kCFCompareEqualTo) {
+            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
+            CFStringRef cfBoard = CFStringCreateWithCString(kCFAllocatorDefault, [b UTF8String] ?: "D94AP", kCFStringEncodingUTF8);
+            if (cfBoard) return cfBoard;
             if (gCFMachineId) return CFRetain(gCFMachineId);
         } else if (CFStringCompare(prop, CFSTR("MarketingName"), 0) == kCFCompareEqualTo ||
                    CFStringCompare(prop, CFSTR("DeviceName"), 0) == kCFCompareEqualTo ||

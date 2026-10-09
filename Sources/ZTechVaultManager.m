@@ -495,22 +495,36 @@ extern char **environ;
         [fm copyItemAtPath:srcPath toPath:dstPath error:nil];
 
         if (fixOwner) {
-            chown([dstPath UTF8String], 501, 501);
-            BOOL isDir = NO;
-            if ([fm fileExistsAtPath:dstPath isDirectory:&isDir] && isDir) {
-                chmod([dstPath UTF8String], 0777);
-            }
+            [self recursivelyFixMobileOwnershipAtPath:dstPath fileManager:fm];
         }
     }
 }
 
 + (void)recursivelyFixMobileOwnershipAtPath:(NSString *)path fileManager:(NSFileManager *)fm {
-    chown([path UTF8String], 501, 501);
+    if (!path || path.length == 0) return;
+    const char *cpath = [path UTF8String];
+    if (!cpath) return;
+
+    chown(cpath, 501, 501);
     BOOL isDir = NO;
     if ([fm fileExistsAtPath:path isDirectory:&isDir] && isDir) {
-        chmod([path UTF8String], 0777);
+        chmod(cpath, 0777);
+        NSArray<NSString *> *subpaths = [fm subpathsOfDirectoryAtPath:path error:nil];
+        for (NSString *sub in subpaths) {
+            NSString *full = [path stringByAppendingPathComponent:sub];
+            const char *cfull = [full UTF8String];
+            if (cfull) {
+                chown(cfull, 501, 501);
+                BOOL subIsDir = NO;
+                if ([fm fileExistsAtPath:full isDirectory:&subIsDir] && subIsDir) {
+                    chmod(cfull, 0777);
+                } else {
+                    chmod(cfull, 0666);
+                }
+            }
+        }
     } else {
-        chmod([path UTF8String], 0666);
+        chmod(cpath, 0666);
     }
 }
 
@@ -518,6 +532,11 @@ extern char **environ;
                                                           proxy:(nullable NSString *)proxyString
                                                         profile:(ZTechDeviceProfile *)profile
                                                           error:(NSError **)error {
+    // 1. Terminate Zalo cleanly and flush filesystem buffers to disk so SQLite databases are consistent and unlocked
+    [self killZaloProcess];
+    usleep(250000); // 250ms
+    sync();
+
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *zaloContainer = [self findZaloDataContainerPath];
     if (!zaloContainer) {
@@ -695,6 +714,19 @@ extern char **environ;
                 NSString *dst = [liveGroupPath stringByAppendingPathComponent:sub];
                 [self copyDirectoryContentsFrom:src to:dst fileManager:fm fixMobileOwner:YES];
             }
+        }
+    }
+
+    // Ensure 100% of restored files in Zalo sandbox & AppGroups belong to mobile (501:501)
+    for (NSString *sub in restoreSubs) {
+        NSString *targetDir = [zaloContainer stringByAppendingPathComponent:sub];
+        [self recursivelyFixMobileOwnershipAtPath:targetDir fileManager:fm];
+    }
+    for (NSString *groupId in appGroups) {
+        NSString *liveGroupPath = appGroups[groupId];
+        for (NSString *sub in restoreSubs) {
+            NSString *targetDir = [liveGroupPath stringByAppendingPathComponent:sub];
+            [self recursivelyFixMobileOwnershipAtPath:targetDir fileManager:fm];
         }
     }
 

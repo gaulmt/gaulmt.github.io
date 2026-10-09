@@ -749,28 +749,38 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             }
             return 0;
         } else if (strcmp(name, "hw.memsize") == 0) {
-            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(uint64_t)) {
-                memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
+                    memcpy(oldp, &gRamBytes, copyLen);
+                }
                 *oldlenp = sizeof(uint64_t);
                 return 0;
             }
         } else if (strcmp(name, "hw.physmem") == 0) {
-            if (oldp != NULL && oldlenp != NULL) {
-                if (*oldlenp >= sizeof(uint64_t)) {
-                    memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    if (*oldlenp >= sizeof(uint64_t)) {
+                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                        *oldlenp = sizeof(uint64_t);
+                    } else {
+                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
+                        memcpy(oldp, &ram32, copyLen);
+                        *oldlenp = sizeof(uint32_t);
+                    }
+                } else {
                     *oldlenp = sizeof(uint64_t);
-                    return 0;
-                } else if (*oldlenp >= sizeof(uint32_t)) {
-                    uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
-                    memcpy(oldp, &ram32, sizeof(uint32_t));
-                    *oldlenp = sizeof(uint32_t);
-                    return 0;
                 }
+                return 0;
             }
         } else if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
-            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(int)) {
-                int cores = 6;
-                memcpy(oldp, &cores, sizeof(int));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    int cores = 6;
+                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
+                    memcpy(oldp, &cores, copyLen);
+                }
                 *oldlenp = sizeof(int);
                 return 0;
             }
@@ -805,28 +815,38 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
             }
             return 0;
         } else if (name[1] == HW_MEMSIZE) {
-            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(uint64_t)) {
-                memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
+                    memcpy(oldp, &gRamBytes, copyLen);
+                }
                 *oldlenp = sizeof(uint64_t);
                 return 0;
             }
         } else if (name[1] == HW_PHYSMEM) {
-            if (oldp != NULL && oldlenp != NULL) {
-                if (*oldlenp >= sizeof(uint64_t)) {
-                    memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    if (*oldlenp >= sizeof(uint64_t)) {
+                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                        *oldlenp = sizeof(uint64_t);
+                    } else {
+                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
+                        memcpy(oldp, &ram32, copyLen);
+                        *oldlenp = sizeof(uint32_t);
+                    }
+                } else {
                     *oldlenp = sizeof(uint64_t);
-                    return 0;
-                } else if (*oldlenp >= sizeof(uint32_t)) {
-                    uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
-                    memcpy(oldp, &ram32, sizeof(uint32_t));
-                    *oldlenp = sizeof(uint32_t);
-                    return 0;
                 }
+                return 0;
             }
         } else if (name[1] == HW_NCPU) {
-            if (oldp != NULL && oldlenp != NULL && *oldlenp >= sizeof(int)) {
-                int cores = 6;
-                memcpy(oldp, &cores, sizeof(int));
+            if (oldlenp != NULL) {
+                if (oldp != NULL) {
+                    int cores = 6;
+                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
+                    memcpy(oldp, &cores, copyLen);
+                }
                 *oldlenp = sizeof(int);
                 return 0;
             }
@@ -1217,25 +1237,6 @@ static BOOL ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
     }
 }
 
-static void ZTechWipeSubfolderContentsOnly(NSString *folderPath) {
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:folderPath error:nil];
-    for (NSString *item in items) {
-        if ([item isEqualToString:@"_zt_last_reset_token.txt"] ||
-            [item isEqualToString:@"_zt_restore_trigger.txt"] ||
-            [item isEqualToString:@"_zt_zalo_marker.txt"] ||
-            [item isEqualToString:@"_zt_active_profile.plist"] ||
-            [item hasPrefix:@".GlobalPreferences"] ||
-            [item hasPrefix:@".com.apple."] ||
-            [item isEqualToString:@"SplashBoard"] ||
-            [item isEqualToString:@"Caches"] ||
-            [item isEqualToString:@"Preferences"]) {
-            continue;
-        }
-        [fm removeItemAtPath:[folderPath stringByAppendingPathComponent:item] error:nil];
-    }
-}
-
 static void ZTechCheckAndPerformInAppReset(NSString *bundleId) {
     @try {
         NSString *lowerBundle = [bundleId lowercaseString];
@@ -1256,56 +1257,8 @@ static void ZTechCheckAndPerformInAppReset(NSString *bundleId) {
             chmod([markerPath UTF8String], 0666);
         }
 
-        // If this launch is an account restore from Vault, apply restore and NEVER wipe!
-        if (ZTechCheckAndPerformInAppRestore(bundleId)) {
-            return;
-        }
-
-        CFTypeRef cfToken = CFPreferencesCopyAppValue(CFSTR("ZTechResetToken"), kCFPreferencesAnyApplication);
-        NSString *globalToken = nil;
-        if (cfToken && CFGetTypeID(cfToken) == CFStringGetTypeID()) {
-            globalToken = [(__bridge NSString *)cfToken copy];
-        }
-        if (cfToken) CFRelease(cfToken);
-
-        if (!globalToken || globalToken.length == 0) return;
-
-        NSString *tokenFile = [home stringByAppendingPathComponent:@"Documents/_zt_last_reset_token.txt"];
-        NSString *lastToken = [NSString stringWithContentsOfFile:tokenFile encoding:NSUTF8StringEncoding error:nil];
-
-        if (!lastToken || ![lastToken isEqualToString:globalToken]) {
-            NSArray *secClasses = @[
-                (__bridge id)kSecClassGenericPassword,
-                (__bridge id)kSecClassInternetPassword,
-                (__bridge id)kSecClassCertificate,
-                (__bridge id)kSecClassKey,
-                (__bridge id)kSecClassIdentity
-            ];
-            for (id secClass in secClasses) {
-                NSDictionary *query = @{(__bridge id)kSecClass: secClass};
-                SecItemDelete((__bridge CFDictionaryRef)query);
-            }
-
-            if (bundleId.length > 0) {
-                [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:bundleId];
-                [[NSUserDefaults standardUserDefaults] synchronize];
-            }
-
-            NSArray<NSString *> *subDirs = @[
-                @"Documents",
-                @"tmp",
-                @"Library/Caches",
-                @"Library/Cookies",
-                @"Library/WebKit",
-                @"Library/Application Support"
-            ];
-            for (NSString *sub in subDirs) {
-                ZTechWipeSubfolderContentsOnly([home stringByAppendingPathComponent:sub]);
-            }
-
-            ZTechEnsureContainerDirectoriesExist(home);
-            [globalToken writeToFile:tokenFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        }
+        // If this launch is an account restore from Vault, apply restored keychain and preferences
+        ZTechCheckAndPerformInAppRestore(bundleId);
     } @catch (NSException *exception) {
     }
 }
@@ -1608,23 +1561,22 @@ static void ZTechHookInit(void) {
             if (raw_CFProxy) pMSHook(raw_CFProxy, (void *)hooked_CFNetworkCopySystemProxySettings, (void **)&orig_CFNetworkCopySystemProxySettings);
             if (raw_CFProxiesForURL) pMSHook(raw_CFProxiesForURL, (void *)hooked_CFNetworkCopyProxiesForURL, (void **)&orig_CFNetworkCopyProxiesForURL);
             if (raw_CFStreamSocket) pMSHook(raw_CFStreamSocket, (void *)hooked_CFStreamCreatePairWithSocketToHost, (void **)&orig_CFStreamCreatePairWithSocketToHost);
+        } else {
+            // 5. Fallback Mach-O Symbol Rebinding (ONLY used when MSHookFunction is unavailable)
+            gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
+            gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};
+            gRebindings[2] = (struct zt_rebinding){"sysctl", (void *)hooked_sysctl, raw_sysctl};
+            gRebindings[3] = (struct zt_rebinding){"MGCopyAnswer", (void *)hooked_MGCopyAnswer, raw_MGCopyAnswer};
+            gRebindings[4] = (struct zt_rebinding){"CFNetworkCopySystemProxySettings", (void *)hooked_CFNetworkCopySystemProxySettings, raw_CFProxy};
+            gRebindings[5] = (struct zt_rebinding){"CFNetworkCopyProxiesForURL", (void *)hooked_CFNetworkCopyProxiesForURL, raw_CFProxiesForURL};
+            gRebindings[6] = (struct zt_rebinding){"CFStreamCreatePairWithSocketToHost", (void *)hooked_CFStreamCreatePairWithSocketToHost, raw_CFStreamSocket};
+            gRebindings[7] = (struct zt_rebinding){"getifaddrs", (void *)hooked_getifaddrs, raw_getifaddrs};
+            gRebindingsCount = 8;
+            if (raw_IORegistry) {
+                gRebindings[gRebindingsCount++] = (struct zt_rebinding){"IORegistryEntryCreateCFProperty", (void *)hooked_IORegistryEntryCreateCFProperty, raw_IORegistry};
+            }
+
+            _dyld_register_func_for_add_image(rebind_symbols_for_image);
         }
-
-        // 5. Safe Mach-O Symbol Rebinding (Covers __got, __auth_got, __la_symbol_ptr, __nl_symbol_ptr)
-
-        gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
-        gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};
-        gRebindings[2] = (struct zt_rebinding){"sysctl", (void *)hooked_sysctl, raw_sysctl};
-        gRebindings[3] = (struct zt_rebinding){"MGCopyAnswer", (void *)hooked_MGCopyAnswer, raw_MGCopyAnswer};
-        gRebindings[4] = (struct zt_rebinding){"CFNetworkCopySystemProxySettings", (void *)hooked_CFNetworkCopySystemProxySettings, raw_CFProxy};
-        gRebindings[5] = (struct zt_rebinding){"CFNetworkCopyProxiesForURL", (void *)hooked_CFNetworkCopyProxiesForURL, raw_CFProxiesForURL};
-        gRebindings[6] = (struct zt_rebinding){"CFStreamCreatePairWithSocketToHost", (void *)hooked_CFStreamCreatePairWithSocketToHost, raw_CFStreamSocket};
-        gRebindings[7] = (struct zt_rebinding){"getifaddrs", (void *)hooked_getifaddrs, raw_getifaddrs};
-        gRebindingsCount = 8;
-        if (raw_IORegistry) {
-            gRebindings[gRebindingsCount++] = (struct zt_rebinding){"IORegistryEntryCreateCFProperty", (void *)hooked_IORegistryEntryCreateCFProperty, raw_IORegistry};
-        }
-
-        _dyld_register_func_for_add_image(rebind_symbols_for_image);
     }
 }

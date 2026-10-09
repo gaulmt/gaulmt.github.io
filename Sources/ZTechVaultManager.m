@@ -461,17 +461,46 @@ extern char **environ;
     return groups;
 }
 
++ (void)runFastChownAndChmod:(NSString *)path {
+    if (!path || path.length == 0) return;
+    const char *cpath = [path UTF8String];
+    if (!cpath) return;
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *chownBins = @[@"/usr/sbin/chown", @"/bin/chown", @"/var/jb/usr/sbin/chown", @"/var/jb/bin/chown"];
+    for (NSString *bin in chownBins) {
+        if ([fm isExecutableFileAtPath:bin]) {
+            pid_t pid;
+            const char *args[] = { [bin UTF8String], "-R", "501:501", cpath, NULL };
+            if (posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ) == 0) {
+                int status = 0;
+                waitpid(pid, &status, 0);
+                break;
+            }
+        }
+    }
+
+    NSArray<NSString *> *chmodBins = @[@"/bin/chmod", @"/usr/bin/chmod", @"/var/jb/bin/chmod", @"/var/jb/usr/bin/chmod"];
+    for (NSString *bin in chmodBins) {
+        if ([fm isExecutableFileAtPath:bin]) {
+            pid_t pid;
+            const char *args[] = { [bin UTF8String], "-R", "0777", cpath, NULL };
+            if (posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ) == 0) {
+                int status = 0;
+                waitpid(pid, &status, 0);
+                break;
+            }
+        }
+    }
+
+    chown(cpath, 501, 501);
+    chmod(cpath, 0777);
+}
+
 + (void)copyDirectoryContentsFrom:(NSString *)srcDir to:(NSString *)dstDir fileManager:(NSFileManager *)fm fixMobileOwner:(BOOL)fixOwner {
     if (![fm fileExistsAtPath:srcDir]) return;
     if (![fm fileExistsAtPath:dstDir]) {
         [fm createDirectoryAtPath:dstDir withIntermediateDirectories:YES attributes:nil error:nil];
-        if (fixOwner) {
-            chown([dstDir UTF8String], 501, 501);
-            chmod([dstDir UTF8String], 0777);
-        }
-    } else if (fixOwner) {
-        chown([dstDir UTF8String], 501, 501);
-        chmod([dstDir UTF8String], 0777);
     }
 
     NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:srcDir error:nil];
@@ -485,7 +514,6 @@ extern char **environ;
         NSString *srcPath = [srcDir stringByAppendingPathComponent:item];
         NSString *dstPath = [dstDir stringByAppendingPathComponent:item];
 
-        // Check if symlink
         NSDictionary *attrs = [fm attributesOfItemAtPath:srcPath error:nil];
         if ([attrs[NSFileType] isEqualToString:NSFileTypeSymbolicLink]) {
             continue;
@@ -493,39 +521,14 @@ extern char **environ;
 
         [fm removeItemAtPath:dstPath error:nil];
         [fm copyItemAtPath:srcPath toPath:dstPath error:nil];
-
-        if (fixOwner) {
-            [self recursivelyFixMobileOwnershipAtPath:dstPath fileManager:fm];
-        }
+    }
+    if (fixOwner) {
+        [self runFastChownAndChmod:dstDir];
     }
 }
 
 + (void)recursivelyFixMobileOwnershipAtPath:(NSString *)path fileManager:(NSFileManager *)fm {
-    if (!path || path.length == 0) return;
-    const char *cpath = [path UTF8String];
-    if (!cpath) return;
-
-    chown(cpath, 501, 501);
-    BOOL isDir = NO;
-    if ([fm fileExistsAtPath:path isDirectory:&isDir] && isDir) {
-        chmod(cpath, 0777);
-        NSArray<NSString *> *subpaths = [fm subpathsOfDirectoryAtPath:path error:nil];
-        for (NSString *sub in subpaths) {
-            NSString *full = [path stringByAppendingPathComponent:sub];
-            const char *cfull = [full UTF8String];
-            if (cfull) {
-                chown(cfull, 501, 501);
-                BOOL subIsDir = NO;
-                if ([fm fileExistsAtPath:full isDirectory:&subIsDir] && subIsDir) {
-                    chmod(cfull, 0777);
-                } else {
-                    chmod(cfull, 0666);
-                }
-            }
-        }
-    } else {
-        chmod(cpath, 0666);
-    }
+    [self runFastChownAndChmod:path];
 }
 
 + (nullable ZTechVaultAccount *)saveCurrentZaloSessionWithTitle:(nullable NSString *)title
@@ -534,7 +537,7 @@ extern char **environ;
                                                           error:(NSError **)error {
     // 1. Terminate Zalo cleanly and flush filesystem buffers to disk so SQLite databases are consistent and unlocked
     [self killZaloProcess];
-    usleep(250000); // 250ms
+    usleep(150000); // 150ms
     sync();
 
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -573,28 +576,60 @@ extern char **environ;
     [fm createDirectoryAtPath:dataBackupDir withIntermediateDirectories:YES attributes:nil error:nil];
     [fm createDirectoryAtPath:groupBackupDir withIntermediateDirectories:YES attributes:nil error:nil];
 
-    // Copy key Zalo directories
-    NSArray<NSString *> *subFolders = @[
+    // Fast copy key Zalo directories
+    NSArray<NSString *> *directFolders = @[
         @"Documents",
-        @"Library/Preferences",
         @"Library/Application Support",
         @"Library/Cookies"
     ];
-    for (NSString *sub in subFolders) {
-        NSString *src = [zaloContainer stringByAppendingPathComponent:sub];
-        NSString *dst = [dataBackupDir stringByAppendingPathComponent:sub];
-        [self copyDirectoryContentsFrom:src to:dst fileManager:fm fixMobileOwner:NO];
+    for (NSString *folder in directFolders) {
+        NSString *src = [zaloContainer stringByAppendingPathComponent:folder];
+        NSString *dst = [dataBackupDir stringByAppendingPathComponent:folder];
+        if ([fm fileExistsAtPath:src]) {
+            [fm removeItemAtPath:dst error:nil];
+            [fm copyItemAtPath:src toPath:dst error:nil];
+        }
     }
 
-    // Copy Zalo AppGroup containers (holds shared auth tokens & database)
+    // Copy Library/Preferences
+    NSString *srcPrefs = [zaloContainer stringByAppendingPathComponent:@"Library/Preferences"];
+    NSString *dstPrefs = [dataBackupDir stringByAppendingPathComponent:@"Library/Preferences"];
+    if ([fm fileExistsAtPath:srcPrefs]) {
+        [fm createDirectoryAtPath:dstPrefs withIntermediateDirectories:YES attributes:nil error:nil];
+        NSArray *pItems = [fm contentsOfDirectoryAtPath:srcPrefs error:nil];
+        for (NSString *p in pItems) {
+            if ([p hasPrefix:@".GlobalPreferences"]) continue;
+            NSString *sp = [srcPrefs stringByAppendingPathComponent:p];
+            NSString *dp = [dstPrefs stringByAppendingPathComponent:p];
+            [fm copyItemAtPath:sp toPath:dp error:nil];
+        }
+    }
+
+    // Copy Zalo AppGroup containers
     NSDictionary<NSString *, NSString *> *appGroups = [self findZaloAppGroupContainers];
     for (NSString *groupId in appGroups) {
         NSString *groupContainer = appGroups[groupId];
         NSString *dstGroup = [groupBackupDir stringByAppendingPathComponent:groupId];
-        for (NSString *sub in subFolders) {
-            NSString *src = [groupContainer stringByAppendingPathComponent:sub];
-            NSString *dst = [dstGroup stringByAppendingPathComponent:sub];
-            [self copyDirectoryContentsFrom:src to:dst fileManager:fm fixMobileOwner:NO];
+        [fm createDirectoryAtPath:dstGroup withIntermediateDirectories:YES attributes:nil error:nil];
+        for (NSString *folder in directFolders) {
+            NSString *src = [groupContainer stringByAppendingPathComponent:folder];
+            NSString *dst = [dstGroup stringByAppendingPathComponent:folder];
+            if ([fm fileExistsAtPath:src]) {
+                [fm removeItemAtPath:dst error:nil];
+                [fm copyItemAtPath:src toPath:dst error:nil];
+            }
+        }
+        NSString *srcGrpPrefs = [groupContainer stringByAppendingPathComponent:@"Library/Preferences"];
+        NSString *dstGrpPrefs = [dstGroup stringByAppendingPathComponent:@"Library/Preferences"];
+        if ([fm fileExistsAtPath:srcGrpPrefs]) {
+            [fm createDirectoryAtPath:dstGrpPrefs withIntermediateDirectories:YES attributes:nil error:nil];
+            NSArray *grpPItems = [fm contentsOfDirectoryAtPath:srcGrpPrefs error:nil];
+            for (NSString *gp in grpPItems) {
+                if ([gp hasPrefix:@".GlobalPreferences"]) continue;
+                NSString *sp = [srcGrpPrefs stringByAppendingPathComponent:gp];
+                NSString *dp = [dstGrpPrefs stringByAppendingPathComponent:gp];
+                [fm copyItemAtPath:sp toPath:dp error:nil];
+            }
         }
     }
 
@@ -641,11 +676,11 @@ extern char **environ;
         return NO;
     }
 
-    // 1. Kill Zalo first so SQLite databases are unlocked
+    // 1. Kill Zalo first so SQLite databases are flushed and unlocked
     [self killZaloProcess];
-    usleep(250000); // 250ms
+    usleep(150000); // 150ms
 
-    // 2. Restore Device Profile + Proxy
+    // 2. Restore Device Profile
     ZTechDeviceProfile *restoredProfile = [ZTechDeviceProfile fromDictionary:account.deviceProfileDict];
     if (!restoredProfile) {
         restoredProfile = [ZTechDeviceDatabase loadOrCreateDefaultProfile];
@@ -660,95 +695,84 @@ extern char **environ;
         *outProfile = restoredProfile;
     }
 
-    // 3. Clean existing Zalo container subdirectories while keeping container structure intact
-    NSArray<NSString *> *cleanSubs = @[
+    // 3. Fast Restore: Swap Documents, Library/Application Support, Library/Cookies
+    NSArray<NSString *> *directFolders = @[
         @"Documents",
-        @"tmp",
-        @"Library/Caches",
-        @"Library/Cookies",
-        @"Library/Preferences",
-        @"Library/WebKit",
-        @"Library/Application Support"
-    ];
-    for (NSString *sub in cleanSubs) {
-        NSString *dirPath = [zaloContainer stringByAppendingPathComponent:sub];
-        NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
-        for (NSString *item in items) {
-            if ([item hasPrefix:@".GlobalPreferences"] || [item hasPrefix:@".com.apple."]) {
-                continue;
-            }
-            [fm removeItemAtPath:[dirPath stringByAppendingPathComponent:item] error:nil];
-        }
-    }
-
-    // 4. Pump backed-up DataContainer files back into Zalo
-    NSArray<NSString *> *restoreSubs = @[
-        @"Documents",
-        @"Library/Preferences",
         @"Library/Application Support",
         @"Library/Cookies"
     ];
-    for (NSString *sub in restoreSubs) {
-        NSString *src = [dataBackupDir stringByAppendingPathComponent:sub];
-        NSString *dst = [zaloContainer stringByAppendingPathComponent:sub];
-        [self copyDirectoryContentsFrom:src to:dst fileManager:fm fixMobileOwner:YES];
+    for (NSString *folder in directFolders) {
+        NSString *src = [dataBackupDir stringByAppendingPathComponent:folder];
+        NSString *dst = [zaloContainer stringByAppendingPathComponent:folder];
+        if ([fm fileExistsAtPath:src]) {
+            [fm removeItemAtPath:dst error:nil];
+            [fm copyItemAtPath:src toPath:dst error:nil];
+        }
     }
 
-    // 5. Pump backed-up AppGroup files back into Zalo's Shared AppGroups
+    // 4. Restore Library/Preferences (preserve .GlobalPreferences.plist)
+    NSString *srcPrefs = [dataBackupDir stringByAppendingPathComponent:@"Library/Preferences"];
+    NSString *dstPrefs = [zaloContainer stringByAppendingPathComponent:@"Library/Preferences"];
+    if ([fm fileExistsAtPath:srcPrefs]) {
+        if (![fm fileExistsAtPath:dstPrefs]) {
+            [fm createDirectoryAtPath:dstPrefs withIntermediateDirectories:YES attributes:nil error:nil];
+        }
+        NSArray *pItems = [fm contentsOfDirectoryAtPath:srcPrefs error:nil];
+        for (NSString *p in pItems) {
+            if ([p hasPrefix:@".GlobalPreferences"]) continue;
+            NSString *sp = [srcPrefs stringByAppendingPathComponent:p];
+            NSString *dp = [dstPrefs stringByAppendingPathComponent:p];
+            [fm removeItemAtPath:dp error:nil];
+            [fm copyItemAtPath:sp toPath:dp error:nil];
+        }
+    }
+
+    // 5. Restore AppGroups
     NSString *groupBackupDir = [slotDir stringByAppendingPathComponent:@"AppGroups"];
     NSDictionary<NSString *, NSString *> *appGroups = [self findZaloAppGroupContainers];
     for (NSString *groupId in appGroups) {
         NSString *liveGroupPath = appGroups[groupId];
         NSString *savedGroupPath = [groupBackupDir stringByAppendingPathComponent:groupId];
         if ([fm fileExistsAtPath:savedGroupPath]) {
-            for (NSString *sub in cleanSubs) {
-                NSString *dirPath = [liveGroupPath stringByAppendingPathComponent:sub];
-                NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
-                for (NSString *item in items) {
-                    if ([item hasPrefix:@".GlobalPreferences"] || [item hasPrefix:@".com.apple."]) continue;
-                    [fm removeItemAtPath:[dirPath stringByAppendingPathComponent:item] error:nil];
+            for (NSString *folder in directFolders) {
+                NSString *src = [savedGroupPath stringByAppendingPathComponent:folder];
+                NSString *dst = [liveGroupPath stringByAppendingPathComponent:folder];
+                if ([fm fileExistsAtPath:src]) {
+                    [fm removeItemAtPath:dst error:nil];
+                    [fm copyItemAtPath:src toPath:dst error:nil];
                 }
             }
-            for (NSString *sub in restoreSubs) {
-                NSString *src = [savedGroupPath stringByAppendingPathComponent:sub];
-                NSString *dst = [liveGroupPath stringByAppendingPathComponent:sub];
-                [self copyDirectoryContentsFrom:src to:dst fileManager:fm fixMobileOwner:YES];
+            NSString *srcGrpPrefs = [savedGroupPath stringByAppendingPathComponent:@"Library/Preferences"];
+            NSString *dstGrpPrefs = [liveGroupPath stringByAppendingPathComponent:@"Library/Preferences"];
+            if ([fm fileExistsAtPath:srcGrpPrefs]) {
+                if (![fm fileExistsAtPath:dstGrpPrefs]) {
+                    [fm createDirectoryAtPath:dstGrpPrefs withIntermediateDirectories:YES attributes:nil error:nil];
+                }
+                NSArray *grpPItems = [fm contentsOfDirectoryAtPath:srcGrpPrefs error:nil];
+                for (NSString *gp in grpPItems) {
+                    if ([gp hasPrefix:@".GlobalPreferences"]) continue;
+                    NSString *sp = [srcGrpPrefs stringByAppendingPathComponent:gp];
+                    NSString *dp = [dstGrpPrefs stringByAppendingPathComponent:gp];
+                    [fm removeItemAtPath:dp error:nil];
+                    [fm copyItemAtPath:sp toPath:dp error:nil];
+                }
             }
+            [self runFastChownAndChmod:liveGroupPath];
         }
     }
 
-    // Ensure 100% of restored files in Zalo sandbox & AppGroups belong to mobile (501:501)
-    for (NSString *sub in restoreSubs) {
-        NSString *targetDir = [zaloContainer stringByAppendingPathComponent:sub];
-        [self recursivelyFixMobileOwnershipAtPath:targetDir fileManager:fm];
-    }
-    for (NSString *groupId in appGroups) {
-        NSString *liveGroupPath = appGroups[groupId];
-        for (NSString *sub in restoreSubs) {
-            NSString *targetDir = [liveGroupPath stringByAppendingPathComponent:sub];
-            [self recursivelyFixMobileOwnershipAtPath:targetDir fileManager:fm];
-        }
-    }
+    // 6. Fast Native Permission & Ownership Fix on Zalo Container
+    [self runFastChownAndChmod:zaloContainer];
 
-    // 6. Write restore trigger & active profile directly into Zalo Documents so ZTechHook.dylib imports them inside sandbox
+    // Write active profile directly into Zalo Documents so ZTechHook.dylib imports them inside sandbox
     NSString *docsDir = [zaloContainer stringByAppendingPathComponent:@"Documents"];
     [fm createDirectoryAtPath:docsDir withIntermediateDirectories:YES attributes:nil error:nil];
-    chown([docsDir UTF8String], 501, 501);
-    chmod([docsDir UTF8String], 0777);
-
-    NSString *triggerFile = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
-    [account.accountId writeToFile:triggerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    chown([triggerFile UTF8String], 501, 501);
-    chmod([triggerFile UTF8String], 0666);
-
     NSString *activeProfFile = [docsDir stringByAppendingPathComponent:@"_zt_active_profile.plist"];
     [[restoredProfile toDictionary] writeToFile:activeProfFile atomically:YES];
-    chown([activeProfFile UTF8String], 501, 501);
     chmod([activeProfFile UTF8String], 0666);
 
     NSString *markerFile = [docsDir stringByAppendingPathComponent:@"_zt_zalo_marker.txt"];
     [@"vn.com.vng.zalo" writeToFile:markerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    chown([markerFile UTF8String], 501, 501);
     chmod([markerFile UTF8String], 0666);
 
     // Ensure .GlobalPreferences symlink exists
@@ -758,11 +782,11 @@ extern char **environ;
         lchown([globalPrefsLink UTF8String], 501, 501);
     }
 
-    // Flush dirty buffers to filesystem before launching Zalo
+    // Flush filesystem
     sync();
 
-    // 7. Launch Zalo automatically!
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 7. Launch Zalo
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self launchZaloApp];
     });
 

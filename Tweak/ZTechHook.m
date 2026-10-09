@@ -511,164 +511,9 @@ static NSDictionary *ZTechLoadProfileOnce(void) {
         }
     }
 
-    // 3. Check CFPreferences AnyApplication
-    CFPropertyListRef cfVal = CFPreferencesCopyAppValue(CFSTR("ZTechGlobalProfile"), kCFPreferencesAnyApplication);
-    if (cfVal) {
-        if (CFGetTypeID(cfVal) == CFDictionaryGetTypeID()) {
-            NSDictionary *d = (__bridge_transfer NSDictionary *)cfVal;
-            NSDictionary *norm = ZTechNormalizeProfile(d);
-            ZTechApplyCachedProfileValues(norm);
-            return gCachedProfile;
-        }
-        CFRelease(cfVal);
-    }
-
     NSDictionary *norm = ZTechNormalizeProfile(nil);
     ZTechApplyCachedProfileValues(norm);
     return gCachedProfile;
-}
-
-#pragma mark - Zero-Leak Proxy Enforcement (NSURLSession, CFNetwork, SocketStream & getifaddrs)
-
-static void ZTechEnforceProxyOnConfiguration(NSURLSessionConfiguration *cfg) {
-    if (!cfg || !gProxyEnabled || !gCachedProxyDict) return;
-    @try {
-        cfg.connectionProxyDictionary = gCachedProxyDict;
-        if (@available(iOS 13.0, *)) {
-            cfg.multipathServiceType = NSURLSessionMultipathServiceTypeNone;
-        }
-        NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders ?: @{}];
-        if (gCachedProxyAuthHeader.length > 0) {
-            headers[@"Proxy-Authorization"] = gCachedProxyAuthHeader;
-            headers[@"Authorization-Proxy"] = gCachedProxyAuthHeader;
-        }
-        [headers removeObjectForKey:@"X-Forwarded-For"];
-        [headers removeObjectForKey:@"X-Real-IP"];
-        [headers removeObjectForKey:@"Client-IP"];
-        [headers removeObjectForKey:@"Forwarded"];
-        cfg.HTTPAdditionalHeaders = headers;
-    } @catch (NSException *e) {}
-}
-
-static NSURLRequest *ZTechSanitizeAndAuthorizeRequest(NSURLRequest *req) {
-    if (!req || !gProxyEnabled) return req;
-    @try {
-        NSMutableURLRequest *mReq = [req isKindOfClass:[NSMutableURLRequest class]]
-            ? (NSMutableURLRequest *)req
-            : [req mutableCopy];
-        if (gCachedProxyAuthHeader.length > 0 && ![mReq valueForHTTPHeaderField:@"Proxy-Authorization"]) {
-            [mReq setValue:gCachedProxyAuthHeader forHTTPHeaderField:@"Proxy-Authorization"];
-        }
-        [mReq setValue:nil forHTTPHeaderField:@"X-Forwarded-For"];
-        [mReq setValue:nil forHTTPHeaderField:@"X-Real-IP"];
-        [mReq setValue:nil forHTTPHeaderField:@"Client-IP"];
-        [mReq setValue:nil forHTTPHeaderField:@"Forwarded"];
-        return mReq;
-    } @catch (NSException *e) {
-        return req;
-    }
-}
-
-static NSURLSessionConfiguration *(*orig_defaultSessionConfig)(id, SEL) = NULL;
-static NSURLSessionConfiguration *swizzled_defaultSessionConfig(id self, SEL _cmd) {
-    NSURLSessionConfiguration *cfg = orig_defaultSessionConfig ? orig_defaultSessionConfig(self, _cmd) : nil;
-    ZTechEnforceProxyOnConfiguration(cfg);
-    return cfg;
-}
-
-static NSURLSessionConfiguration *(*orig_ephemeralSessionConfig)(id, SEL) = NULL;
-static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _cmd) {
-    NSURLSessionConfiguration *cfg = orig_ephemeralSessionConfig ? orig_ephemeralSessionConfig(self, _cmd) : nil;
-    ZTechEnforceProxyOnConfiguration(cfg);
-    return cfg;
-}
-
-static NSURLSessionConfiguration *(*orig_backgroundSessionConfig)(id, SEL, NSString *) = NULL;
-static NSURLSessionConfiguration *swizzled_backgroundSessionConfig(id self, SEL _cmd, NSString *identifier) {
-    NSURLSessionConfiguration *cfg = orig_backgroundSessionConfig ? orig_backgroundSessionConfig(self, _cmd, identifier) : nil;
-    ZTechEnforceProxyOnConfiguration(cfg);
-    return cfg;
-}
-
-static NSURLSession *(*orig_sessionWithConfig)(id, SEL, NSURLSessionConfiguration *) = NULL;
-static NSURLSession *swizzled_sessionWithConfig(id self, SEL _cmd, NSURLSessionConfiguration *configuration) {
-    ZTechEnforceProxyOnConfiguration(configuration);
-    return orig_sessionWithConfig ? orig_sessionWithConfig(self, _cmd, configuration) : nil;
-}
-
-static NSURLSession *(*orig_sessionWithConfigDelegateQueue)(id, SEL, NSURLSessionConfiguration *, id, NSOperationQueue *) = NULL;
-static NSURLSession *swizzled_sessionWithConfigDelegateQueue(id self, SEL _cmd, NSURLSessionConfiguration *configuration, id delegate, NSOperationQueue *queue) {
-    ZTechEnforceProxyOnConfiguration(configuration);
-    return orig_sessionWithConfigDelegateQueue ? orig_sessionWithConfigDelegateQueue(self, _cmd, configuration, delegate, queue) : nil;
-}
-
-static NSURLSessionDataTask *(*orig_dataTaskWithRequest)(id, SEL, NSURLRequest *) = NULL;
-static NSURLSessionDataTask *swizzled_dataTaskWithRequest(id self, SEL _cmd, NSURLRequest *request) {
-    NSURLRequest *cleanReq = ZTechSanitizeAndAuthorizeRequest(request);
-    return orig_dataTaskWithRequest ? orig_dataTaskWithRequest(self, _cmd, cleanReq) : nil;
-}
-
-static NSURLSessionDataTask *(*orig_dataTaskWithRequestCompletion)(id, SEL, NSURLRequest *, id) = NULL;
-static NSURLSessionDataTask *swizzled_dataTaskWithRequestCompletion(id self, SEL _cmd, NSURLRequest *request, id completionHandler) {
-    NSURLRequest *cleanReq = ZTechSanitizeAndAuthorizeRequest(request);
-    return orig_dataTaskWithRequestCompletion ? orig_dataTaskWithRequestCompletion(self, _cmd, cleanReq, completionHandler) : nil;
-}
-
-static CFDictionaryRef (*orig_CFNetworkCopySystemProxySettings)(void) = NULL;
-static CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
-    if (gProxyEnabled && gCachedProxyDict != nil) {
-        return (__bridge_retained CFDictionaryRef)[gCachedProxyDict copy];
-    }
-    return orig_CFNetworkCopySystemProxySettings ? orig_CFNetworkCopySystemProxySettings() : NULL;
-}
-
-static CFArrayRef (*orig_CFNetworkCopyProxiesForURL)(CFURLRef url, CFDictionaryRef proxySettings) = NULL;
-static CFArrayRef hooked_CFNetworkCopyProxiesForURL(CFURLRef url, CFDictionaryRef proxySettings) {
-    if (gProxyEnabled && gCachedCFProxyArray != nil) {
-        return (__bridge_retained CFArrayRef)[gCachedCFProxyArray copy];
-    }
-    return orig_CFNetworkCopyProxiesForURL ? orig_CFNetworkCopyProxiesForURL(url, proxySettings) : NULL;
-}
-
-static void (*orig_CFStreamCreatePairWithSocketToHost)(CFAllocatorRef alloc, CFStringRef host, UInt32 port, CFReadStreamRef *readStream, CFWriteStreamRef *writeStream) = NULL;
-static void hooked_CFStreamCreatePairWithSocketToHost(CFAllocatorRef alloc, CFStringRef host, UInt32 port, CFReadStreamRef *readStream, CFWriteStreamRef *writeStream) {
-    if (orig_CFStreamCreatePairWithSocketToHost) {
-        orig_CFStreamCreatePairWithSocketToHost(alloc, host, port, readStream, writeStream);
-    }
-    if (gProxyEnabled && gCachedProxyDict != nil) {
-        CFStringRef propKey = gProxyIsSocks ? kCFStreamPropertySOCKSProxy : kCFStreamPropertyHTTPProxy;
-        if (readStream && *readStream) {
-            CFReadStreamSetProperty(*readStream, propKey, (__bridge CFTypeRef)gCachedProxyDict);
-        }
-        if (writeStream && *writeStream) {
-            CFWriteStreamSetProperty(*writeStream, propKey, (__bridge CFTypeRef)gCachedProxyDict);
-        }
-    }
-}
-
-static int (*orig_getifaddrs)(struct ifaddrs **ifap) = NULL;
-static int hooked_getifaddrs(struct ifaddrs **ifap) {
-    int ret = orig_getifaddrs ? orig_getifaddrs(ifap) : -1;
-    if (ret == 0 && ifap != NULL && *ifap != NULL && gProxyEnabled) {
-        struct ifaddrs *cur = *ifap;
-        while (cur != NULL) {
-            if (cur->ifa_addr != NULL && cur->ifa_name != NULL && strncmp(cur->ifa_name, "lo", 2) != 0) {
-                sa_family_t fam = cur->ifa_addr->sa_family;
-                if (fam == AF_INET) {
-                    struct sockaddr_in *sin = (struct sockaddr_in *)cur->ifa_addr;
-                    sin->sin_addr.s_addr = gMaskedLocalIPv4;
-                } else if (fam == AF_INET6) {
-                    struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)cur->ifa_addr;
-                    memset(&sin6->sin6_addr, 0, sizeof(struct in6_addr));
-                    sin6->sin6_addr.s6_addr[0] = 0xfe;
-                    sin6->sin6_addr.s6_addr[1] = 0x80;
-                    sin6->sin6_addr.s6_addr[15] = 0x01;
-                }
-            }
-            cur = cur->ifa_next;
-        }
-    }
-    return ret;
 }
 
 #pragma mark - Lock-Free Pure C Function Hooks (uname, sysctlbyname, sysctl, MGCopyAnswer)
@@ -1006,78 +851,7 @@ static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
     return (unsigned long long)gRamBytes;
 }
 
-static id (*orig_WKWebView_initWithFrameConfig)(id, SEL, CGRect, id) = NULL;
-static id swizzled_WKWebView_initWithFrameConfig(id self, SEL _cmd, CGRect frame, id configuration) {
-    @try {
-        if (configuration) {
-            Class usrScriptCls = NSClassFromString(@"WKUserScript");
-            SEL allocSel = sel_registerName("alloc");
-            SEL initSel = sel_registerName("initWithSource:injectionTime:forMainFrameOnly:");
-            SEL uccSel = sel_registerName("userContentController");
-            SEL addSel = sel_registerName("addUserScript:");
-
-            if (usrScriptCls && [configuration respondsToSelector:uccSel]) {
-                id ucc = ((id (*)(id, SEL))objc_msgSend)(configuration, uccSel);
-                if (ucc && [ucc respondsToSelector:addSel]) {
-                    if (gProxyEnabled) {
-                        NSString *rtcJs = @"(function(){"
-                            @"var origRTC=window.RTCPeerConnection||window.webkitRTCPeerConnection;"
-                            @"if(origRTC){"
-                            @"var wrapped=function(cfg,con){"
-                            @"cfg=cfg||{};cfg.iceServers=[];cfg.iceTransportPolicy='relay';"
-                            @"return new origRTC(cfg,con);"
-                            @"};"
-                            @"wrapped.prototype=origRTC.prototype;"
-                            @"window.RTCPeerConnection=wrapped;window.webkitRTCPeerConnection=wrapped;"
-                            @"}"
-                            @"})();";
-                        id s0 = ((id (*)(id, SEL))objc_msgSend)(usrScriptCls, allocSel);
-                        if (s0 && [s0 respondsToSelector:initSel]) {
-                            id u0 = ((id (*)(id, SEL, NSString *, NSInteger, BOOL))objc_msgSend)(s0, initSel, rtcJs, 0, NO);
-                            if (u0) ((void (*)(id, SEL, id))objc_msgSend)(ucc, addSel, u0);
-                        }
-                    }
-
-                    NSString *safeModel = [(gModelNameObj ?: @"iPhone 16 Pro Max") stringByReplacingOccurrencesOfString:@"'" withString:@""];
-                    NSString *osVerUnderscore = [(gIosVersionObj ?: @"18.2.1") stringByReplacingOccurrencesOfString:@"." withString:@"_"];
-                    NSString *customUA = [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148", osVerUnderscore];
-                    NSString *js = [NSString stringWithFormat:
-                        @"(function(){"
-                        @"var m='%@';"
-                        @"var ua='%@';"
-                        @"try{Object.defineProperty(navigator,'userAgent',{get:function(){return ua;}});}catch(e){}"
-                        @"var re=/iPhone(?:\\d+,\\d+|\\s*(?:6s?|7|8|SE|X[SR]?|1[1-6]e?)(?:\\s*(?:Plus|Pro\\s*Max|Pro|Max|mini|\\(\\d+[a-z]*\\s*(?:generation|gen\\.?)\\)|\\(\\d{4}\\)))?)/gi;"
-                        @"function fix(){"
-                        @"if(!document.body||!document.body.innerText||document.body.innerText.indexOf('iPhone')===-1)return;"
-                        @"var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false),n;"
-                        @"while((n=w.nextNode())){"
-                        @"if(n.nodeValue&&n.nodeValue.indexOf('iPhone')!==-1&&n.nodeValue.indexOf(m)===-1){"
-                        @"n.nodeValue=n.nodeValue.replace(re,m);"
-                        @"}"
-                        @"}"
-                        @"}"
-                        @"setTimeout(fix,150);setTimeout(fix,500);setInterval(fix,900);"
-                        @"})();", safeModel, customUA];
-
-                    id s1 = ((id (*)(id, SEL))objc_msgSend)(usrScriptCls, allocSel);
-                    if (s1 && [s1 respondsToSelector:initSel]) {
-                        id u1 = ((id (*)(id, SEL, NSString *, NSInteger, BOOL))objc_msgSend)(s1, initSel, js, 1, NO);
-                        if (u1) ((void (*)(id, SEL, id))objc_msgSend)(ucc, addSel, u1);
-                    }
-                }
-            }
-        }
-    } @catch (NSException *e) {}
-    id webView = orig_WKWebView_initWithFrameConfig ? orig_WKWebView_initWithFrameConfig(self, _cmd, frame, configuration) : nil;
-    if (webView && [webView respondsToSelector:sel_registerName("setCustomUserAgent:")]) {
-        NSString *osVerUnderscore = [(gIosVersionObj ?: @"18.2.1") stringByReplacingOccurrencesOfString:@"." withString:@"_"];
-        NSString *customUA = [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148", osVerUnderscore];
-        ((void (*)(id, SEL, id))objc_msgSend)(webView, sel_registerName("setCustomUserAgent:"), customUA);
-    }
-    return webView;
-}
-
-#pragma mark - Safe Container Repair, Vault Snapshot/Restore & In-Process Reset
+#pragma mark - Safe Container Directories
 
 static void ZTechEnsureContainerDirectoriesExist(NSString *home) {
     if (!home || home.length == 0) return;
@@ -1099,167 +873,6 @@ static void ZTechEnsureContainerDirectoriesExist(NSString *home) {
             [fm createDirectoryAtPath:p withIntermediateDirectories:YES attributes:nil error:nil];
         }
         chmod([p UTF8String], 0777);
-    }
-    NSString *globalPrefsLink = [home stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
-    if (![fm fileExistsAtPath:globalPrefsLink]) {
-        symlink("/private/var/mobile/Library/Preferences/.GlobalPreferences.plist", [globalPrefsLink UTF8String]);
-    }
-}
-
-static void ZTechSnapshotZaloKeychainAndPrefsAsync(NSString *bundleId) {
-    if (!bundleId || bundleId.length == 0) return;
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-        @autoreleasepool {
-            @try {
-                NSString *home = NSHomeDirectory();
-                NSString *docsDir = [home stringByAppendingPathComponent:@"Documents"];
-
-                NSString *markerPath = [docsDir stringByAppendingPathComponent:@"_zt_zalo_marker.txt"];
-                [bundleId writeToFile:markerPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                chmod([markerPath UTF8String], 0666);
-
-                NSDictionary *dom = [[NSUserDefaults standardUserDefaults] persistentDomainForName:bundleId];
-                if (dom && dom.count > 0) {
-                    NSString *prefsSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"];
-                    [dom writeToFile:prefsSnapPath atomically:YES];
-                }
-
-                NSMutableArray *savedItems = [NSMutableArray array];
-                NSArray *classes = @[
-                    (__bridge id)kSecClassGenericPassword,
-                    (__bridge id)kSecClassInternetPassword
-                ];
-                for (id secClass in classes) {
-                    NSDictionary *query = @{
-                        (__bridge id)kSecClass: secClass,
-                        (__bridge id)kSecReturnAttributes: @YES,
-                        (__bridge id)kSecReturnData: @YES,
-                        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll
-                    };
-                    CFTypeRef result = NULL;
-                    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-                    if (status == errSecSuccess && result) {
-                        NSArray *items = (__bridge_transfer NSArray *)result;
-                        for (NSDictionary *item in items) {
-                            NSMutableDictionary *entry = [NSMutableDictionary dictionary];
-                            entry[@"secClass"] = [secClass isEqual:(__bridge id)kSecClassGenericPassword] ? @"genp" : @"inet";
-                            if ([item[(__bridge id)kSecAttrAccount] isKindOfClass:[NSString class]] ||
-                                [item[(__bridge id)kSecAttrAccount] isKindOfClass:[NSData class]]) {
-                                entry[@"acct"] = item[(__bridge id)kSecAttrAccount];
-                            }
-                            if ([item[(__bridge id)kSecAttrService] isKindOfClass:[NSString class]] ||
-                                [item[(__bridge id)kSecAttrService] isKindOfClass:[NSData class]]) {
-                                entry[@"svce"] = item[(__bridge id)kSecAttrService];
-                            }
-                            if ([item[(__bridge id)kSecAttrGeneric] isKindOfClass:[NSData class]] ||
-                                [item[(__bridge id)kSecAttrGeneric] isKindOfClass:[NSString class]]) {
-                                entry[@"gena"] = item[(__bridge id)kSecAttrGeneric];
-                            }
-                            if ([item[(__bridge id)kSecAttrAccessGroup] isKindOfClass:[NSString class]]) {
-                                entry[@"agrp"] = item[(__bridge id)kSecAttrAccessGroup];
-                            }
-                            if ([item[(__bridge id)kSecValueData] isKindOfClass:[NSData class]]) {
-                                entry[@"v_Data"] = item[(__bridge id)kSecValueData];
-                            }
-                            if (entry[@"v_Data"]) {
-                                [savedItems addObject:entry];
-                            }
-                        }
-                    }
-                }
-                if (savedItems.count > 0) {
-                    NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
-                    [savedItems writeToFile:kcSnapPath atomically:YES];
-                }
-            } @catch (NSException *e) {}
-        }
-    });
-}
-
-static BOOL ZTechCheckAndPerformInAppRestore(NSString *bundleId) {
-    @try {
-        NSString *home = NSHomeDirectory();
-        NSString *docsDir = [home stringByAppendingPathComponent:@"Documents"];
-        NSString *triggerFile = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
-        NSFileManager *fm = [NSFileManager defaultManager];
-        if (![fm fileExistsAtPath:triggerFile]) {
-            return NO;
-        }
-
-        [fm removeItemAtPath:triggerFile error:nil];
-
-        CFTypeRef cfToken = CFPreferencesCopyAppValue(CFSTR("ZTechResetToken"), kCFPreferencesAnyApplication);
-        if (cfToken && CFGetTypeID(cfToken) == CFStringGetTypeID()) {
-            NSString *globalToken = [(__bridge NSString *)cfToken copy];
-            NSString *tokenFile = [docsDir stringByAppendingPathComponent:@"_zt_last_reset_token.txt"];
-            [globalToken writeToFile:tokenFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            chmod([tokenFile UTF8String], 0666);
-        }
-        if (cfToken) CFRelease(cfToken);
-
-        NSString *prefsSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"];
-        NSDictionary *savedPrefs = [NSDictionary dictionaryWithContentsOfFile:prefsSnapPath];
-        if (savedPrefs && [savedPrefs isKindOfClass:[NSDictionary class]] && bundleId.length > 0) {
-            [[NSUserDefaults standardUserDefaults] setPersistentDomain:savedPrefs forName:bundleId];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-
-        NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
-        NSArray *savedKc = [NSArray arrayWithContentsOfFile:kcSnapPath];
-        if (savedKc && [savedKc isKindOfClass:[NSArray class]] && savedKc.count > 0) {
-            NSArray *secClasses = @[
-                (__bridge id)kSecClassGenericPassword,
-                (__bridge id)kSecClassInternetPassword
-            ];
-            for (id secClass in secClasses) {
-                NSDictionary *delQuery = @{(__bridge id)kSecClass: secClass};
-                SecItemDelete((__bridge CFDictionaryRef)delQuery);
-            }
-            for (NSDictionary *entry in savedKc) {
-                if (![entry isKindOfClass:[NSDictionary class]] || !entry[@"v_Data"]) continue;
-                NSMutableDictionary *addItem = [NSMutableDictionary dictionary];
-                NSString *clsType = entry[@"secClass"];
-                addItem[(__bridge id)kSecClass] = [clsType isEqualToString:@"inet"]
-                    ? (__bridge id)kSecClassInternetPassword
-                    : (__bridge id)kSecClassGenericPassword;
-                addItem[(__bridge id)kSecValueData] = entry[@"v_Data"];
-                addItem[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlock;
-                if (entry[@"acct"]) addItem[(__bridge id)kSecAttrAccount] = entry[@"acct"];
-                if (entry[@"svce"]) addItem[(__bridge id)kSecAttrService] = entry[@"svce"];
-                if (entry[@"gena"]) addItem[(__bridge id)kSecAttrGeneric] = entry[@"gena"];
-                if (entry[@"agrp"]) addItem[(__bridge id)kSecAttrAccessGroup] = entry[@"agrp"];
-                SecItemAdd((__bridge CFDictionaryRef)addItem, NULL);
-            }
-        }
-        return YES;
-    } @catch (NSException *e) {
-        return NO;
-    }
-}
-
-static void ZTechCheckAndPerformInAppReset(NSString *bundleId) {
-    @try {
-        NSString *lowerBundle = [bundleId lowercaseString];
-        if (![lowerBundle containsString:@"zalo"] &&
-            ![lowerBundle containsString:@"vng"] &&
-            ![lowerBundle containsString:@"tiktok"] &&
-            ![lowerBundle containsString:@"musical"] &&
-            ![lowerBundle containsString:@"shopee"]) {
-            return;
-        }
-
-        NSString *home = NSHomeDirectory();
-        ZTechEnsureContainerDirectoriesExist(home);
-
-        if ([lowerBundle containsString:@"zalo"] || [lowerBundle containsString:@"vng"]) {
-            NSString *markerPath = [home stringByAppendingPathComponent:@"Documents/_zt_zalo_marker.txt"];
-            [bundleId writeToFile:markerPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            chmod([markerPath UTF8String], 0666);
-        }
-
-        // If this launch is an account restore from Vault, apply restored keychain and preferences
-        ZTechCheckAndPerformInAppRestore(bundleId);
-    } @catch (NSException *exception) {
     }
 }
 
@@ -1348,31 +961,10 @@ static void ZTechHookInit(void) {
 
         ZTechEnsureContainerDirectoriesExist(NSHomeDirectory());
 
+        // Fast instant cached profile read
         ZTechLoadProfileOnce();
-        ZTechCheckAndPerformInAppReset(bundleId);
 
-        NSString *lowerBundle = [bundleId lowercaseString];
-        if ([lowerBundle containsString:@"zalo"] || [lowerBundle containsString:@"vng"]) {
-            [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                              object:nil
-                                                               queue:[NSOperationQueue mainQueue]
-                                                          usingBlock:^(NSNotification * _Nonnull note) {
-                gCachedProfile = nil;
-                ZTechLoadProfileOnce();
-                ZTechSnapshotZaloKeychainAndPrefsAsync(bundleId);
-            }];
-            [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidEnterBackgroundNotification
-                                                              object:nil
-                                                               queue:[NSOperationQueue mainQueue]
-                                                          usingBlock:^(NSNotification * _Nonnull note) {
-                ZTechSnapshotZaloKeychainAndPrefsAsync(bundleId);
-            }];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                ZTechSnapshotZaloKeychainAndPrefsAsync(bundleId);
-            });
-        }
-
-        // 1. Objective-C Swizzles on UIDevice, NSProcessInfo, NSURLSessionConfiguration, NSURLSession
+        // 1. Swizzle UIDevice
         Class uiDeviceCls = [UIDevice class];
         Method mSysVer = class_getInstanceMethod(uiDeviceCls, @selector(systemVersion));
         if (mSysVer) {
@@ -1398,6 +990,7 @@ static void ZTechHookInit(void) {
             method_setImplementation(mIdfv, (IMP)swizzled_identifierForVendor);
         }
 
+        // 2. Swizzle NSProcessInfo
         Class procCls = [NSProcessInfo class];
         Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
         if (mOsVer) {
@@ -1417,58 +1010,7 @@ static void ZTechHookInit(void) {
             method_setImplementation(mPhysMem, (IMP)swizzled_physicalMemory);
         }
 
-        Class urlCfgCls = [NSURLSessionConfiguration class];
-        Method mDefCfg = class_getClassMethod(urlCfgCls, @selector(defaultSessionConfiguration));
-        if (mDefCfg) {
-            orig_defaultSessionConfig = (void *)method_getImplementation(mDefCfg);
-            method_setImplementation(mDefCfg, (IMP)swizzled_defaultSessionConfig);
-        }
-        Method mEphCfg = class_getClassMethod(urlCfgCls, @selector(ephemeralSessionConfiguration));
-        if (mEphCfg) {
-            orig_ephemeralSessionConfig = (void *)method_getImplementation(mEphCfg);
-            method_setImplementation(mEphCfg, (IMP)swizzled_ephemeralSessionConfig);
-        }
-        Method mBgCfg = class_getClassMethod(urlCfgCls, @selector(backgroundSessionConfigurationWithIdentifier:));
-        if (mBgCfg) {
-            orig_backgroundSessionConfig = (void *)method_getImplementation(mBgCfg);
-            method_setImplementation(mBgCfg, (IMP)swizzled_backgroundSessionConfig);
-        }
-
-        Class urlSessCls = [NSURLSession class];
-        Method mSessCfg = class_getClassMethod(urlSessCls, @selector(sessionWithConfiguration:));
-        if (mSessCfg) {
-            orig_sessionWithConfig = (void *)method_getImplementation(mSessCfg);
-            method_setImplementation(mSessCfg, (IMP)swizzled_sessionWithConfig);
-        }
-        Method mSessCfgDel = class_getClassMethod(urlSessCls, @selector(sessionWithConfiguration:delegate:delegateQueue:));
-        if (mSessCfgDel) {
-            orig_sessionWithConfigDelegateQueue = (void *)method_getImplementation(mSessCfgDel);
-            method_setImplementation(mSessCfgDel, (IMP)swizzled_sessionWithConfigDelegateQueue);
-        }
-        Method mDataTaskReq = class_getInstanceMethod(urlSessCls, @selector(dataTaskWithRequest:));
-        if (mDataTaskReq) {
-            orig_dataTaskWithRequest = (void *)method_getImplementation(mDataTaskReq);
-            method_setImplementation(mDataTaskReq, (IMP)swizzled_dataTaskWithRequest);
-        }
-        Method mDataTaskReqComp = class_getInstanceMethod(urlSessCls, @selector(dataTaskWithRequest:completionHandler:));
-        if (mDataTaskReqComp) {
-            orig_dataTaskWithRequestCompletion = (void *)method_getImplementation(mDataTaskReqComp);
-            method_setImplementation(mDataTaskReqComp, (IMP)swizzled_dataTaskWithRequestCompletion);
-        }
-
-        // 2. Zalo WKWebView WebRTC Proxy Leak Protection
-        if ([lowerBundle containsString:@"zalo"] || [lowerBundle containsString:@"vng"]) {
-            Class wkCls = NSClassFromString(@"WKWebView");
-            if (wkCls) {
-                Method mWkInit = class_getInstanceMethod(wkCls, sel_registerName("initWithFrame:configuration:"));
-                if (mWkInit) {
-                    orig_WKWebView_initWithFrameConfig = (void *)method_getImplementation(mWkInit);
-                    method_setImplementation(mWkInit, (IMP)swizzled_WKWebView_initWithFrameConfig);
-                }
-            }
-        }
-
-        // 3. GPU (Metal) & Carrier Swizzles
+        // 3. Swizzle GPU (_MTLDevice / MTLDevice) without instantiating device
         Class mtlDevCls = NSClassFromString(@"_MTLDevice");
         if (!mtlDevCls) mtlDevCls = NSClassFromString(@"MTLDevice");
         if (mtlDevCls) {
@@ -1478,20 +1020,8 @@ static void ZTechHookInit(void) {
                 method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
             }
         }
-        void *raw_MTL = dlsym(RTLD_DEFAULT, "MTLCreateSystemDefaultDevice");
-        if (raw_MTL) {
-            id (*createDev)(void) = (id (*)(void))raw_MTL;
-            id dev = createDev();
-            if (dev) {
-                Class instCls = [dev class];
-                Method mGpu = class_getInstanceMethod(instCls, @selector(name));
-                if (mGpu && method_getImplementation(mGpu) != (IMP)swizzled_MTLDevice_name) {
-                    orig_MTLDevice_name = (void *)method_getImplementation(mGpu);
-                    method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
-                }
-            }
-        }
 
+        // 4. Swizzle CTCarrier
         Class ctCarrierCls = NSClassFromString(@"CTCarrier");
         if (ctCarrierCls) {
             Method mCarrier = class_getInstanceMethod(ctCarrierCls, @selector(carrierName));
@@ -1516,30 +1046,21 @@ static void ZTechHookInit(void) {
             }
         }
 
-        // 4. Safe Mach-O Symbol Rebinding (Covers __got, __auth_got, __la_symbol_ptr, __nl_symbol_ptr)
+        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname, sysctl, MGCopyAnswer, IORegistryEntryCreateCFProperty)
         void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
         void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
         void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
         void *raw_MGCopyAnswer = dlsym(RTLD_DEFAULT, "MGCopyAnswer");
-        void *raw_CFProxy = dlsym(RTLD_DEFAULT, "CFNetworkCopySystemProxySettings");
-        void *raw_CFProxiesForURL = dlsym(RTLD_DEFAULT, "CFNetworkCopyProxiesForURL");
-        void *raw_CFStreamSocket = dlsym(RTLD_DEFAULT, "CFStreamCreatePairWithSocketToHost");
-        void *raw_getifaddrs = dlsym(RTLD_DEFAULT, "getifaddrs");
         void *raw_IORegistry = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
 
         orig_uname = raw_uname;
         orig_sysctlbyname = raw_sysctlbyname;
         orig_sysctl = raw_sysctl;
         orig_MGCopyAnswer = raw_MGCopyAnswer;
-        orig_CFNetworkCopySystemProxySettings = raw_CFProxy;
-        orig_CFNetworkCopyProxiesForURL = raw_CFProxiesForURL;
-        orig_CFStreamCreatePairWithSocketToHost = raw_CFStreamSocket;
-        orig_getifaddrs = raw_getifaddrs;
         if (raw_IORegistry) {
             orig_IORegistryEntryCreateCFProperty = raw_IORegistry;
         }
 
-        // 4. ElleKit / Substrate Direct Native Hooking (Native for arm64e Dopamine & arm64)
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
         zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
         if (!pMSHook) {
@@ -1556,22 +1077,13 @@ static void ZTechHookInit(void) {
             if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
             if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
             if (raw_MGCopyAnswer) pMSHook(raw_MGCopyAnswer, (void *)hooked_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
-            if (raw_getifaddrs) pMSHook(raw_getifaddrs, (void *)hooked_getifaddrs, (void **)&orig_getifaddrs);
             if (raw_IORegistry) pMSHook(raw_IORegistry, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
-            if (raw_CFProxy) pMSHook(raw_CFProxy, (void *)hooked_CFNetworkCopySystemProxySettings, (void **)&orig_CFNetworkCopySystemProxySettings);
-            if (raw_CFProxiesForURL) pMSHook(raw_CFProxiesForURL, (void *)hooked_CFNetworkCopyProxiesForURL, (void **)&orig_CFNetworkCopyProxiesForURL);
-            if (raw_CFStreamSocket) pMSHook(raw_CFStreamSocket, (void *)hooked_CFStreamCreatePairWithSocketToHost, (void **)&orig_CFStreamCreatePairWithSocketToHost);
         } else {
-            // 5. Fallback Mach-O Symbol Rebinding (ONLY used when MSHookFunction is unavailable)
             gRebindings[0] = (struct zt_rebinding){"uname", (void *)hooked_uname, raw_uname};
             gRebindings[1] = (struct zt_rebinding){"sysctlbyname", (void *)hooked_sysctlbyname, raw_sysctlbyname};
             gRebindings[2] = (struct zt_rebinding){"sysctl", (void *)hooked_sysctl, raw_sysctl};
             gRebindings[3] = (struct zt_rebinding){"MGCopyAnswer", (void *)hooked_MGCopyAnswer, raw_MGCopyAnswer};
-            gRebindings[4] = (struct zt_rebinding){"CFNetworkCopySystemProxySettings", (void *)hooked_CFNetworkCopySystemProxySettings, raw_CFProxy};
-            gRebindings[5] = (struct zt_rebinding){"CFNetworkCopyProxiesForURL", (void *)hooked_CFNetworkCopyProxiesForURL, raw_CFProxiesForURL};
-            gRebindings[6] = (struct zt_rebinding){"CFStreamCreatePairWithSocketToHost", (void *)hooked_CFStreamCreatePairWithSocketToHost, raw_CFStreamSocket};
-            gRebindings[7] = (struct zt_rebinding){"getifaddrs", (void *)hooked_getifaddrs, raw_getifaddrs};
-            gRebindingsCount = 8;
+            gRebindingsCount = 4;
             if (raw_IORegistry) {
                 gRebindings[gRebindingsCount++] = (struct zt_rebinding){"IORegistryEntryCreateCFProperty", (void *)hooked_IORegistryEntryCreateCFProperty, raw_IORegistry};
             }

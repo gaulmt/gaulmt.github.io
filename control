@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.4.6
+Version: 5.4.7
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.4.6 - Triet De Fix Zalo Crash, PAC arm64e Fix, Mobile Perms Fix
+Description: gaulmt -Tech v5.4.7 - Instant Vault Restore & Purge Dyld SecItem Hangs
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

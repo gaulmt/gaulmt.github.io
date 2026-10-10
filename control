@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.0
+Version: 5.5.1
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.0 - Tich Hop Chan Doan He Thong & Fake Hoan Hao AIDA64 / Zalo
+Description: gaulmt -Tech v5.5.1 - Fix Crash Zalo tren iPhone 11-16 (arm64e) & Fake Hoan Hao AIDA64
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

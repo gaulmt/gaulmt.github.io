@@ -799,7 +799,15 @@ static void ZTechHookInit(void) {
             }
         }
 
-        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname via ElleKit / Substrate)
+        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname, sysctl via ElleKit / Substrate)
+        // CRITICAL FIX FOR ARM64E (iPhone 11 - iPhone 16):
+        // Zalo invokes sysctl hundreds of times on startup across multi-threaded GCD/networking/WebKit calls.
+        // On ARM64E devices (A12+), MSHookFunction on 'sysctl' creates PAC-trampolines that trigger fatal
+        // hardware pointer authentication / memory exceptions in Zalo.
+        // Therefore:
+        // - In AIDA64: Hook sysctl, sysctlbyname, and uname to achieve 100% hardware display spoofing.
+        // - In Zalo: ONLY hook uname (and sysctlbyname). NEVER hook raw sysctl! Zalo gets full device identity
+        //   via UIDevice, NSProcessInfo, MTLDevice, CTCarrier and uname without any risk of crashing!
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
         zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
         if (!pMSHook) {
@@ -815,11 +823,15 @@ static void ZTechHookInit(void) {
         }
         if (pMSHook) {
             void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
-            void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
-            void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
             if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
-            if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
-            if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
+
+            if (isAida) {
+                // AIDA64 queries raw sysctl & sysctlbyname extensively to read CPU cores, RAM, and hardware model
+                void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
+                void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
+                if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
+                if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
+            }
         }
     }
 }

@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.5.0
+          Version: 5.5.1
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.5.0 truc tiep tren Sileo & Zebra (Tich Hop Chan Doan & Fake AIDA64 / Zalo)
+          Description: Nguon cai dat gaulmt -Tech v5.5.1 truc tiep tren Sileo & Zebra (Fix Triet De Crash Zalo tren iPhone 11-16 & Fake AIDA64)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.5.0 - Tích Hợp Chẩn Đoán Thiết Bị & Fake Hoàn Hảo AIDA64 / Zalo"
+                    "title": "gaulmt -Tech v5.5.1 - Khắc Phục Triệt Để Crash Zalo iPhone 11-16 & Fake AIDA64"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản cập nhật **gaulmt -Tech v5.5.0** mang đến công cụ chẩn đoán chuyên sâu và sửa triệt để nhận diện phần cứng:\n\n- **Tích Hợp Chức Năng 'Chẩn Đoán & Copy'**: Khách hàng chỉ cần bấm 1 nút trong app, toàn bộ thông tin về kiểu Jailbreak (Dopamine/palera1n/Rootful), thư viện Hook (ElleKit/Substrate), tình trạng Tweak, cấu trúc quyền hạn thư mục Zalo và AIDA64 sẽ được sao chép ngay để gửi hỗ trợ kỹ thuật.\n- **Lệnh CLI ztech-diag**: Bổ sung lệnh terminal `/var/jb/usr/bin/ztech-diag` để kiểm tra nhanh môi trường qua NewTerm / SSH.\n- **Fake Phần Cứng Hoàn Hảo 100% Cho AIDA64 & Zalo**: Chặn đứng toàn bộ tầng POSIX `sysctl`, `sysctlbyname`, `uname` và khớp bộ lọc `Executables = ( 'AIDA64', 'aida64', 'Zalo' )`.\n- **Tối Ưu Quyền Hạn Mobile (501:501)**: Ghi profile và phân quyền trực tiếp vào Documents của Zalo và AIDA64, không bị lỗi Sandbox."
+                    "markdown": "Bản cập nhật **gaulmt -Tech v5.5.1** giải quyết dứt điểm hiện tượng Zalo bị crash trên các dòng iPhone 11 trở lên (ARM64E PAC):\n\n- **Fix Xung Đột Pointer Authentication (ARM64E)**: Cô lập hoàn toàn hook `sysctl` chỉ dành riêng cho AIDA64; Zalo không còn bị can thiệp tầng PAC trampoline syscall, loại bỏ 100% nguyên nhân gây văng app khi khởi động.\n- **Đồng Bộ Nhận Diện Hoàn Hảo**: Giữ nguyên cơ chế spoof UIDevice, NSProcessInfo, Metal GPU, CTCarrier, uname cho cả Zalo và AIDA64.\n- **Tự Động Phân Quyền Mobile (501:501)**: Đảm bảo Sandbox không bao giờ bị chặn truy cập file dữ liệu profile."
                   }
                 ]
               }

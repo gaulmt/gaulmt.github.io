@@ -1,0 +1,38 @@
+Package: com.ztech.devicechanger
+Version: 5.5.1
+Architecture: iphoneos-arm
+Maintainer: gaulmt -Tech
+Installed-Size: 1032
+Depends: firmware (>= 12.0), mobilesubstrate
+Filename: debs/gaulmt_Tech_Rootful_arm.deb
+Size: 165462
+MD5sum: e82fde63d6d2aef21a241233a89c9680
+SHA1: 2618d58c3a02bb67838dce80eb15bd47c04f9bbe
+SHA256: 59fdc29c9a88ea355062bf429c7fd8fdbd070d0ac307de42612cd093341c4bb4
+Section: Utilities
+Description: gaulmt -Tech v5.5.1 - Fix Crash Zalo tren iPhone 11-16 (arm64e) & Fake Hoan Hao AIDA64
+Author: gaulmt -Tech
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: gaulmt -Tech
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.5.1
+Architecture: iphoneos-arm64
+Maintainer: gaulmt -Tech
+Installed-Size: 1032
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/gaulmt_Tech_Rootless_arm64.deb
+Size: 165038
+MD5sum: 078ddfa5826e1fa5e9d1d0d04fc9a9f6
+SHA1: 55f2de3bf3dc5d7243fd0af3914e5de97fd568d7
+SHA256: 85ea1e19e9ecc72dd021f1349001f41937362e74374495fea214e083d3ea7b56
+Section: Utilities
+Description: gaulmt -Tech v5.5.1 - Fix Crash Zalo tren iPhone 11-16 (arm64e) & Fake Hoan Hao AIDA64
+Author: gaulmt -Tech
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: gaulmt -Tech (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+

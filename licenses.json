@@ -1,0 +1,12 @@
+{
+  "updatedAt": "2026-10-07T08:30:00Z",
+  "keys": [
+    {
+      "key": "GT-ADMIN-MASTER-9999",
+      "hwid": "*",
+      "owner": "Admin Chủ Hệ Thống",
+      "expires": "LIFETIME",
+      "status": "active"
+    }
+  ]
+}

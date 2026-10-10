@@ -1,0 +1,21 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "gaulmt -Tech v5.5.1 - Khắc Phục Triệt Để Crash Zalo iPhone 11-16 & Fake AIDA64"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Bản cập nhật **gaulmt -Tech v5.5.1** giải quyết dứt điểm hiện tượng Zalo bị crash trên các dòng iPhone 11 trở lên (ARM64E PAC):\n\n- **Fix Xung Đột Pointer Authentication (ARM64E)**: Cô lập hoàn toàn hook `sysctl` chỉ dành riêng cho AIDA64; Zalo không còn bị can thiệp tầng PAC trampoline syscall, loại bỏ 100% nguyên nhân gây văng app khi khởi động.\n- **Đồng Bộ Nhận Diện Hoàn Hảo**: Giữ nguyên cơ chế spoof UIDevice, NSProcessInfo, Metal GPU, CTCarrier, uname cho cả Zalo và AIDA64.\n- **Tự Động Phân Quyền Mobile (501:501)**: Đảm bảo Sandbox không bao giờ bị chặn truy cập file dữ liệu profile."
+        }
+      ]
+    }
+  ]
+}

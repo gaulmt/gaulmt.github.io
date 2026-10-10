@@ -1,0 +1,8 @@
+Origin: gaulmt -Tech Official Repo
+Label: gaulmt -Tech
+Suite: stable
+Version: 5.5.1
+Codename: ios
+Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
+Components: main
+Description: Nguon cai dat gaulmt -Tech v5.5.1 truc tiep tren Sileo & Zebra (Fix Triet De Crash Zalo tren iPhone 11-16 & Fake AIDA64)

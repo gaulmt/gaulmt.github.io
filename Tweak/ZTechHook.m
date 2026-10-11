@@ -602,31 +602,6 @@ static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
     return (unsigned long long)gRamBytes;
 }
 
-#pragma mark - Safe Container Directories
-
-static void ZTechEnsureContainerDirectoriesExist(NSString *home) {
-    if (!home || home.length == 0) return;
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray<NSString *> *requiredDirs = @[
-        @"Documents",
-        @"tmp",
-        @"SystemData",
-        @"Library",
-        @"Library/Caches",
-        @"Library/Preferences",
-        @"Library/Cookies",
-        @"Library/Application Support",
-        @"Library/SplashBoard"
-    ];
-    for (NSString *sub in requiredDirs) {
-        NSString *p = [home stringByAppendingPathComponent:sub];
-        if (![fm fileExistsAtPath:p]) {
-            [fm createDirectoryAtPath:p withIntermediateDirectories:YES attributes:nil error:nil];
-        }
-        chmod([p UTF8String], 0777);
-    }
-}
-
 #pragma mark - Constructor
 
 __attribute__((constructor))
@@ -712,121 +687,123 @@ static void ZTechHookInit(void) {
             gRealMachineCStr[sizeof(gRealMachineCStr) - 1] = '\0';
         }
 
-        ZTechEnsureContainerDirectoriesExist(NSHomeDirectory());
-
         // Fast instant cached profile read
         ZTechLoadProfileOnce();
 
-        // 1. Swizzle UIDevice
-        Class uiDeviceCls = [UIDevice class];
-        Method mSysVer = class_getInstanceMethod(uiDeviceCls, @selector(systemVersion));
-        if (mSysVer) {
-            orig_systemVersion = (void *)method_getImplementation(mSysVer);
-            method_setImplementation(mSysVer, (IMP)swizzled_systemVersion);
-        }
-
-        Method mDevName = class_getInstanceMethod(uiDeviceCls, @selector(name));
-        if (mDevName) {
-            orig_deviceName = (void *)method_getImplementation(mDevName);
-            method_setImplementation(mDevName, (IMP)swizzled_deviceName);
-        }
-
-        Method mBat = class_getInstanceMethod(uiDeviceCls, @selector(batteryLevel));
-        if (mBat) {
-            orig_batteryLevel = (void *)method_getImplementation(mBat);
-            method_setImplementation(mBat, (IMP)swizzled_batteryLevel);
-        }
-
-        Method mIdfv = class_getInstanceMethod(uiDeviceCls, @selector(identifierForVendor));
-        if (mIdfv) {
-            orig_identifierForVendor = (void *)method_getImplementation(mIdfv);
-            method_setImplementation(mIdfv, (IMP)swizzled_identifierForVendor);
-        }
-
-        // 2. Swizzle NSProcessInfo
-        Class procCls = [NSProcessInfo class];
-        Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
-        if (mOsVer) {
-            orig_osVersion = (void *)method_getImplementation(mOsVer);
-            method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
-        }
-
-        Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
-        if (mOsVerStr) {
-            orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
-            method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
-        }
-
-        Method mPhysMem = class_getInstanceMethod(procCls, @selector(physicalMemory));
-        if (mPhysMem) {
-            orig_physicalMemory = (void *)method_getImplementation(mPhysMem);
-            method_setImplementation(mPhysMem, (IMP)swizzled_physicalMemory);
-        }
-
-        // 3. Swizzle GPU (_MTLDevice / MTLDevice) without instantiating device
-        Class mtlDevCls = NSClassFromString(@"_MTLDevice");
-        if (!mtlDevCls) mtlDevCls = NSClassFromString(@"MTLDevice");
-        if (mtlDevCls) {
-            Method mGpu = class_getInstanceMethod(mtlDevCls, @selector(name));
-            if (mGpu) {
-                orig_MTLDevice_name = (void *)method_getImplementation(mGpu);
-                method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
+        // 1. Safe Objective-C Swizzling for UIDevice (Safe for BOTH Zalo and AIDA64)
+        @try {
+            Class uiDeviceCls = [UIDevice class];
+            Method mSysVer = class_getInstanceMethod(uiDeviceCls, @selector(systemVersion));
+            if (mSysVer) {
+                orig_systemVersion = (void *)method_getImplementation(mSysVer);
+                method_setImplementation(mSysVer, (IMP)swizzled_systemVersion);
             }
-        }
 
-        // 4. Swizzle CTCarrier
-        Class ctCarrierCls = NSClassFromString(@"CTCarrier");
-        if (ctCarrierCls) {
-            Method mCarrier = class_getInstanceMethod(ctCarrierCls, @selector(carrierName));
-            if (mCarrier) {
-                orig_carrierName = (void *)method_getImplementation(mCarrier);
-                method_setImplementation(mCarrier, (IMP)swizzled_carrierName);
+            Method mDevName = class_getInstanceMethod(uiDeviceCls, @selector(name));
+            if (mDevName) {
+                orig_deviceName = (void *)method_getImplementation(mDevName);
+                method_setImplementation(mDevName, (IMP)swizzled_deviceName);
             }
-            Method mIso = class_getInstanceMethod(ctCarrierCls, @selector(isoCountryCode));
-            if (mIso) {
-                orig_isoCountryCode = (void *)method_getImplementation(mIso);
-                method_setImplementation(mIso, (IMP)swizzled_isoCountryCode);
-            }
-            Method mMcc = class_getInstanceMethod(ctCarrierCls, @selector(mobileCountryCode));
-            if (mMcc) {
-                orig_mobileCountryCode = (void *)method_getImplementation(mMcc);
-                method_setImplementation(mMcc, (IMP)swizzled_mobileCountryCode);
-            }
-            Method mMnc = class_getInstanceMethod(ctCarrierCls, @selector(mobileNetworkCode));
-            if (mMnc) {
-                orig_mobileNetworkCode = (void *)method_getImplementation(mMnc);
-                method_setImplementation(mMnc, (IMP)swizzled_mobileNetworkCode);
-            }
-        }
 
-        // 5. Hardware Symbol Hooking (C-level: uname, sysctlbyname, sysctl via ElleKit / Substrate)
-        // CRITICAL FIX FOR ARM64E (iPhone 11 - iPhone 16):
-        // Zalo invokes sysctl hundreds of times on startup across multi-threaded GCD/networking/WebKit calls.
-        // On ARM64E devices (A12+), MSHookFunction on 'sysctl' creates PAC-trampolines that trigger fatal
-        // hardware pointer authentication / memory exceptions in Zalo.
-        // Therefore:
-        // - In AIDA64: Hook sysctl, sysctlbyname, and uname to achieve 100% hardware display spoofing.
-        // - In Zalo: ONLY hook uname (and sysctlbyname). NEVER hook raw sysctl! Zalo gets full device identity
-        //   via UIDevice, NSProcessInfo, MTLDevice, CTCarrier and uname without any risk of crashing!
-        typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
-        zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
-        if (!pMSHook) {
-            void *hElle = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (!hElle) hElle = dlopen("/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
-            if (hElle) {
-                pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
+            Method mBat = class_getInstanceMethod(uiDeviceCls, @selector(batteryLevel));
+            if (mBat) {
+                orig_batteryLevel = (void *)method_getImplementation(mBat);
+                method_setImplementation(mBat, (IMP)swizzled_batteryLevel);
             }
-        }
-        if (pMSHook) {
-            void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
-            if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
 
-            if (isAida) {
-                // AIDA64 queries raw sysctl & sysctlbyname extensively to read CPU cores, RAM, and hardware model
+            Method mIdfv = class_getInstanceMethod(uiDeviceCls, @selector(identifierForVendor));
+            if (mIdfv) {
+                orig_identifierForVendor = (void *)method_getImplementation(mIdfv);
+                method_setImplementation(mIdfv, (IMP)swizzled_identifierForVendor);
+            }
+        } @catch (NSException *e) {}
+
+        // 2. Safe Objective-C Swizzling for CTCarrier (Safe for BOTH Zalo and AIDA64)
+        @try {
+            Class ctCarrierCls = NSClassFromString(@"CTCarrier");
+            if (ctCarrierCls) {
+                Method mCarrier = class_getInstanceMethod(ctCarrierCls, @selector(carrierName));
+                if (mCarrier) {
+                    orig_carrierName = (void *)method_getImplementation(mCarrier);
+                    method_setImplementation(mCarrier, (IMP)swizzled_carrierName);
+                }
+                Method mIso = class_getInstanceMethod(ctCarrierCls, @selector(isoCountryCode));
+                if (mIso) {
+                    orig_isoCountryCode = (void *)method_getImplementation(mIso);
+                    method_setImplementation(mIso, (IMP)swizzled_isoCountryCode);
+                }
+                Method mMcc = class_getInstanceMethod(ctCarrierCls, @selector(mobileCountryCode));
+                if (mMcc) {
+                    orig_mobileCountryCode = (void *)method_getImplementation(mMcc);
+                    method_setImplementation(mMcc, (IMP)swizzled_mobileCountryCode);
+                }
+                Method mMnc = class_getInstanceMethod(ctCarrierCls, @selector(mobileNetworkCode));
+                if (mMnc) {
+                    orig_mobileNetworkCode = (void *)method_getImplementation(mMnc);
+                    method_setImplementation(mMnc, (IMP)swizzled_mobileNetworkCode);
+                }
+            }
+        } @catch (NSException *e) {}
+
+        // 3. Isolated Hardware & Diagnostic Spoofing (AIDA64 ONLY):
+        // CRITICAL STABILITY ARCHITECTURE:
+        // - In Zalo: ONLY Objective-C runtime swizzling (UIDevice + CTCarrier) is used.
+        //   Zero C-level MSHookFunction, zero NSProcessInfo operatingSystemVersion modification.
+        //   This guarantees 100% immune against PAC (Pointer Authentication) traps on ARM64E (iPhone 11-16)
+        //   and eliminates @available runtime incompatibilities on iOS 15 devices.
+        // - In AIDA64: Hook all C-level sysctl, sysctlbyname, uname, NSProcessInfo, and Metal GPU name
+        //   so that AIDA64 displays 100% fake hardware, RAM, CPU cores, and OS version without flaw!
+        if (isAida) {
+            @try {
+                // Swizzle NSProcessInfo
+                Class procCls = [NSProcessInfo class];
+                Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
+                if (mOsVer) {
+                    orig_osVersion = (void *)method_getImplementation(mOsVer);
+                    method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
+                }
+
+                Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
+                if (mOsVerStr) {
+                    orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
+                    method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
+                }
+
+                Method mPhysMem = class_getInstanceMethod(procCls, @selector(physicalMemory));
+                if (mPhysMem) {
+                    orig_physicalMemory = (void *)method_getImplementation(mPhysMem);
+                    method_setImplementation(mPhysMem, (IMP)swizzled_physicalMemory);
+                }
+
+                // Swizzle GPU (_MTLDevice / MTLDevice)
+                Class mtlDevCls = NSClassFromString(@"_MTLDevice");
+                if (!mtlDevCls) mtlDevCls = NSClassFromString(@"MTLDevice");
+                if (mtlDevCls) {
+                    Method mGpu = class_getInstanceMethod(mtlDevCls, @selector(name));
+                    if (mGpu) {
+                        orig_MTLDevice_name = (void *)method_getImplementation(mGpu);
+                        method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
+                    }
+                }
+            } @catch (NSException *e) {}
+
+            typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
+            zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
+            if (!pMSHook) {
+                void *hElle = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (!hElle) hElle = dlopen("/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
+                if (hElle) {
+                    pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
+                }
+            }
+            if (pMSHook) {
+                void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
+                if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
+
                 void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
                 void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
                 if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);

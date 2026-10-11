@@ -790,8 +790,13 @@ extern char **environ;
     // Ensure .GlobalPreferences symlink exists
     NSString *globalPrefsLink = [zaloContainer stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
     if (![fm fileExistsAtPath:globalPrefsLink]) {
-        symlink("/private/var/mobile/Library/Preferences/.GlobalPreferences.plist", [globalPrefsLink UTF8String]);
-        lchown([globalPrefsLink UTF8String], 501, 501);
+        const char *target = [fm fileExistsAtPath:@"/var/mobile/Library/Preferences/.GlobalPreferences.plist"] ?
+                             "/var/mobile/Library/Preferences/.GlobalPreferences.plist" :
+                             "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist";
+        if ([fm fileExistsAtPath:[NSString stringWithUTF8String:target]]) {
+            symlink(target, [globalPrefsLink UTF8String]);
+            lchown([globalPrefsLink UTF8String], 501, 501);
+        }
     }
 
     // Flush filesystem
@@ -868,6 +873,8 @@ extern char **environ;
                 SEL openSel = sel_registerName("openApplicationWithBundleID:");
                 if ([ws respondsToSelector:openSel]) {
                     BOOL opened = ((BOOL (*)(id, SEL, NSString *))objc_msgSend)(ws, openSel, @"vn.com.vng.zalo");
+                    if (opened) return;
+                    opened = ((BOOL (*)(id, SEL, NSString *))objc_msgSend)(ws, openSel, @"com.vng.zalo");
                     if (opened) return;
                 }
             }

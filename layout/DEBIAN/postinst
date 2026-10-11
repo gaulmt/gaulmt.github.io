@@ -5,9 +5,10 @@ mkdir -p /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShare
 chmod 0777 /Library/Preferences/ZTechShared /var/jb/Library/Preferences/ZTechShared >/dev/null 2>&1 || true
 chmod 0755 /usr/bin/ztech-diag /var/jb/usr/bin/ztech-diag >/dev/null 2>&1 || true
 
+# Rootless TweakInject symlinks
 if [ -d "/var/jb/Library/MobileSubstrate/DynamicLibraries" ]; then
     mkdir -p /var/jb/usr/lib/TweakInject >/dev/null 2>&1 || true
-    for F in /var/jb/Library/MobileSubstrate/DynamicLibraries/*; do
+    for F in /var/jb/Library/MobileSubstrate/DynamicLibraries/ZTech*; do
         if [ -f "$F" ]; then
             BASE=$(basename "$F")
             ln -sf "$F" "/var/jb/usr/lib/TweakInject/$BASE" >/dev/null 2>&1 || true
@@ -15,20 +16,35 @@ if [ -d "/var/jb/Library/MobileSubstrate/DynamicLibraries" ]; then
     done
 fi
 
-# Auto-repair any app data containers (e.g., Zalo) whose subdirectories or permissions were affected
+# Rootful TweakInject symlinks (if TweakInject directory exists)
+if [ -d "/Library/MobileSubstrate/DynamicLibraries" ] && [ ! -d "/var/jb" ]; then
+    if [ -d "/usr/lib/TweakInject" ]; then
+        for F in /Library/MobileSubstrate/DynamicLibraries/ZTech*; do
+            if [ -f "$F" ]; then
+                BASE=$(basename "$F")
+                ln -sf "$F" "/usr/lib/TweakInject/$BASE" >/dev/null 2>&1 || true
+            fi
+        done
+    fi
+fi
+
+# Targeted repair ONLY for Zalo & AIDA64 data containers and AppGroups
 for ROOT_DIR in "/var/mobile/Containers/Data/Application" "/var/mobile/Containers/Shared/AppGroup"; do
     if [ -d "$ROOT_DIR" ]; then
         for CONT in "$ROOT_DIR"/*; do
             if [ -d "$CONT" ]; then
-                mkdir -p "$CONT/Documents" "$CONT/tmp" "$CONT/SystemData" "$CONT/Library/Caches" "$CONT/Library/Preferences" "$CONT/Library/Cookies" "$CONT/Library/Application Support" "$CONT/Library/SplashBoard" >/dev/null 2>&1 || true
-                if [ ! -e "$CONT/Library/Preferences/.GlobalPreferences.plist" ]; then
-                    ln -s "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist" "$CONT/Library/Preferences/.GlobalPreferences.plist" >/dev/null 2>&1 || true
+                IS_TARGET=0
+                META="$CONT/.com.apple.mobile_container_manager.metadata.plist"
+                if [ -f "$META" ]; then
+                    if grep -qiE "zalo|vng|aida64" "$META" 2>/dev/null; then
+                        IS_TARGET=1
+                    fi
                 fi
-                if [ -f "$CONT/.com.apple.mobile_container_manager.metadata.plist" ]; then
-                    chmod 0644 "$CONT/.com.apple.mobile_container_manager.metadata.plist" >/dev/null 2>&1 || true
+                if [ "$IS_TARGET" -eq 1 ] || [ -f "$CONT/Documents/_zt_zalo_marker.txt" ] || [ -f "$CONT/Documents/_zt_active_profile.plist" ]; then
+                    mkdir -p "$CONT/Documents" "$CONT/tmp" "$CONT/Library/Caches" "$CONT/Library/Preferences" >/dev/null 2>&1 || true
+                    chown -R 501:501 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" 2>/dev/null || true
+                    chmod -R 0777 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" 2>/dev/null || true
                 fi
-                chown -R mobile:mobile "$CONT/Documents" "$CONT/tmp" "$CONT/SystemData" "$CONT/Library" >/dev/null 2>&1 || true
-                chmod -R 0775 "$CONT/Documents" "$CONT/tmp" "$CONT/SystemData" "$CONT/Library" >/dev/null 2>&1 || true
             fi
         done
     fi

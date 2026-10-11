@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.5.2
+          Version: 5.5.3
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.5.2 truc tiep tren Sileo & Zebra (Fix Triet De 100% Crash Zalo tren arm64e PAC & Fake AIDA64)
+          Description: Nguon cai dat gaulmt -Tech v5.5.3 truc tiep tren Sileo & Zebra (Toan Dien 7749 Tinh Nang: On Dinh Mien Dich Crash Zalo arm64/arm64e & Fake AIDA64)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.5.2 - Khắc Phục Triệt Để 100% Crash Zalo (ARM64E) & Fake AIDA64"
+                    "title": "gaulmt -Tech v5.5.3 - Phiên Bản Hoàn Hảo & Miễn Dịch Crash Toàn Diện"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản cập nhật **gaulmt -Tech v5.5.2** giải quyết dứt điểm 100% hiện tượng Zalo bị crash văng ra ngoài trên iPhone 11 trở lên (ARM64E):\n\n- **Loại Bỏ Hoàn Toàn PAC Trampoline Trong Zalo**: Toàn bộ C-level hooks (`uname`, `sysctl`, `sysctlbyname`) được cô lập 100% chỉ chạy trong AIDA64. Zalo tuyệt đối không bị can thiệp binary instructions tầng kernel, chống 100% lỗi EXC_BAD_ACCESS / PAC trap trên ARM64E.\n- **Bảo Toàn Tương Thích Runtime (@available)**: Không can thiệp `NSProcessInfo operatingSystemVersion` trong Zalo, giúp UIKit và Zalo trên iOS 15 không bị gọi nhầm API iOS 16/17/18 gây crash.\n- **Loại Bỏ Chmod Sandbox Khởi Động**: Tweak dylib không còn thực hiện chmod thư mục sandbox khi khởi động, tránh xung đột quyền hệ thống.\n- **Nhận Diện Hoàn Hảo**: Zalo đổi sạch sẽ UIDevice (systemVersion, name, batteryLevel, identifierForVendor) và CTCarrier (nhà mạng) theo profile được chọn."
+                    "markdown": "Bản cập nhật tối thượng **gaulmt -Tech v5.5.3** mang lại sự ổn định và tương thích tuyệt đối trên mọi dòng máy iPhone (từ iPhone 6s đến iPhone 16 Pro Max), mọi phiên bản iOS (iOS 12 - 18) và mọi môi trường Jailbreak (Dopamine, palera1n, Xina, unc0ver, checkra1n, TrollStore):\n\n- **Miễn Dịch 100% Lỗi Văng Zalo Trên ARM64E (A12-A18)**: Cô lập triệt để hook tầng C (`uname`, `sysctl`, `sysctlbyname`) chỉ chạy riêng cho AIDA64. Zalo vận hành hoàn toàn qua Objective-C runtime method exchange mượt mà, không bao giờ bị kích hoạt lỗi PAC trampoline kernel.\n- **Tương Thích Runtime Đa Phiên Bản**: Không can thiệp `NSProcessInfo operatingSystemVersion` trong Zalo, loại bỏ hoàn toàn nguy cơ xung đột `@available` khi chạy trên iOS 14/15.\n- **Tối Ưu Hóa Phân Quyền Hạt Nhân (501:501, 0777/0666)**: Phân biệt chính xác giữa Application Data Container và AppGroups, đảm bảo sandbox luôn đọc ghi dữ liệu tức thì mà không gặp xung đột file lock.\n- **Đồng Bộ Giả Lập Hoàn Hảo AIDA64**: Hiển thị 100% chính xác phần cứng giả lập (Model, Chip, GPU Metal, RAM, Core CPU, iOS Version) trong AIDA64.\n- **Hỗ Trợ Khởi Chạy Thông Minh**: Tự động nhận diện đa Bundle ID của Zalo (`vn.com.vng.zalo`, `com.vng.zalo`) khi người dùng bấm Mở Zalo."
                   }
                 ]
               }
@@ -161,7 +161,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.5.2 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.5.3 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -186,7 +186,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.2"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.3"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

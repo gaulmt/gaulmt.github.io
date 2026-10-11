@@ -438,7 +438,8 @@ extern char **environ;
         }
         NSString *sp = [sdir stringByAppendingPathComponent:@"com.ztech.profile.plist"];
         if ([sharedDict writeToFile:sp atomically:YES]) {
-            chmod([sp UTF8String], 0644);
+            chown([sp UTF8String], 501, 501);
+            chmod([sp UTF8String], 0666);
         }
     }
 
@@ -522,18 +523,24 @@ extern char **environ;
 }
 
 + (void)repairContainerStructureAtPath:(NSString *)containerPath fileManager:(NSFileManager *)fm {
-    NSArray<NSString *> *requiredSubDirs = @[
+    if (!containerPath || containerPath.length == 0) return;
+
+    BOOL isAppGroup = [containerPath containsString:@"/Shared/AppGroup/"];
+    NSArray<NSString *> *subDirs = isAppGroup ? @[
+        @"Library",
+        @"Library/Caches",
+        @"Library/Preferences"
+    ] : @[
         @"Documents",
         @"tmp",
-        @"SystemData",
         @"Library",
         @"Library/Caches",
         @"Library/Preferences",
         @"Library/Cookies",
-        @"Library/Application Support",
-        @"Library/SplashBoard"
+        @"Library/Application Support"
     ];
-    for (NSString *sub in requiredSubDirs) {
+
+    for (NSString *sub in subDirs) {
         NSString *p = [containerPath stringByAppendingPathComponent:sub];
         if (![fm fileExistsAtPath:p]) {
             [fm createDirectoryAtPath:p withIntermediateDirectories:YES attributes:nil error:nil];
@@ -541,10 +548,18 @@ extern char **environ;
         chown([p UTF8String], 501, 501);
         chmod([p UTF8String], 0777);
     }
-    NSString *globalPrefsLink = [containerPath stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
-    if (![fm fileExistsAtPath:globalPrefsLink]) {
-        symlink("/private/var/mobile/Library/Preferences/.GlobalPreferences.plist", [globalPrefsLink UTF8String]);
-        lchown([globalPrefsLink UTF8String], 501, 501);
+
+    if (!isAppGroup) {
+        NSString *globalPrefsLink = [containerPath stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
+        if (![fm fileExistsAtPath:globalPrefsLink]) {
+            const char *target = [fm fileExistsAtPath:@"/var/mobile/Library/Preferences/.GlobalPreferences.plist"] ?
+                                 "/var/mobile/Library/Preferences/.GlobalPreferences.plist" :
+                                 "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist";
+            if ([fm fileExistsAtPath:[NSString stringWithUTF8String:target]]) {
+                symlink(target, [globalPrefsLink UTF8String]);
+                lchown([globalPrefsLink UTF8String], 501, 501);
+            }
+        }
     }
 }
 

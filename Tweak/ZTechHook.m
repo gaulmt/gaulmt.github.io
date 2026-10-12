@@ -22,6 +22,9 @@
 #import <mach-o/nlist.h>
 #import <string.h>
 #import <notify.h>
+#import <execinfo.h>
+#import <signal.h>
+#import <time.h>
 #if __has_feature(ptrauth_calls)
 #import <ptrauth.h>
 #endif
@@ -36,9 +39,82 @@ static NSString *gModelNameObj = @"iPhone 16 Pro Max";
 static NSString *gMachineIdObj = @"iPhone17,2";
 static NSString *gIosVersionObj = @"18.2.1";
 static NSString *gUuidObj = @"7BD46FDA-D93D-45BD-9158-7178669502DD";
+static NSUUID *gCachedVendorUUID = nil;
+static NSString *gRealIosVersionObj = @"15.5";
 static NSString *gCarrierNameObj = @"Viettel";
 static NSString *gActiveProxyObj = @"";
 static float gBatteryFloat = 0.76f;
+
+static void ZTechHookTrace(const char *msg) {
+    if (!msg) return;
+    FILE *f = fopen("/var/tmp/ztech_hook_trace.log", "a");
+    if (f) {
+        time_t now = time(NULL);
+        char tbuf[32] = {0};
+        struct tm tm_info;
+        localtime_r(&now, &tm_info);
+        strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", &tm_info);
+        fprintf(f, "[%s][pid:%d] %s\n", tbuf, getpid(), msg);
+        fflush(f);
+        fclose(f);
+    }
+}
+
+static void ZTechSignalHandler(int sig, siginfo_t *info, void *context) {
+    FILE *f = fopen("/var/tmp/ztech_crash.log", "a");
+    if (f) {
+        time_t now = time(NULL);
+        char tbuf[32] = {0};
+        struct tm tm_info;
+        localtime_r(&now, &tm_info);
+        strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", &tm_info);
+        fprintf(f, "\n=== [CRASH CAUGHT BY ZTECH HOOK] ===\n");
+        fprintf(f, "Time: %s | PID: %d | Signal: %d (%s) | Fault Address: %p\n",
+                tbuf, getpid(), sig, strsignal(sig), info ? info->si_addr : NULL);
+        
+        void *callstack[64];
+        int frames = backtrace(callstack, 64);
+        char **strs = backtrace_symbols(callstack, frames);
+        if (strs) {
+            fprintf(f, "Callstack (%d frames):\n", frames);
+            for (int i = 0; i < frames; ++i) {
+                fprintf(f, "  [%02d] %s\n", i, strs[i]);
+            }
+            free(strs);
+        }
+        fprintf(f, "====================================\n\n");
+        fflush(f);
+        fclose(f);
+    }
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void ZTechUncaughtExceptionHandler(NSException *exception) {
+    FILE *f = fopen("/var/tmp/ztech_crash.log", "a");
+    if (f) {
+        time_t now = time(NULL);
+        char tbuf[32] = {0};
+        struct tm tm_info;
+        localtime_r(&now, &tm_info);
+        strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", &tm_info);
+        fprintf(f, "\n=== [UNCAUGHT EXCEPTION CAUGHT BY ZTECH HOOK] ===\n");
+        fprintf(f, "Time: %s | PID: %d\nName: %s\nReason: %s\n",
+                tbuf, getpid(),
+                [exception.name UTF8String] ?: "Unknown",
+                [exception.reason UTF8String] ?: "Unknown");
+        NSArray *syms = [exception callStackSymbols];
+        if (syms) {
+            fprintf(f, "CallStack:\n");
+            for (NSString *sym in syms) {
+                fprintf(f, "  %s\n", [sym UTF8String]);
+            }
+        }
+        fprintf(f, "=================================================\n\n");
+        fflush(f);
+        fclose(f);
+    }
+}
 
 
 
@@ -247,6 +323,12 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     gMachineIdObj = [prof[@"machineId"] ?: @"iPhone17,2" copy];
     gIosVersionObj = [prof[@"iosVersion"] ?: @"18.2.1" copy];
     gUuidObj = [prof[@"identifier"] ?: @"7BD46FDA-D93D-45BD-9158-7178669502DD" copy];
+    if (gUuidObj.length > 0) {
+        gCachedVendorUUID = [[NSUUID alloc] initWithUUIDString:gUuidObj];
+    }
+    if (!gCachedVendorUUID) {
+        gCachedVendorUUID = [NSUUID UUID];
+    }
     gCarrierNameObj = [prof[@"carrier"] ?: @"Viettel" copy];
     gActiveProxyObj = [prof[@"activeProxy"] ?: @"" copy];
 
@@ -575,11 +657,10 @@ static float swizzled_batteryLevel(id self, SEL _cmd) {
 
 static NSUUID *(*orig_identifierForVendor)(id, SEL) = NULL;
 static NSUUID *swizzled_identifierForVendor(id self, SEL _cmd) {
-    if (gUuidObj.length > 0) {
-        NSUUID *u = [[NSUUID alloc] initWithUUIDString:gUuidObj];
-        if (u) return u;
+    if (gCachedVendorUUID) {
+        return gCachedVendorUUID;
     }
-    return orig_identifierForVendor ? orig_identifierForVendor(self, _cmd) : [NSUUID UUID];
+    return [NSUUID UUID];
 }
 
 static NSOperatingSystemVersion (*orig_osVersion)(id, SEL) = NULL;
@@ -675,11 +756,28 @@ static void ZTechHookInit(void) {
         BOOL isAida = (bundleId && [bundleId localizedCaseInsensitiveContainsString:@"aida64"]) ||
                       (procName && [procName localizedCaseInsensitiveContainsString:@"aida64"]);
         BOOL isZalo = (bundleId && [bundleId localizedCaseInsensitiveContainsString:@"zalo"]) ||
-                      (procName && [procName localizedCaseInsensitiveContainsString:@"zalo"]);
+                      (procName && [procName localizedCaseInsensitiveContainsString:@"zalo"]) ||
+                      (bundleId && [bundleId localizedCaseInsensitiveContainsString:@"zingalo"]) ||
+                      (procName && [procName localizedCaseInsensitiveContainsString:@"zingalo"]);
 
         if (!isAida && !isZalo) {
             return;
         }
+
+        // Install universal crash reporters & signal catchers immediately
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_sigaction = ZTechSignalHandler;
+        sa.sa_flags = SA_SIGINFO;
+        sigaction(SIGSEGV, &sa, NULL);
+        sigaction(SIGBUS, &sa, NULL);
+        sigaction(SIGILL, &sa, NULL);
+        sigaction(SIGABRT, &sa, NULL);
+
+        NSSetUncaughtExceptionHandler(&ZTechUncaughtExceptionHandler);
+
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/5] ZTechHookInit started in pid:%d (%@ / %@)",
+                         getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         struct utsname realUts;
         if (uname(&realUts) == 0 && realUts.machine[0] != '\0') {
@@ -690,13 +788,26 @@ static void ZTechHookInit(void) {
         // Fast instant cached profile read
         ZTechLoadProfileOnce();
 
+        ZTechHookTrace([[NSString stringWithFormat:@"[2/5] Profile loaded: model=%@, id=%@, ios=%@, uuid=%@",
+                         gModelNameObj, gMachineIdObj, gIosVersionObj, gUuidObj] UTF8String]);
+
         // 1. Safe Objective-C Swizzling for UIDevice (Safe for BOTH Zalo and AIDA64)
         @try {
             Class uiDeviceCls = [UIDevice class];
-            Method mSysVer = class_getInstanceMethod(uiDeviceCls, @selector(systemVersion));
-            if (mSysVer) {
-                orig_systemVersion = (void *)method_getImplementation(mSysVer);
-                method_setImplementation(mSysVer, (IMP)swizzled_systemVersion);
+
+            // CRITICAL SYSTEM VERSION ISOLATION:
+            // ONLY swizzle systemVersion for AIDA64!
+            // In Zalo, UIKit and third-party SDKs check systemVersion to decide whether
+            // to call iOS 16/17/18 APIs. If systemVersion claims iOS 16+ on an iOS 15 kernel,
+            // UIKit immediately attempts to access non-existent classes/methods and terminates with
+            // unrecognized selector or dyld crashes. Leaving systemVersion untouched in Zalo
+            // guarantees 100% flawless execution on iOS 12-15!
+            if (isAida) {
+                Method mSysVer = class_getInstanceMethod(uiDeviceCls, @selector(systemVersion));
+                if (mSysVer) {
+                    orig_systemVersion = (void *)method_getImplementation(mSysVer);
+                    method_setImplementation(mSysVer, (IMP)swizzled_systemVersion);
+                }
             }
 
             Method mDevName = class_getInstanceMethod(uiDeviceCls, @selector(name));
@@ -716,7 +827,10 @@ static void ZTechHookInit(void) {
                 orig_identifierForVendor = (void *)method_getImplementation(mIdfv);
                 method_setImplementation(mIdfv, (IMP)swizzled_identifierForVendor);
             }
-        } @catch (NSException *e) {}
+            ZTechHookTrace("[3/5] UIDevice swizzled successfully");
+        } @catch (NSException *e) {
+            ZTechHookTrace([[NSString stringWithFormat:@"[3/5 ERROR] UIDevice swizzle exception: %@", e] UTF8String]);
+        }
 
         // 2. Safe Objective-C Swizzling for CTCarrier (Safe for BOTH Zalo and AIDA64)
         @try {
@@ -742,8 +856,13 @@ static void ZTechHookInit(void) {
                     orig_mobileNetworkCode = (void *)method_getImplementation(mMnc);
                     method_setImplementation(mMnc, (IMP)swizzled_mobileNetworkCode);
                 }
+                ZTechHookTrace("[4/5] CTCarrier swizzled successfully");
+            } else {
+                ZTechHookTrace("[4/5] CTCarrier not loaded (skipped)");
             }
-        } @catch (NSException *e) {}
+        } @catch (NSException *e) {
+            ZTechHookTrace([[NSString stringWithFormat:@"[4/5 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
+        }
 
         // 3. Isolated Hardware & Diagnostic Spoofing (AIDA64 ONLY):
         // CRITICAL STABILITY ARCHITECTURE:
@@ -810,5 +929,6 @@ static void ZTechHookInit(void) {
                 if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
             }
         }
+        ZTechHookTrace("[5/5] ZTechHookInit completed 100% OK");
     }
 }

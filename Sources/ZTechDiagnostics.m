@@ -220,6 +220,108 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
             break;
         }
     }
+    // 6. THÔNG TIN CRASH REPORTER & TRACE NHẬT KÝ ZALO
+    [outStr appendString:@"\n6. BÁO CÁO NHẬT KÝ CRASH & HOOK TRACE CỦA ZALO:\n"];
+
+    // 6.1 Check in-process Hook Trace
+    NSString *tracePath = @"/var/tmp/ztech_hook_trace.log";
+    if ([fm fileExistsAtPath:tracePath]) {
+        NSString *traceContent = [NSString stringWithContentsOfFile:tracePath encoding:NSUTF8StringEncoding error:nil];
+        if (traceContent && traceContent.length > 0) {
+            NSArray<NSString *> *lines = [traceContent componentsSeparatedByString:@"\n"];
+            NSInteger startIdx = (lines.count > 15) ? (lines.count - 15) : 0;
+            [outStr appendString:@"- Hook Trace gần nhất (15 dòng cuối):\n"];
+            for (NSInteger i = startIdx; i < lines.count; i++) {
+                if (lines[i].length > 0) {
+                    [outStr appendFormat:@"  * %@\n", lines[i]];
+                }
+            }
+        } else {
+            [outStr appendString:@"- Hook Trace: [Tệp rỗng]\n"];
+        }
+    } else {
+        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace]\n"];
+    }
+
+    // 6.2 Check in-process Crash Log
+    NSString *inProcessCrashPath = @"/var/tmp/ztech_crash.log";
+    if ([fm fileExistsAtPath:inProcessCrashPath]) {
+        NSString *crashContent = [NSString stringWithContentsOfFile:inProcessCrashPath encoding:NSUTF8StringEncoding error:nil];
+        if (crashContent && crashContent.length > 0) {
+            [outStr appendString:@"\n- Phát hiện Crash Handler nội bộ:\n"];
+            NSArray<NSString *> *cLines = [crashContent componentsSeparatedByString:@"\n"];
+            NSInteger cStart = (cLines.count > 25) ? (cLines.count - 25) : 0;
+            for (NSInteger i = cStart; i < cLines.count; i++) {
+                if (cLines[i].length > 0) {
+                    [outStr appendFormat:@"  * %@\n", cLines[i]];
+                }
+            }
+        }
+    }
+
+    // 6.3 Check Apple System CrashReporter (.ips / .plist)
+    NSArray<NSString *> *crashDirs = @[
+        @"/var/mobile/Library/Logs/CrashReporter",
+        @"/Library/Logs/CrashReporter",
+        @"/var/jb/var/mobile/Library/Logs/CrashReporter"
+    ];
+    NSString *latestCrashFile = nil;
+    NSDate *latestDate = [NSDate distantPast];
+
+    for (NSString *cd in crashDirs) {
+        if (![fm fileExistsAtPath:cd]) continue;
+        NSArray<NSString *> *files = [fm contentsOfDirectoryAtPath:cd error:nil];
+        for (NSString *file in files) {
+            NSString *lower = [file lowercaseString];
+            if ([lower containsString:@"zalo"] || [lower containsString:@"zingalo"]) {
+                NSString *fullPath = [cd stringByAppendingPathComponent:file];
+                NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+                NSDate *modDate = attrs[NSFileModificationDate];
+                if (modDate && [modDate compare:latestDate] == NSOrderedDescending) {
+                    latestDate = modDate;
+                    latestCrashFile = fullPath;
+                }
+            }
+        }
+    }
+
+    if (latestCrashFile) {
+        [outStr appendFormat:@"\n- Phát hiện tệp CrashReporter hệ thống: %@\n", [latestCrashFile lastPathComponent]];
+        [outStr appendFormat:@"  * Thời điểm ghi nhận: %@\n", latestDate];
+        NSString *rawIps = [NSString stringWithContentsOfFile:latestCrashFile encoding:NSUTF8StringEncoding error:nil];
+        if (rawIps && rawIps.length > 0) {
+            NSArray<NSString *> *ipsLines = [rawIps componentsSeparatedByString:@"\n"];
+            BOOL printBacktrace = NO;
+            int btCount = 0;
+            for (NSString *line in ipsLines) {
+                if ([line hasPrefix:@"Exception Type:"] ||
+                    [line hasPrefix:@"Exception Subtype:"] ||
+                    [line hasPrefix:@"Exception Codes:"] ||
+                    [line hasPrefix:@"Termination Reason:"] ||
+                    [line hasPrefix:@"Triggered by Thread:"] ||
+                    [line containsString:@"\"exception\""] ||
+                    [line containsString:@"\"termination\""]) {
+                    [outStr appendFormat:@"  * %@\n", line];
+                }
+                if ([line containsString:@"Thread 0 Crashed:"] || [line containsString:@"Crashed:"]) {
+                    printBacktrace = YES;
+                    [outStr appendFormat:@"  * %@\n", line];
+                    continue;
+                }
+                if (printBacktrace) {
+                    if (btCount < 10 && line.length > 0) {
+                        [outStr appendFormat:@"    %@\n", line];
+                        btCount++;
+                    } else if (line.length == 0 || [line hasPrefix:@"Thread "]) {
+                        printBacktrace = NO;
+                    }
+                }
+            }
+        }
+    } else {
+        [outStr appendString:@"- CrashReporter hệ thống: Không phát hiện tệp crash log Zalo nào trong thư mục Logs.\n"];
+    }
+
     [outStr appendString:@"\n========================================================"];
 
     return outStr;

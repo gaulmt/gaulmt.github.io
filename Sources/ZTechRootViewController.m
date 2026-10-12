@@ -605,7 +605,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.5.3";
+    appSub.text = @"Identity & Vault · v5.5.4";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;

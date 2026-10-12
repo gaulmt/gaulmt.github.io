@@ -302,7 +302,7 @@ extern char **environ;
         Class proxyCls = NSClassFromString(@"LSApplicationProxy");
         if (proxyCls) {
             SEL selProxy = sel_registerName("applicationProxyForIdentifier:");
-            NSArray<NSString *> *candidateIds = @[@"vn.com.vng.zalo", @"com.vng.zalo"];
+            NSArray<NSString *> *candidateIds = @[@"vn.com.vng.zalo", @"com.vng.zalo", @"com.zing.zalo", @"com.vng.zingalo", @"vn.com.vng.zingalo", @"com.zing.zingalo"];
             for (NSString *bid in candidateIds) {
                 if ([proxyCls respondsToSelector:selProxy]) {
                     id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, selProxy, bid);
@@ -428,15 +428,19 @@ extern char **environ;
     @try {
         Class proxyCls = NSClassFromString(@"LSApplicationProxy");
         if (proxyCls && [proxyCls respondsToSelector:sel_registerName("applicationProxyForIdentifier:")]) {
-            id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, sel_registerName("applicationProxyForIdentifier:"), @"vn.com.vng.zalo");
-            if (proxy && [proxy respondsToSelector:sel_registerName("groupContainerURLs")]) {
-                NSDictionary *gUrls = ((NSDictionary *(*)(id, SEL))objc_msgSend)(proxy, sel_registerName("groupContainerURLs"));
-                if ([gUrls isKindOfClass:[NSDictionary class]]) {
-                    for (NSString *gid in gUrls) {
-                        NSURL *u = gUrls[gid];
-                        if ([u isKindOfClass:[NSURL class]] && u.path.length > 0 && [fm fileExistsAtPath:u.path]) {
-                            groups[[gid lowercaseString]] = u.path;
+            NSArray<NSString *> *candBids = @[@"vn.com.vng.zalo", @"com.vng.zalo", @"com.zing.zalo", @"com.vng.zingalo", @"vn.com.vng.zingalo", @"com.zing.zingalo"];
+            for (NSString *bid in candBids) {
+                id proxy = ((id (*)(id, SEL, NSString *))objc_msgSend)(proxyCls, sel_registerName("applicationProxyForIdentifier:"), bid);
+                if (proxy && [proxy respondsToSelector:sel_registerName("groupContainerURLs")]) {
+                    NSDictionary *gUrls = ((NSDictionary *(*)(id, SEL))objc_msgSend)(proxy, sel_registerName("groupContainerURLs"));
+                    if ([gUrls isKindOfClass:[NSDictionary class]] && gUrls.count > 0) {
+                        for (NSString *gid in gUrls) {
+                            NSURL *u = gUrls[gid];
+                            if ([u isKindOfClass:[NSURL class]] && u.path.length > 0 && [fm fileExistsAtPath:u.path]) {
+                                groups[[gid lowercaseString]] = u.path;
+                            }
                         }
+                        break;
                     }
                 }
             }
@@ -872,10 +876,11 @@ extern char **environ;
             if (ws) {
                 SEL openSel = sel_registerName("openApplicationWithBundleID:");
                 if ([ws respondsToSelector:openSel]) {
-                    BOOL opened = ((BOOL (*)(id, SEL, NSString *))objc_msgSend)(ws, openSel, @"vn.com.vng.zalo");
-                    if (opened) return;
-                    opened = ((BOOL (*)(id, SEL, NSString *))objc_msgSend)(ws, openSel, @"com.vng.zalo");
-                    if (opened) return;
+                    NSArray<NSString *> *bids = @[@"vn.com.vng.zalo", @"com.vng.zalo", @"com.zing.zalo", @"com.vng.zingalo", @"vn.com.vng.zingalo", @"com.zing.zingalo"];
+                    for (NSString *bid in bids) {
+                        BOOL opened = ((BOOL (*)(id, SEL, NSString *))objc_msgSend)(ws, openSel, bid);
+                        if (opened) return;
+                    }
                 }
             }
         }

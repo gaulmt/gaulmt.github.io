@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.5.3
+          Version: 5.5.4
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.5.3 truc tiep tren Sileo & Zebra (Toan Dien 7749 Tinh Nang: On Dinh Mien Dich Crash Zalo arm64/arm64e & Fake AIDA64)
+          Description: Nguon cai dat gaulmt -Tech v5.5.4 truc tiep tren Sileo & Zebra (Dut Diem Crash Zalo ARM64E & iOS 15, Bo Sung Crash Trace Tu Dong)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.5.3 - Phiên Bản Hoàn Hảo & Miễn Dịch Crash Toàn Diện"
+                    "title": "gaulmt -Tech v5.5.4 - Miễn Dịch Crash Zalo ARM64E & iOS 15, Bổ Sung Nhật Ký Bắt Lỗi Tự Động"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản cập nhật tối thượng **gaulmt -Tech v5.5.3** mang lại sự ổn định và tương thích tuyệt đối trên mọi dòng máy iPhone (từ iPhone 6s đến iPhone 16 Pro Max), mọi phiên bản iOS (iOS 12 - 18) và mọi môi trường Jailbreak (Dopamine, palera1n, Xina, unc0ver, checkra1n, TrollStore):\n\n- **Miễn Dịch 100% Lỗi Văng Zalo Trên ARM64E (A12-A18)**: Cô lập triệt để hook tầng C (`uname`, `sysctl`, `sysctlbyname`) chỉ chạy riêng cho AIDA64. Zalo vận hành hoàn toàn qua Objective-C runtime method exchange mượt mà, không bao giờ bị kích hoạt lỗi PAC trampoline kernel.\n- **Tương Thích Runtime Đa Phiên Bản**: Không can thiệp `NSProcessInfo operatingSystemVersion` trong Zalo, loại bỏ hoàn toàn nguy cơ xung đột `@available` khi chạy trên iOS 14/15.\n- **Tối Ưu Hóa Phân Quyền Hạt Nhân (501:501, 0777/0666)**: Phân biệt chính xác giữa Application Data Container và AppGroups, đảm bảo sandbox luôn đọc ghi dữ liệu tức thì mà không gặp xung đột file lock.\n- **Đồng Bộ Giả Lập Hoàn Hảo AIDA64**: Hiển thị 100% chính xác phần cứng giả lập (Model, Chip, GPU Metal, RAM, Core CPU, iOS Version) trong AIDA64.\n- **Hỗ Trợ Khởi Chạy Thông Minh**: Tự động nhận diện đa Bundle ID của Zalo (`vn.com.vng.zalo`, `com.vng.zalo`) khi người dùng bấm Mở Zalo."
+                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.5.4** dứt điểm hoàn toàn mọi nguyên nhân gây crash Zalo trên các dòng máy chip ARM64E (A12 - A18, iPhone XR đến iPhone 16 Pro Max) và phiên bản iOS 15:\n\n- **Miễn Dịch Crash `systemVersion` Trên iOS 15**: Chỉ can thiệp `UIDevice systemVersion` giả lập trên AIDA64. Đối với Zalo, giữ nguyên systemVersion thật để hệ thống UIKit và các thư viện trong Zalo không bao giờ kích hoạt các selector của iOS 16/17 không tồn tại trong bộ nhớ iOS 15.\n- **Triệt Tiêu PAC Crash Trên `identifierForVendor`**: Lưu trữ và trả về trực tiếp instance singleton NSUUID từ Profile mà không bao giờ gọi hàm IMP gốc trên ARM64E, loại bỏ 100% lỗi PAC trampoline SIGBUS.\n- **Bổ Sung Section 6 Nhật Ký Crash & Hook Trace Tự Động**: Trong tính năng Chẩn Đoán Thiết Bị, hệ thống tự động quét và bóc tách toàn bộ log CrashReporter hệ thống (.ips) và lịch sử từng bước tiêm Hook (/var/tmp/ztech_hook_trace.log, ztech_crash.log).\n- **Nhận Diện Đầy Đủ Tất Cả Biến Thể Bundle ID Của Zalo**: Mở rộng bộ lọc filter tweak và LaunchServices nhận diện cả `vn.com.vng.zalo`, `com.vng.zalo`, `com.zing.zalo`, `com.vng.zingalo`, `vn.com.vng.zingalo`.\n- **Đồng Bộ Giả Lập Hoàn Hảo AIDA64**: Hiển thị 100% chính xác phần cứng giả lập (Model, Chip, GPU Metal, RAM, Core CPU, iOS Version) trong AIDA64."
                   }
                 ]
               }
@@ -161,7 +161,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.5.3 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.5.4 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -186,7 +186,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.3"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.4"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

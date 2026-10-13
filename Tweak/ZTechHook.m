@@ -37,7 +37,7 @@ static NSDictionary *gCachedProfile = nil;
 static char gMachineCStr[64] = "iPhone17,2";
 static char gBoardIdCStr[32] = "D94AP";
 static char gModelNameCStr[64] = "iPhone 16 Pro Max";
-static char gRealMachineCStr[64] = "iPhone9,3";
+static char gRealMachineCStr[64] = "iPhone12,1";
 static struct utsname gRealUts;
 static int gHasRealUts = 0;
 static int gIsAidaProcess = 0;
@@ -47,7 +47,14 @@ static NSString *gMachineIdObj = @"iPhone17,2";
 static NSString *gIosVersionObj = @"18.2.1";
 static NSString *gUuidObj = @"7BD46FDA-D93D-45BD-9158-7178669502DD";
 static NSUUID *gCachedVendorUUID = nil;
-static NSString *gRealIosVersionObj = @"15.5";
+static NSString *gRealMachineObj = @"";
+static NSString *gRealMarketingObj = @"";
+static NSString *gRealBoardIdObj = @"";
+static NSString *gRealIosVersionObj = @"";
+static NSString *gRealIosUnderscoreObj = @"";
+static NSString *gRealScaleStr = @"Scale/2.00";
+static NSString *gTargetIosUnderscoreObj = @"18_2_1";
+static NSString *gTargetScaleStr = @"Scale/3.00";
 static NSString *gCarrierNameObj = @"Viettel";
 static NSString *gActiveProxyObj = @"";
 static float gBatteryFloat = 0.76f;
@@ -406,10 +413,12 @@ static NSString *ZTechBoardIdForMachine(NSString *m) {
     if ([m isEqualToString:@"iPhone17,5"]) return @"D49AP"; // 16e
     if ([m isEqualToString:@"iPhone16,2"]) return @"D84AP"; // 15 Pro Max
     if ([m isEqualToString:@"iPhone16,1"]) return @"D83AP"; // 15 Pro
+    if ([m isEqualToString:@"iPhone15,5"]) return @"D83AP"; // 15 Plus
+    if ([m isEqualToString:@"iPhone15,4"]) return @"D83AP"; // 15
     if ([m isEqualToString:@"iPhone15,3"]) return @"D74AP"; // 14 Pro Max
     if ([m isEqualToString:@"iPhone15,2"]) return @"D73AP"; // 14 Pro
-    if ([m isEqualToString:@"iPhone15,5"]) return @"D28AP"; // 14 Plus
-    if ([m isEqualToString:@"iPhone15,4"]) return @"D27AP"; // 14
+    if ([m isEqualToString:@"iPhone14,8"]) return @"D28AP"; // 14 Plus
+    if ([m isEqualToString:@"iPhone14,7"]) return @"D27AP"; // 14
     if ([m isEqualToString:@"iPhone14,3"]) return @"D28AP"; // 13 Pro Max
     if ([m isEqualToString:@"iPhone14,2"]) return @"D27AP"; // 13 Pro
     if ([m isEqualToString:@"iPhone14,5"]) return @"D17AP"; // 13
@@ -424,7 +433,7 @@ static NSString *ZTechBoardIdForMachine(NSString *m) {
     if ([m isEqualToString:@"iPhone12,3"]) return @"D421AP"; // 11 Pro
     if ([m isEqualToString:@"iPhone12,1"]) return @"N104AP"; // 11
     if ([m isEqualToString:@"iPhone11,8"]) return @"N841AP"; // XR
-    if ([m isEqualToString:@"iPhone11,6"]) return @"D331pAP"; // XS Max
+    if ([m isEqualToString:@"iPhone11,6"] || [m isEqualToString:@"iPhone11,4"]) return @"D331pAP"; // XS Max
     if ([m isEqualToString:@"iPhone11,2"]) return @"D321AP"; // XS
     if ([m isEqualToString:@"iPhone10,6"] || [m isEqualToString:@"iPhone10,3"]) return @"D22AP"; // X
     if ([m isEqualToString:@"iPhone10,5"] || [m isEqualToString:@"iPhone10,2"]) return @"D21AP"; // 8 Plus
@@ -437,12 +446,68 @@ static NSString *ZTechBoardIdForMachine(NSString *m) {
     return @"D94AP";
 }
 
+static NSString *ZTechScaleForMachine(NSString *mach) {
+    if (!mach) return @"Scale/3.00";
+    if ([mach isEqualToString:@"iPhone8,1"] || [mach isEqualToString:@"iPhone8,4"] ||
+        [mach isEqualToString:@"iPhone9,1"] || [mach isEqualToString:@"iPhone9,3"] ||
+        [mach isEqualToString:@"iPhone10,1"] || [mach isEqualToString:@"iPhone10,4"] ||
+        [mach isEqualToString:@"iPhone11,8"] || [mach isEqualToString:@"iPhone12,1"] ||
+        [mach isEqualToString:@"iPhone12,8"] || [mach isEqualToString:@"iPhone14,6"]) {
+        return @"Scale/2.00";
+    }
+    return @"Scale/3.00";
+}
+
+static NSString *ZTechMarketingNameForMachine(NSString *mach) {
+    if (!mach) return @"iPhone 16 Pro Max";
+    if ([mach isEqualToString:@"iPhone17,2"]) return @"iPhone 16 Pro Max";
+    if ([mach isEqualToString:@"iPhone17,1"]) return @"iPhone 16 Pro";
+    if ([mach isEqualToString:@"iPhone17,4"]) return @"iPhone 16 Plus";
+    if ([mach isEqualToString:@"iPhone17,3"]) return @"iPhone 16";
+    if ([mach isEqualToString:@"iPhone17,5"]) return @"iPhone 16e";
+    if ([mach isEqualToString:@"iPhone16,2"]) return @"iPhone 15 Pro Max";
+    if ([mach isEqualToString:@"iPhone16,1"]) return @"iPhone 15 Pro";
+    if ([mach isEqualToString:@"iPhone15,5"]) return @"iPhone 15 Plus";
+    if ([mach isEqualToString:@"iPhone15,4"]) return @"iPhone 15";
+    if ([mach isEqualToString:@"iPhone15,3"]) return @"iPhone 14 Pro Max";
+    if ([mach isEqualToString:@"iPhone15,2"]) return @"iPhone 14 Pro";
+    if ([mach isEqualToString:@"iPhone14,8"]) return @"iPhone 14 Plus";
+    if ([mach isEqualToString:@"iPhone14,7"]) return @"iPhone 14";
+    if ([mach isEqualToString:@"iPhone14,6"]) return @"iPhone SE (2022)";
+    if ([mach isEqualToString:@"iPhone14,3"]) return @"iPhone 13 Pro Max";
+    if ([mach isEqualToString:@"iPhone14,2"]) return @"iPhone 13 Pro";
+    if ([mach isEqualToString:@"iPhone14,5"]) return @"iPhone 13";
+    if ([mach isEqualToString:@"iPhone14,4"]) return @"iPhone 13 mini";
+    if ([mach isEqualToString:@"iPhone13,4"]) return @"iPhone 12 Pro Max";
+    if ([mach isEqualToString:@"iPhone13,3"]) return @"iPhone 12 Pro";
+    if ([mach isEqualToString:@"iPhone13,2"]) return @"iPhone 12";
+    if ([mach isEqualToString:@"iPhone13,1"]) return @"iPhone 12 mini";
+    if ([mach isEqualToString:@"iPhone12,8"]) return @"iPhone SE (2020)";
+    if ([mach isEqualToString:@"iPhone12,5"]) return @"iPhone 11 Pro Max";
+    if ([mach isEqualToString:@"iPhone12,3"]) return @"iPhone 11 Pro";
+    if ([mach isEqualToString:@"iPhone12,1"]) return @"iPhone 11";
+    if ([mach isEqualToString:@"iPhone11,8"]) return @"iPhone XR";
+    if ([mach isEqualToString:@"iPhone11,6"] || [mach isEqualToString:@"iPhone11,4"]) return @"iPhone XS Max";
+    if ([mach isEqualToString:@"iPhone11,2"]) return @"iPhone XS";
+    if ([mach isEqualToString:@"iPhone10,6"] || [mach isEqualToString:@"iPhone10,3"]) return @"iPhone X";
+    if ([mach isEqualToString:@"iPhone10,5"] || [mach isEqualToString:@"iPhone10,2"]) return @"iPhone 8 Plus";
+    if ([mach isEqualToString:@"iPhone10,4"] || [mach isEqualToString:@"iPhone10,1"]) return @"iPhone 8";
+    if ([mach isEqualToString:@"iPhone9,4"] || [mach isEqualToString:@"iPhone9,2"]) return @"iPhone 7 Plus";
+    if ([mach isEqualToString:@"iPhone9,3"] || [mach isEqualToString:@"iPhone9,1"]) return @"iPhone 7";
+    if ([mach isEqualToString:@"iPhone8,4"]) return @"iPhone SE (1st Gen)";
+    if ([mach isEqualToString:@"iPhone8,2"]) return @"iPhone 6s Plus";
+    if ([mach isEqualToString:@"iPhone8,1"]) return @"iPhone 6s";
+    return @"iPhone";
+}
+
 static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     if (!prof) return;
     gCachedProfile = prof;
     gModelNameObj = [prof[@"modelName"] ?: @"iPhone 16 Pro Max" copy];
     gMachineIdObj = [prof[@"machineId"] ?: @"iPhone17,2" copy];
     gIosVersionObj = [prof[@"iosVersion"] ?: @"18.2.1" copy];
+    gTargetIosUnderscoreObj = [gIosVersionObj stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+    gTargetScaleStr = ZTechScaleForMachine(gMachineIdObj);
     gUuidObj = [prof[@"identifier"] ?: @"7BD46FDA-D93D-45BD-9158-7178669502DD" copy];
     if (gUuidObj.length > 0) {
         gCachedVendorUUID = [[NSUUID alloc] initWithUUIDString:gUuidObj];
@@ -636,15 +701,20 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
     int ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
     if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
         char *buf = (char *)oldp;
-        if (strstr(buf, "iPhone12,1") != NULL) {
+        if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
             size_t len = strlen(gMachineCStr) + 1;
             size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
             memcpy(oldp, gMachineCStr, copyLen);
             *oldlenp = len;
-        } else if (strstr(buf, "iPhone 11") != NULL) {
+        } else if (gRealMarketingObj && gRealMarketingObj.length > 0 && strstr(buf, [gRealMarketingObj UTF8String]) != NULL) {
             size_t len = strlen(gModelNameCStr) + 1;
             size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
             memcpy(oldp, gModelNameCStr, copyLen);
+            *oldlenp = len;
+        } else if (gRealBoardIdObj && gRealBoardIdObj.length > 0 && strstr(buf, [gRealBoardIdObj UTF8String]) != NULL) {
+            size_t len = strlen(gBoardIdCStr) + 1;
+            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+            memcpy(oldp, gBoardIdCStr, copyLen);
             *oldlenp = len;
         }
     }
@@ -733,15 +803,20 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
         int ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
         if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
             char *buf = (char *)oldp;
-            if (strstr(buf, "iPhone12,1") != NULL) {
+            if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
                 size_t len = strlen(gMachineCStr) + 1;
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, gMachineCStr, copyLen);
                 *oldlenp = len;
-            } else if (strstr(buf, "iPhone 11") != NULL) {
+            } else if (gRealMarketingObj && gRealMarketingObj.length > 0 && strstr(buf, [gRealMarketingObj UTF8String]) != NULL) {
                 size_t len = strlen(gModelNameCStr) + 1;
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, gModelNameCStr, copyLen);
+                *oldlenp = len;
+            } else if (gRealBoardIdObj && gRealBoardIdObj.length > 0 && strstr(buf, [gRealBoardIdObj UTF8String]) != NULL) {
+                size_t len = strlen(gBoardIdCStr) + 1;
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, gBoardIdCStr, copyLen);
                 *oldlenp = len;
             }
         }
@@ -787,25 +862,20 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
     }
     if (res != NULL && CFGetTypeID(res) == CFStringGetTypeID()) {
         NSString *val = (__bridge NSString *)res;
-        if ([val hasPrefix:@"iPhone"] && [val containsString:@","]) {
+        if ([val hasPrefix:@"iPhone"] && [val containsString:@","] && ![val isEqualToString:gMachineIdObj]) {
             CFRelease(res);
             return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
         }
-        if ([val localizedCaseInsensitiveContainsString:@"iPhone 11"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone 12"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone 13"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone 14"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone 15"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone X"] ||
-            [val localizedCaseInsensitiveContainsString:@"iPhone 8"]) {
+        if ((gRealMarketingObj.length > 0 && [val localizedCaseInsensitiveContainsString:gRealMarketingObj]) ||
+            ([val hasPrefix:@"iPhone "] && ![val isEqualToString:gModelNameObj])) {
             CFRelease(res);
             return (__bridge_retained CFTypeRef)[gModelNameObj copy];
         }
-        if ([val isEqualToString:@"N104AP"]) {
+        if (gRealBoardIdObj.length > 0 && [val isEqualToString:gRealBoardIdObj]) {
             CFRelease(res);
             return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
         }
-        if ([val isEqualToString:@"15.5"] || [val isEqualToString:@"15.5.0"]) {
+        if (gRealIosVersionObj.length > 0 && ([val isEqualToString:gRealIosVersionObj] || [val hasPrefix:gRealIosVersionObj])) {
             CFRelease(res);
             return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
         }
@@ -833,13 +903,24 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
     if (res != NULL) {
         if (CFGetTypeID(res) == CFStringGetTypeID()) {
             NSString *s = (__bridge NSString *)res;
-            if ([s hasPrefix:@"iPhone"] && [s containsString:@","]) return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
-            if ([s localizedCaseInsensitiveContainsString:@"iPhone 11"]) return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+            if ([s hasPrefix:@"iPhone"] && [s containsString:@","] && ![s isEqualToString:gMachineIdObj]) {
+                return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+            }
+            if ((gRealMarketingObj.length > 0 && [s localizedCaseInsensitiveContainsString:gRealMarketingObj]) ||
+                ([s hasPrefix:@"iPhone "] && ![s isEqualToString:gModelNameObj])) {
+                return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+            }
+            if (gRealBoardIdObj.length > 0 && [s isEqualToString:gRealBoardIdObj]) {
+                return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
+            }
         } else if (CFGetTypeID(res) == CFDataGetTypeID()) {
             NSData *d = (__bridge NSData *)res;
             NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
-            if (s && [s hasPrefix:@"iPhone"] && [s containsString:@","]) {
+            if (s && [s hasPrefix:@"iPhone"] && [s containsString:@","] && ![s hasPrefix:gMachineIdObj]) {
                 return (__bridge_retained CFTypeRef)[[gMachineIdObj stringByAppendingString:@"\0"] dataUsingEncoding:NSUTF8StringEncoding];
+            }
+            if (s && gRealBoardIdObj.length > 0 && [s hasPrefix:gRealBoardIdObj]) {
+                return (__bridge_retained CFTypeRef)[[[NSString stringWithUTF8String:gBoardIdCStr] stringByAppendingString:@"\0"] dataUsingEncoding:NSUTF8StringEncoding];
             }
         }
     }
@@ -1076,35 +1157,57 @@ static SEL gZTechOrigDefCfgSel = NULL;
 static SEL gZTechOrigEphCfgSel = NULL;
 static SEL gZTechOrigSetHdrSel = NULL;
 
+static NSString *ZTechSanitizeHeaderString(NSString *v) {
+    if (!v || ![v isKindOfClass:[NSString class]] || v.length == 0) return v;
+
+    // 1. Real machine model ID replacement
+    if (gRealMachineObj && gRealMachineObj.length > 0 && [v localizedCaseInsensitiveContainsString:gRealMachineObj]) {
+        v = [v stringByReplacingOccurrencesOfString:gRealMachineObj withString:(gMachineIdObj ?: @"iPhone17,2")];
+    }
+    // Universal regex replacement for any iPhone\d+,\d+
+    static NSRegularExpression *machRegex = nil;
+    static dispatch_once_t machRegexOnce;
+    dispatch_once(&machRegexOnce, ^{
+        machRegex = [NSRegularExpression regularExpressionWithPattern:@"iPhone\\d+,\\d+" options:0 error:nil];
+    });
+    if (machRegex) {
+        v = [machRegex stringByReplacingMatchesInString:v options:0 range:NSMakeRange(0, v.length) withTemplate:(gMachineIdObj ?: @"iPhone17,2")];
+    }
+
+    // 2. Real marketing name replacement
+    if (gRealMarketingObj && gRealMarketingObj.length > 0 && [v localizedCaseInsensitiveContainsString:gRealMarketingObj]) {
+        v = [v stringByReplacingOccurrencesOfString:gRealMarketingObj withString:(gModelNameObj ?: @"iPhone 16 Pro Max")];
+    }
+
+    // 3. Real iOS version replacement
+    if (gRealIosVersionObj && gRealIosVersionObj.length > 0 && [v containsString:gRealIosVersionObj]) {
+        v = [v stringByReplacingOccurrencesOfString:gRealIosVersionObj withString:(gIosVersionObj ?: @"18.2.1")];
+    }
+
+    // 4. Real iOS underscore version replacement
+    if (gRealIosUnderscoreObj && gRealIosUnderscoreObj.length > 0 && [v containsString:gRealIosUnderscoreObj]) {
+        v = [v stringByReplacingOccurrencesOfString:gRealIosUnderscoreObj withString:(gTargetIosUnderscoreObj ?: @"18_2_1")];
+    }
+
+    // 5. Dynamic scale replacement
+    if (gRealScaleStr && gTargetScaleStr && ![gRealScaleStr isEqualToString:gTargetScaleStr]) {
+        if ([v containsString:gRealScaleStr]) {
+            v = [v stringByReplacingOccurrencesOfString:gRealScaleStr withString:gTargetScaleStr];
+        }
+    }
+
+    return v;
+}
+
 static void ZTechSanitizeHeadersDict(NSMutableDictionary *headers) {
     if (!headers) return;
     for (NSString *key in [headers allKeys]) {
         id val = headers[key];
         if ([val isKindOfClass:[NSString class]]) {
-            NSString *v = (NSString *)val;
-            BOOL changed = NO;
-            if ([v localizedCaseInsensitiveContainsString:@"iPhone12,1"]) {
-                v = [v stringByReplacingOccurrencesOfString:@"iPhone12,1" withString:(gMachineIdObj ?: @"iPhone17,2")];
-                changed = YES;
-            }
-            if ([v localizedCaseInsensitiveContainsString:@"iPhone 11"]) {
-                v = [v stringByReplacingOccurrencesOfString:@"iPhone 11" withString:(gModelNameObj ?: @"iPhone 16 Pro Max")];
-                changed = YES;
-            }
-            if ([v containsString:@"15.5"]) {
-                v = [v stringByReplacingOccurrencesOfString:@"15.5" withString:(gIosVersionObj ?: @"18.2.1")];
-                changed = YES;
-            }
-            if ([v containsString:@"15_5"]) {
-                v = [v stringByReplacingOccurrencesOfString:@"15_5" withString:@"18_2_1"];
-                changed = YES;
-            }
-            if ([v containsString:@"Scale/2.00"]) {
-                v = [v stringByReplacingOccurrencesOfString:@"Scale/2.00" withString:@"Scale/3.00"];
-                changed = YES;
-            }
-            if (changed) {
-                headers[key] = v;
+            NSString *origV = (NSString *)val;
+            NSString *sanitized = ZTechSanitizeHeaderString(origV);
+            if (![sanitized isEqualToString:origV]) {
+                headers[key] = sanitized;
             }
         }
     }
@@ -1112,23 +1215,7 @@ static void ZTechSanitizeHeadersDict(NSMutableDictionary *headers) {
 
 static void swizzled_setValueForHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
     if (value && [value isKindOfClass:[NSString class]]) {
-        NSString *v = value;
-        if ([v localizedCaseInsensitiveContainsString:@"iPhone12,1"]) {
-            v = [v stringByReplacingOccurrencesOfString:@"iPhone12,1" withString:(gMachineIdObj ?: @"iPhone17,2")];
-        }
-        if ([v localizedCaseInsensitiveContainsString:@"iPhone 11"]) {
-            v = [v stringByReplacingOccurrencesOfString:@"iPhone 11" withString:(gModelNameObj ?: @"iPhone 16 Pro Max")];
-        }
-        if ([v containsString:@"15.5"]) {
-            v = [v stringByReplacingOccurrencesOfString:@"15.5" withString:(gIosVersionObj ?: @"18.2.1")];
-        }
-        if ([v containsString:@"15_5"]) {
-            v = [v stringByReplacingOccurrencesOfString:@"15_5" withString:@"18_2_1"];
-        }
-        if ([v containsString:@"Scale/2.00"]) {
-            v = [v stringByReplacingOccurrencesOfString:@"Scale/2.00" withString:@"Scale/3.00"];
-        }
-        value = v;
+        value = ZTechSanitizeHeaderString(value);
     }
     if (gZTechOrigSetHdrSel && [self respondsToSelector:gZTechOrigSetHdrSel]) {
         ((void (*)(id, SEL, id, id))objc_msgSend)(self, gZTechOrigSetHdrSel, value, field);
@@ -1736,14 +1823,41 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.1 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.2 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
             gHasRealUts = 1;
             strncpy(gRealMachineCStr, gRealUts.machine, sizeof(gRealMachineCStr) - 1);
             gRealMachineCStr[sizeof(gRealMachineCStr) - 1] = '\0';
+            gRealMachineObj = [NSString stringWithUTF8String:gRealMachineCStr];
+            gRealMarketingObj = ZTechMarketingNameForMachine(gRealMachineObj);
+            gRealScaleStr = ZTechScaleForMachine(gRealMachineObj);
         }
+
+        // Read real board-id before any sysctl hooks
+        char realModelBuf[64] = {0};
+        size_t rLen = sizeof(realModelBuf);
+        int mib[2] = { CTL_HW, HW_MODEL };
+        if (__sysctl(mib, 2, realModelBuf, &rLen, NULL, 0) == 0 && realModelBuf[0] != '\0') {
+            gRealBoardIdObj = [NSString stringWithUTF8String:realModelBuf];
+        } else if (gRealMachineObj.length > 0) {
+            gRealBoardIdObj = ZTechBoardIdForMachine(gRealMachineObj);
+        }
+
+        // Read real iOS version
+        NSOperatingSystemVersion osVer = [[NSProcessInfo processInfo] operatingSystemVersion];
+        if (osVer.majorVersion > 0) {
+            if (osVer.patchVersion > 0) {
+                gRealIosVersionObj = [NSString stringWithFormat:@"%ld.%ld.%ld", (long)osVer.majorVersion, (long)osVer.minorVersion, (long)osVer.patchVersion];
+            } else {
+                gRealIosVersionObj = [NSString stringWithFormat:@"%ld.%ld", (long)osVer.majorVersion, (long)osVer.minorVersion];
+            }
+        }
+        gRealIosUnderscoreObj = [gRealIosVersionObj stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+
+        ZTechHookTrace([[NSString stringWithFormat:@"[Real Hardware] mach=%@, market=%@, board=%@, ios=%@, scale=%@",
+                         gRealMachineObj, gRealMarketingObj, gRealBoardIdObj, gRealIosVersionObj, gRealScaleStr] UTF8String]);
 
         // Fast instant cached profile read (reads local container first)
         ZTechLoadProfileOnce();

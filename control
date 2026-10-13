@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.7
+Version: 5.5.8
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.7 - Triệt Tiêu Lỗi PAC NSURLSession & SyncedDefaults EXC_GUARD Trên ARM64E, Đồng Bộ Keychain Zalo Nội Tuyến
+Description: gaulmt -Tech v5.5.8 - Đồng Bộ Giả Lập Dòng Máy Phần Cứng (uname / sysctl / UIDevice) Cho Zalo & AIDA64 Trên ARM64E (Zero-Trampoline)
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.5.7
+          Version: 5.5.8
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.5.7 truc tiep tren Sileo & Zebra (Triet Tieu PAC NSURLSession & SyncedDefaults EXC_GUARD Tren ARM64E)
+          Description: Nguon cai dat gaulmt -Tech v5.5.8 truc tiep tren Sileo & Zebra (Gia Lap Dong May Phan Cung uname/sysctl Cho Zalo & AIDA64 Tren ARM64E)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.5.7 - Triệt Tiêu PAC Fault NSURLSession & SyncedDefaults EXC_GUARD Trên ARM64E"
+                    "title": "gaulmt -Tech v5.5.8 - Giả Lập Toàn Diện Dòng Máy Phần Cứng (uname / sysctl / UIDevice) Trên Zalo & AIDA64"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.5.7** xử lý dứt điểm 100% lỗi hậu khởi động Zalo trên chip ARM64E (iPhone XR - 16 Pro Max):\n\n- **Chống Lỗi PAC `NSURLSessionConfiguration` Trên ARM64E**: Chuyển cơ chế swizzle sang `method_exchangeImplementations` qua `objc_msgSend` chuẩn ABI ARM64E và chỉ kích hoạt khi bật Proxy, loại bỏ hoàn toàn xung đột chữ ký con trỏ hàm PAC sau khi Zalo vào giao diện.\n- **Triệt Tiêu `ExcUserFault_Zalo` (`EXC_GUARD` / `SyncedDefaults`)**: Ảo hóa bộ nhớ `+[NSUbiquitousKeyValueStore defaultStore]` nội tuyến cho Zalo và tách biệt `CFPreferences` khỏi constructor `dyld`, ngăn chặn tuyệt đối lỗi `SYDRemotePreferencesSource` làm văng ứng dụng sau 2 giây khởi động.\n- **Đồng Bộ Keychain & 6 AppGroup Nội Tuyến**: Tự động dọn sạch 100% Keychain (`SecItemDelete`) và 6 AppGroup từ bên trong tiến trình Zalo (`uid 501`) khi đổi máy ảo hoặc Reset.\n- **Giữ Vững Trình Bắt Crash Sau Khi Zalo Khởi Động**: Tái khẳng định Signal Handler sau `UIApplicationDidFinishLaunchingNotification`."
+                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.5.8** kích hoạt giả lập mã phần cứng (`uname`, `sysctlbyname`, `sysctl`, `UIDevice _deviceInfoForKey:`) trực tiếp cho cả **Zalo** và **AIDA64** với kiến trúc **Zero-Trampoline (`__sysctl`)** miễn dịch 100% lỗi PAC trên chip ARM64E:\n\n- **Giả Lập Dòng Máy Phần Cứng Trong Zalo (`uname` / `hw.machine` / `hw.model` / `UIDevice`)**: Khi tạo tài khoản hoặc đăng nhập, Zalo nhận diện 100% đúng dòng máy giả lập (ví dụ iPhone 14 Pro Max / iPhone 15 Pro Max / iPhone 16 Pro Max) thay vì thiết bị gốc.\n- **Kiến Trúc Zero-Trampoline (`__sysctl` & `gRealUts`)**: Hàm hook `uname`, `sysctlbyname` và `sysctl` viết thuần C (không gọi Objective-C, không nhảy qua trampoline `orig_*` của ElleKit), triệt tiêu 100% nguy cơ lỗi PAC trên chip A12 - A18 (`arm64e`).\n- **Tự Động Làm Sạch Cache Thiết Bị Khi Đổi Dòng Máy (`UUID:machineId`)**: Tự động xóa sạch bộ nhớ đệm thiết bị cũ ngay khi đổi dòng máy hoặc nâng cấp lên v5.5.8."
                   }
                 ]
               }
@@ -161,7 +161,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.5.7 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.5.8 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>
@@ -186,7 +186,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
-          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.7"
+          git commit -m "Deploy Multi-Path Sileo APT Repository v5.5.8"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)

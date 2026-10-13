@@ -31,9 +31,16 @@
 
 #pragma mark - Lock-Free Pre-Cached Profile, Pure C Buffers & Pre-Parsed Proxy State
 
+extern int __sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen);
+
 static NSDictionary *gCachedProfile = nil;
 static char gMachineCStr[64] = "iPhone17,2";
+static char gBoardIdCStr[32] = "D94AP";
+static char gModelNameCStr[64] = "iPhone 16 Pro Max";
 static char gRealMachineCStr[64] = "iPhone9,3";
+static struct utsname gRealUts;
+static int gHasRealUts = 0;
+static int gIsAidaProcess = 0;
 static uint64_t gRamBytes = 8ULL * 1024ULL * 1024ULL * 1024ULL;
 static NSString *gModelNameObj = @"iPhone 16 Pro Max";
 static NSString *gMachineIdObj = @"iPhone17,2";
@@ -390,6 +397,46 @@ static NSDictionary *ZTechNormalizeProfile(NSDictionary *raw) {
     return m;
 }
 
+static NSString *ZTechBoardIdForMachine(NSString *m) {
+    if (!m) return @"D94AP";
+    if ([m isEqualToString:@"iPhone17,2"]) return @"D94AP"; // 16 Pro Max
+    if ([m isEqualToString:@"iPhone17,1"]) return @"D93AP"; // 16 Pro
+    if ([m isEqualToString:@"iPhone17,3"]) return @"D47AP"; // 16
+    if ([m isEqualToString:@"iPhone17,4"]) return @"D48AP"; // 16 Plus
+    if ([m isEqualToString:@"iPhone17,5"]) return @"D49AP"; // 16e
+    if ([m isEqualToString:@"iPhone16,2"]) return @"D84AP"; // 15 Pro Max
+    if ([m isEqualToString:@"iPhone16,1"]) return @"D83AP"; // 15 Pro
+    if ([m isEqualToString:@"iPhone15,3"]) return @"D74AP"; // 14 Pro Max
+    if ([m isEqualToString:@"iPhone15,2"]) return @"D73AP"; // 14 Pro
+    if ([m isEqualToString:@"iPhone15,5"]) return @"D28AP"; // 14 Plus
+    if ([m isEqualToString:@"iPhone15,4"]) return @"D27AP"; // 14
+    if ([m isEqualToString:@"iPhone14,3"]) return @"D28AP"; // 13 Pro Max
+    if ([m isEqualToString:@"iPhone14,2"]) return @"D27AP"; // 13 Pro
+    if ([m isEqualToString:@"iPhone14,5"]) return @"D17AP"; // 13
+    if ([m isEqualToString:@"iPhone14,4"]) return @"D16AP"; // 13 mini
+    if ([m isEqualToString:@"iPhone14,6"]) return @"D49AP"; // SE 2022
+    if ([m isEqualToString:@"iPhone13,4"]) return @"D54pAP"; // 12 Pro Max
+    if ([m isEqualToString:@"iPhone13,3"]) return @"D53pAP"; // 12 Pro
+    if ([m isEqualToString:@"iPhone13,2"]) return @"D53gAP"; // 12
+    if ([m isEqualToString:@"iPhone13,1"]) return @"D52gAP"; // 12 mini
+    if ([m isEqualToString:@"iPhone12,8"]) return @"D79AP"; // SE 2020
+    if ([m isEqualToString:@"iPhone12,5"]) return @"D431AP"; // 11 Pro Max
+    if ([m isEqualToString:@"iPhone12,3"]) return @"D421AP"; // 11 Pro
+    if ([m isEqualToString:@"iPhone12,1"]) return @"N104AP"; // 11
+    if ([m isEqualToString:@"iPhone11,8"]) return @"N841AP"; // XR
+    if ([m isEqualToString:@"iPhone11,6"]) return @"D331pAP"; // XS Max
+    if ([m isEqualToString:@"iPhone11,2"]) return @"D321AP"; // XS
+    if ([m isEqualToString:@"iPhone10,6"] || [m isEqualToString:@"iPhone10,3"]) return @"D22AP"; // X
+    if ([m isEqualToString:@"iPhone10,5"] || [m isEqualToString:@"iPhone10,2"]) return @"D21AP"; // 8 Plus
+    if ([m isEqualToString:@"iPhone10,4"] || [m isEqualToString:@"iPhone10,1"]) return @"D20AP"; // 8
+    if ([m isEqualToString:@"iPhone9,4"] || [m isEqualToString:@"iPhone9,2"]) return @"D11AP"; // 7 Plus
+    if ([m isEqualToString:@"iPhone9,3"] || [m isEqualToString:@"iPhone9,1"]) return @"D10AP"; // 7
+    if ([m isEqualToString:@"iPhone8,4"]) return @"N69uAP"; // SE 1st Gen
+    if ([m isEqualToString:@"iPhone8,2"]) return @"N66AP"; // 6s Plus
+    if ([m isEqualToString:@"iPhone8,1"]) return @"N71AP"; // 6s
+    return @"D94AP";
+}
+
 static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     if (!prof) return;
     gCachedProfile = prof;
@@ -411,13 +458,24 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
         strncpy(gMachineCStr, mc, sizeof(gMachineCStr) - 1);
         gMachineCStr[sizeof(gMachineCStr) - 1] = '\0';
     }
+    const char *mnc = [gModelNameObj UTF8String];
+    if (mnc) {
+        strncpy(gModelNameCStr, mnc, sizeof(gModelNameCStr) - 1);
+        gModelNameCStr[sizeof(gModelNameCStr) - 1] = '\0';
+    }
+    NSString *boardObj = ZTechBoardIdForMachine(gMachineIdObj);
+    const char *bc = [boardObj UTF8String];
+    if (bc) {
+        strncpy(gBoardIdCStr, bc, sizeof(gBoardIdCStr) - 1);
+        gBoardIdCStr[sizeof(gBoardIdCStr) - 1] = '\0';
+    }
+
     NSInteger ramGB = [prof[@"ramGB"] integerValue];
     if (ramGB < 2) ramGB = 8;
     gRamBytes = (uint64_t)ramGB * 1024ULL * 1024ULL * 1024ULL;
 
     NSInteger pct = [prof[@"batteryPercent"] integerValue];
     gBatteryFloat = (pct > 0 && pct <= 100) ? ((float)pct / 100.0f) : 0.76f;
-
 
     ZTechRebuildCachedProxyState(gActiveProxyObj);
 }
@@ -469,64 +527,33 @@ static NSDictionary *ZTechLoadProfileOnce(void) {
     return gCachedProfile;
 }
 
-#pragma mark - Lock-Free Pure C Function Hooks (uname, sysctlbyname, sysctl, MGCopyAnswer)
-
-static NSString *ZTechBoardIdForMachine(NSString *m) {
-    if (!m) return @"D94AP";
-    if ([m isEqualToString:@"iPhone17,2"]) return @"D94AP"; // 16 Pro Max
-    if ([m isEqualToString:@"iPhone17,1"]) return @"D93AP"; // 16 Pro
-    if ([m isEqualToString:@"iPhone17,3"]) return @"D47AP"; // 16
-    if ([m isEqualToString:@"iPhone17,4"]) return @"D48AP"; // 16 Plus
-    if ([m isEqualToString:@"iPhone17,5"]) return @"D49AP"; // 16e
-    if ([m isEqualToString:@"iPhone16,2"]) return @"D84AP"; // 15 Pro Max
-    if ([m isEqualToString:@"iPhone16,1"]) return @"D83AP"; // 15 Pro
-    if ([m isEqualToString:@"iPhone15,3"]) return @"D74AP"; // 14 Pro Max
-    if ([m isEqualToString:@"iPhone15,2"]) return @"D73AP"; // 14 Pro
-    if ([m isEqualToString:@"iPhone15,5"]) return @"D28AP"; // 14 Plus
-    if ([m isEqualToString:@"iPhone15,4"]) return @"D27AP"; // 14
-    if ([m isEqualToString:@"iPhone14,3"]) return @"D28AP"; // 13 Pro Max
-    if ([m isEqualToString:@"iPhone14,2"]) return @"D27AP"; // 13 Pro
-    if ([m isEqualToString:@"iPhone14,5"]) return @"D17AP"; // 13
-    if ([m isEqualToString:@"iPhone14,4"]) return @"D16AP"; // 13 mini
-    if ([m isEqualToString:@"iPhone14,6"]) return @"D49AP"; // SE 2022
-    if ([m isEqualToString:@"iPhone13,4"]) return @"D54pAP"; // 12 Pro Max
-    if ([m isEqualToString:@"iPhone13,3"]) return @"D53pAP"; // 12 Pro
-    if ([m isEqualToString:@"iPhone13,2"]) return @"D53gAP"; // 12
-    if ([m isEqualToString:@"iPhone13,1"]) return @"D52gAP"; // 12 mini
-    if ([m isEqualToString:@"iPhone12,8"]) return @"D79AP"; // SE 2020
-    if ([m isEqualToString:@"iPhone12,5"]) return @"D431AP"; // 11 Pro Max
-    if ([m isEqualToString:@"iPhone12,3"]) return @"D421AP"; // 11 Pro
-    if ([m isEqualToString:@"iPhone12,1"]) return @"N104AP"; // 11
-    if ([m isEqualToString:@"iPhone11,8"]) return @"N841AP"; // XR
-    if ([m isEqualToString:@"iPhone11,6"]) return @"D331pAP"; // XS Max
-    if ([m isEqualToString:@"iPhone11,2"]) return @"D321AP"; // XS
-    if ([m isEqualToString:@"iPhone10,6"] || [m isEqualToString:@"iPhone10,3"]) return @"D22AP"; // X
-    if ([m isEqualToString:@"iPhone10,5"] || [m isEqualToString:@"iPhone10,2"]) return @"D21AP"; // 8 Plus
-    if ([m isEqualToString:@"iPhone10,4"] || [m isEqualToString:@"iPhone10,1"]) return @"D20AP"; // 8
-    if ([m isEqualToString:@"iPhone9,4"] || [m isEqualToString:@"iPhone9,2"]) return @"D11AP"; // 7 Plus
-    if ([m isEqualToString:@"iPhone9,3"] || [m isEqualToString:@"iPhone9,1"]) return @"D10AP"; // 7
-    if ([m isEqualToString:@"iPhone8,4"]) return @"N69uAP"; // SE 1st Gen
-    if ([m isEqualToString:@"iPhone8,2"]) return @"N66AP"; // 6s Plus
-    if ([m isEqualToString:@"iPhone8,1"]) return @"N71AP"; // 6s
-    return @"D94AP";
-}
+#pragma mark - Lock-Free Pure C Function Hooks (Zero-Trampoline uname, sysctlbyname, sysctl via __sysctl)
 
 static int (*orig_uname)(struct utsname *buf) = NULL;
 static int hooked_uname(struct utsname *buf) {
-    int ret = orig_uname ? orig_uname(buf) : uname(buf);
-    if (buf != NULL) {
-        strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
-        buf->machine[sizeof(buf->machine) - 1] = '\0';
-        strncpy(buf->nodename, [gModelNameObj UTF8String] ?: "iPhone", sizeof(buf->nodename) - 1);
+    if (buf == NULL) return -1;
+    if (gHasRealUts) {
+        memcpy(buf, &gRealUts, sizeof(struct utsname));
+    } else {
+        memset(buf, 0, sizeof(struct utsname));
+        strncpy(buf->sysname, "Darwin", sizeof(buf->sysname) - 1);
+        strncpy(buf->nodename, "iPhone", sizeof(buf->nodename) - 1);
+        strncpy(buf->release, "21.5.0", sizeof(buf->release) - 1);
+        strncpy(buf->version, "Darwin Kernel Version 21.5.0", sizeof(buf->version) - 1);
+    }
+    strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
+    buf->machine[sizeof(buf->machine) - 1] = '\0';
+    if (gIsAidaProcess && gModelNameCStr[0] != '\0') {
+        strncpy(buf->nodename, gModelNameCStr, sizeof(buf->nodename) - 1);
         buf->nodename[sizeof(buf->nodename) - 1] = '\0';
     }
-    return ret;
+    return 0;
 }
 
 static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name != NULL && namelen >= 2) {
-        if (name[0] == CTL_HW && name[1] == HW_MACHINE) {
+    if (name != NULL && namelen >= 2 && name[0] == CTL_HW) {
+        if (name[1] == HW_MACHINE) {
             size_t len = strlen(gMachineCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
@@ -536,19 +563,17 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                 *oldlenp = len;
             }
             return 0;
-        } else if (name[0] == CTL_HW && name[1] == HW_MODEL) {
-            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
-            const char *board = [b UTF8String] ?: "D94AP";
-            size_t len = strlen(board) + 1;
+        } else if (name[1] == HW_MODEL) {
+            size_t len = strlen(gBoardIdCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, board, copyLen);
+                memcpy(oldp, gBoardIdCStr, copyLen);
             }
             if (oldlenp != NULL) {
                 *oldlenp = len;
             }
             return 0;
-        } else if (name[0] == CTL_HW && name[1] == HW_MEMSIZE) {
+        } else if (gIsAidaProcess && name[1] == HW_MEMSIZE) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
@@ -557,7 +582,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                 *oldlenp = sizeof(uint64_t);
                 return 0;
             }
-        } else if (name[0] == CTL_HW && name[1] == HW_PHYSMEM) {
+        } else if (gIsAidaProcess && name[1] == HW_PHYSMEM) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     if (*oldlenp >= sizeof(uint64_t)) {
@@ -574,7 +599,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                 }
                 return 0;
             }
-        } else if (name[0] == CTL_HW && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
+        } else if (gIsAidaProcess && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     int cores = 6;
@@ -586,7 +611,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
             }
         }
     }
-    return orig_sysctl ? orig_sysctl(name, namelen, oldp, oldlenp, newp, newlen) : sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    return __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
 }
 
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
@@ -603,18 +628,16 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             }
             return 0;
         } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
-            NSString *b = ZTechBoardIdForMachine(gMachineIdObj);
-            const char *board = [b UTF8String] ?: "D94AP";
-            size_t len = strlen(board) + 1;
+            size_t len = strlen(gBoardIdCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, board, copyLen);
+                memcpy(oldp, gBoardIdCStr, copyLen);
             }
             if (oldlenp != NULL) {
                 *oldlenp = len;
             }
             return 0;
-        } else if (strcmp(name, "hw.memsize") == 0) {
+        } else if (gIsAidaProcess && strcmp(name, "hw.memsize") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
@@ -623,7 +646,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = sizeof(uint64_t);
                 return 0;
             }
-        } else if (strcmp(name, "hw.physmem") == 0) {
+        } else if (gIsAidaProcess && strcmp(name, "hw.physmem") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     if (*oldlenp >= sizeof(uint64_t)) {
@@ -640,7 +663,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 }
                 return 0;
             }
-        } else if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
+        } else if (gIsAidaProcess && (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0)) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     int cores = 6;
@@ -650,7 +673,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = sizeof(int);
                 return 0;
             }
-        } else if (strcmp(name, "machdep.cpu.brand_string") == 0) {
+        } else if (gIsAidaProcess && strcmp(name, "machdep.cpu.brand_string") == 0) {
             const char *soc = "Apple A18 Pro";
             size_t len = strlen(soc) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -662,8 +685,14 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             }
             return 0;
         }
+        int name2oid_oid[2] = { 0, 3 };
+        int real_oid[CTL_MAXNAME + 2];
+        size_t oidlen = sizeof(real_oid);
+        int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
+        if (err < 0) return err;
+        return hooked_sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
     }
-    return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : sysctlbyname(name, oldp, oldlenp, newp, newlen);
+    return -1;
 }
 
 
@@ -758,6 +787,25 @@ static NSString *swizzled_osVersionString(id self, SEL _cmd) {
 static unsigned long long (*orig_physicalMemory)(id, SEL) = NULL;
 static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
     return (unsigned long long)gRamBytes;
+}
+
+static SEL gZTechOrigDevInfoSel = NULL;
+static id swizzled_deviceInfoForKey(id self, SEL _cmd, NSString *key) {
+    if (key && [key isKindOfClass:[NSString class]]) {
+        if ([key isEqualToString:@"ProductType"] || [key isEqualToString:@"hw-machine"]) {
+            return gMachineIdObj ?: @"iPhone17,2";
+        }
+        if ([key isEqualToString:@"HWModelStr"]) {
+            return [NSString stringWithUTF8String:gBoardIdCStr];
+        }
+        if ([key isEqualToString:@"DeviceName"] || [key isEqualToString:@"UserAssignedDeviceName"] || [key isEqualToString:@"MarketingNameString"]) {
+            return gModelNameObj ?: @"iPhone 16 Pro Max";
+        }
+    }
+    if (gZTechOrigDevInfoSel && [self respondsToSelector:gZTechOrigDevInfoSel]) {
+        return ((id (*)(id, SEL, id))objc_msgSend)(self, gZTechOrigDevInfoSel, key);
+    }
+    return nil;
 }
 
 static SEL gZTechOrigDefCfgSel = NULL;
@@ -1154,23 +1202,25 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
                 }
             }
 
-            if (gUuidObj.length > 0) {
-                [gUuidObj writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
+            if (currentSig.length > 1) {
+                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
                 chmod([boundUuidFile UTF8String], 0666);
             }
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.5/6] Vault session restored (Keychain + Prefs) for UUID=%@", gUuidObj] UTF8String]);
+            ZTechHookTrace([[NSString stringWithFormat:@"[2.5/6] Vault session restored (Keychain + Prefs) for sig=%@", currentSig] UTF8String]);
             return;
         }
 
-        // Case 2: Check if Clean Reset or New Device UUID requires purging stale Keychain & Container
-        NSString *boundUuid = [[NSString stringWithContentsOfFile:boundUuidFile encoding:NSUTF8StringEncoding error:nil]
-                               stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        // Case 2: Check if Clean Reset or New Device UUID/Model requires purging stale Keychain & Container
+        NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
+        NSString *boundSig = [[NSString stringWithContentsOfFile:boundUuidFile encoding:NSUTF8StringEncoding error:nil]
+                              stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         BOOL hasWipeFlag = [fm fileExistsAtPath:wipeFlag];
-        BOOL uuidChanged = (!boundUuid || boundUuid.length == 0 || ![boundUuid isEqualToString:gUuidObj]);
+        BOOL sigChanged = (!boundSig || boundSig.length == 0 || ![boundSig isEqualToString:currentSig]);
 
-        if (hasWipeFlag || uuidChanged) {
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.1/6] In-process deep clean triggered (wipeFlag=%d, boundUUID=%@ -> newUUID=%@)",
-                             hasWipeFlag ? 1 : 0, boundUuid ?: @"(none)", gUuidObj] UTF8String]);
+        if (hasWipeFlag || sigChanged) {
+            ZTechHookTrace([[NSString stringWithFormat:@"[2.1/6] In-process deep clean triggered (wipeFlag=%d, boundSig=%@ -> newSig=%@)",
+                             hasWipeFlag ? 1 : 0, boundSig ?: @"(none)", currentSig] UTF8String]);
 
             [fm removeItemAtPath:wipeFlag error:nil];
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"] error:nil];
@@ -1236,12 +1286,12 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
                 }
             }
 
-            // 4. Bind the new UUID so subsequent launches of the same session preserve login data
-            if (gUuidObj.length > 0) {
-                [gUuidObj writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            // 4. Bind the new UUID:machineId so subsequent launches of the same session preserve login data
+            if (currentSig.length > 1) {
+                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
                 chmod([boundUuidFile UTF8String], 0666);
             }
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6] In-process deep clean completed 100%% for UUID=%@", gUuidObj] UTF8String]);
+            ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6] In-process deep clean completed 100%% for sig=%@", currentSig] UTF8String]);
         }
     } @catch (NSException *e) {
         ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6 ERROR] Sync exception: %@", e] UTF8String]);
@@ -1329,6 +1379,7 @@ static void ZTechHookInit(void) {
             return;
         }
 
+        gIsAidaProcess = isAida ? 1 : 0;
         gProcessStartTime = time(NULL);
 
         // Immediately clean up any broken .GlobalPreferences.plist symlink inside the app's container before CFPreferences initializes
@@ -1347,12 +1398,12 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.7 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.8 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
-        struct utsname realUts;
-        if (uname(&realUts) == 0 && realUts.machine[0] != '\0') {
-            strncpy(gRealMachineCStr, realUts.machine, sizeof(gRealMachineCStr) - 1);
+        if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
+            gHasRealUts = 1;
+            strncpy(gRealMachineCStr, gRealUts.machine, sizeof(gRealMachineCStr) - 1);
             gRealMachineCStr[sizeof(gRealMachineCStr) - 1] = '\0';
         }
 
@@ -1421,6 +1472,16 @@ static void ZTechHookInit(void) {
                     orig_identifierForVendor = (void *)method_getImplementation(mIdfv);
                     method_setImplementation(mIdfv, (IMP)swizzled_identifierForVendor);
                 }
+
+                SEL devInfoSel = sel_registerName("_deviceInfoForKey:");
+                Method mDevInfo = class_getInstanceMethod(uiDeviceCls, devInfoSel);
+                if (mDevInfo) {
+                    gZTechOrigDevInfoSel = sel_registerName("_ztech_orig_deviceInfoForKey:");
+                    if (class_addMethod(uiDeviceCls, gZTechOrigDevInfoSel, (IMP)swizzled_deviceInfoForKey, method_getTypeEncoding(mDevInfo))) {
+                        Method mSwizDevInfo = class_getInstanceMethod(uiDeviceCls, gZTechOrigDevInfoSel);
+                        if (mSwizDevInfo) method_exchangeImplementations(mDevInfo, mSwizDevInfo);
+                    }
+                }
             }
 
             // Only swizzle NSURLSessionConfiguration when proxy is enabled, using arm64e PAC-safe method_exchangeImplementations
@@ -1480,7 +1541,40 @@ static void ZTechHookInit(void) {
             ZTechHookTrace([[NSString stringWithFormat:@"[4/6 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
         }
 
-        // 3. Isolated Hardware & Diagnostic Spoofing (AIDA64 ONLY)
+        // 3. Hardware Model Spoofing (uname, sysctlbyname, sysctl) for BOTH Zalo & AIDA64 (Zero-Trampoline via __sysctl)
+        typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
+        zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
+        if (!pMSHook) {
+            void *hElle = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
+            if (hElle) {
+                pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
+            }
+        }
+        if (pMSHook) {
+            void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
+            if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
+
+            void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
+            void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
+            if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
+            if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
+
+            struct utsname verifyUts;
+            memset(&verifyUts, 0, sizeof(verifyUts));
+            uname(&verifyUts);
+            char verifyMach[64] = {0};
+            size_t verifyLen = sizeof(verifyMach);
+            sysctlbyname("hw.machine", verifyMach, &verifyLen, NULL, 0);
+            ZTechHookTrace([[NSString stringWithFormat:@"[4.5/6] Hardware spoofing active: uname.machine=%s, sysctl(hw.machine)=%s, board=%s",
+                             verifyUts.machine, verifyMach, gBoardIdCStr] UTF8String]);
+        }
+
+        // 4. Extra Diagnostic Spoofing (NSProcessInfo & Metal GPU) for AIDA64 ONLY
         if (isAida) {
             @try {
                 Class procCls = objc_getClass("NSProcessInfo");
@@ -1514,29 +1608,6 @@ static void ZTechHookInit(void) {
                     }
                 }
             } @catch (NSException *e) {}
-
-            typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
-            zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
-            if (!pMSHook) {
-                void *hElle = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (!hElle) hElle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (!hElle) hElle = dlopen("/usr/lib/libellekit.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (!hElle) hElle = dlopen("/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (!hElle) hElle = dlopen("/var/jb/usr/lib/libsubstitute.dylib", RTLD_LAZY | RTLD_GLOBAL);
-                if (hElle) {
-                    pMSHook = (zt_MSHookFunction_t)dlsym(hElle, "MSHookFunction");
-                }
-            }
-            if (pMSHook) {
-                void *raw_uname = dlsym(RTLD_DEFAULT, "uname");
-                if (raw_uname) pMSHook(raw_uname, (void *)hooked_uname, (void **)&orig_uname);
-
-                void *raw_sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
-                void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
-                if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
-                if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
-            }
         }
 
         // Observe UIApplicationDidFinishLaunchingNotification to confirm app reached UI loop & re-assert signal handlers

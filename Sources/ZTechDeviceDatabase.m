@@ -448,12 +448,12 @@ extern char **environ;
         }
     }
 
-    // One-time automatic repair of any corrupted Zalo container/AppGroup/Keychain state on v5.5.9 upgrade
+    // One-time automatic repair of any corrupted Zalo container/AppGroup/Keychain state on v5.6.0 upgrade
     NSString *repairFlag = [fm fileExistsAtPath:@"/var/jb/var/mobile/Library/Preferences"]
-        ? @"/var/jb/var/mobile/Library/Preferences/_zt_v559_repaired.flag"
-        : @"/var/mobile/Library/Preferences/_zt_v559_repaired.flag";
+        ? @"/var/jb/var/mobile/Library/Preferences/_zt_v560_repaired.flag"
+        : @"/var/mobile/Library/Preferences/_zt_v560_repaired.flag";
     if (![fm fileExistsAtPath:repairFlag]) {
-        [@"5.5.9" writeToFile:repairFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [@"5.6.0" writeToFile:repairFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
         chmod([repairFlag UTF8String], 0666);
         [self cleanResetAllProfileDataAndCache];
     }

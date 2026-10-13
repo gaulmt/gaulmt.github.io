@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.5.9
+          Version: 5.6.0
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.5.9 truc tiep tren Sileo & Zebra (Caller-Aware Hardware Spoofing + Mach-O GOT Rebinding Mien Dich Crash)
+          Description: Nguon cai dat gaulmt -Tech v5.6.0 truc tiep tren Sileo & Zebra (MobileGestalt MGCopyAnswerWithError + Pure C Hardware Spoofing)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.5.9 - Giả Lập Phần Cứng Chọn Lọc Theo Module (Caller-Aware + Mach-O GOT Rebinding)"
+                    "title": "gaulmt -Tech v5.6.0 - MobileGestalt MGCopyAnswerWithError + Pure C Hardware Spoofing"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.5.9** trang bị kiến trúc **Caller-Aware Filtering** kết hợp **Mach-O GOT Rebinding** giúp Zalo nhận diện 100% dòng máy giả lập mà tuyệt đối không bao giờ gây xung đột với các framework/driver hệ thống iOS:\n\n- **Lọc Địa Chỉ Gọi Theo Module (`ZTechIsCallerFromApp`)**: Chỉ trả về mã máy giả lập (`uname`, `sysctlbyname`, `sysctl`) khi lệnh gọi xuất phát từ chính binary/framework của `Zalo.app` hoặc `AIDA64.app`. Mọi lời gọi từ driver đồ họa (`Metal`/`AGXMetal`), `UIKitCore`, `WebKit` hay hệ thống iOS đều nhận thông số phần cứng thật, triệt tiêu 100% nguy cơ crash khi bật giả lập.\n- **Mach-O Symbol Table Rebinding (`_uname`, `_sysctlbyname`, `_sysctl`, `_MGCopyAnswer`)**: Ghi đè trực tiếp bảng GOT nội bộ của `Zalo.app` để bắt trọn cả truy vấn `MGCopyAnswer(ProductType)` mà không cần can thiệp vào mã máy của `libMobileGestalt.dylib`."
+                    "markdown": "Bản phát hành tối ưu **gaulmt -Tech v5.6.0** giải quyết triệt để vấn đề Zalo nhận diện thiết bị ảo:\n\n- **MobileGestalt Interception (`MGCopyAnswerWithError`)**: Can thiệp trực tiếp hàm gốc `MGCopyAnswerWithError` trong `libMobileGestalt.dylib` bằng ElleKit an toàn, trả về chuẩn xác `ProductType`, `MarketingNameString`, `DeviceName`, `HWModelStr`, `ProductVersion` cho Zalo.\n- **Zero-Trampoline Pure C Hardware Spoofing**: Cung cấp `uname` và `sysctlbyname(\"hw.machine\")` trực tiếp cho mọi module ứng dụng đồng thời bảo vệ driver Metal GPU đồ họa.\n- **Đồng Bộ Đầy Đủ UIDevice & NSProcessInfo**: Swizzle toàn diện `systemVersion`, `name`, `model`, `localizedModel`, `_rawDeviceName`, `_deviceInfoForKey:` và `NSProcessInfo` cho cả Zalo và AIDA64."
                   }
                 ]
               }

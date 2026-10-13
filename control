@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.9
+Version: 5.6.0
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.9 - Giả Lập Phần Cứng Có Chọn Lọc Theo Module (Caller-Aware + Mach-O GOT Rebinding), Miễn Dịch 100% Crash Driver Hệ Thống
+Description: gaulmt -Tech v5.6.0 - MobileGestalt MGCopyAnswerWithError + Pure-C Hardware Spoofing + Full UIDevice/NSProcessInfo, Triệt Để Nhận Diện Mọi Thiết Bị Ảo Trực Tiếp Trong Zalo
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

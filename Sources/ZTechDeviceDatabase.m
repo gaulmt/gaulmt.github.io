@@ -443,13 +443,21 @@ extern char **environ;
         }
     }
 
+    // One-time automatic repair of any corrupted v5.5.0-v5.5.4 Zalo container/AppGroup state on upgrade
+    NSString *repairFlag = [fm fileExistsAtPath:@"/var/jb/var/mobile/Library/Preferences"]
+        ? @"/var/jb/var/mobile/Library/Preferences/_zt_v555_repaired.flag"
+        : @"/var/mobile/Library/Preferences/_zt_v555_repaired.flag";
+    if (![fm fileExistsAtPath:repairFlag]) {
+        [@"5.5.5" writeToFile:repairFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        chmod([repairFlag UTF8String], 0666);
+        [self cleanResetAllProfileDataAndCache];
+    }
+
     // Also write _zt_active_profile.plist directly inside Zalo's own Data Container & AppGroup so sandboxed Zalo can always read it
     NSString *zaloContainer = [ZTechVaultManager findZaloDataContainerPath];
     if (zaloContainer.length > 0) {
+        [self repairContainerStructureAtPath:zaloContainer fileManager:fm];
         NSString *zDocs = [zaloContainer stringByAppendingPathComponent:@"Documents"];
-        if (![fm fileExistsAtPath:zDocs]) {
-            [fm createDirectoryAtPath:zDocs withIntermediateDirectories:YES attributes:nil error:nil];
-        }
         NSString *zProfPath = [zDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
         if ([sharedDict writeToFile:zProfPath atomically:YES]) {
             chown([zProfPath UTF8String], 501, 501);
@@ -468,6 +476,7 @@ extern char **environ;
     NSDictionary<NSString *, NSString *> *zaloGroups = [ZTechVaultManager findZaloAppGroupContainers];
     for (NSString *grpPath in zaloGroups.allValues) {
         if (grpPath.length > 0) {
+            [self repairContainerStructureAtPath:grpPath fileManager:fm];
             NSString *gProfPath = [grpPath stringByAppendingPathComponent:@"_zt_active_profile.plist"];
             if ([sharedDict writeToFile:gProfPath atomically:YES]) {
                 chown([gProfPath UTF8String], 501, 501);
@@ -479,18 +488,18 @@ extern char **environ;
     // Also write _zt_active_profile.plist directly inside AIDA64's Data Container if installed
     NSString *aidaContainer = [ZTechVaultManager findAIDA64DataContainerPath];
     if (aidaContainer.length > 0) {
+        [self repairContainerStructureAtPath:aidaContainer fileManager:fm];
         NSString *aDocs = [aidaContainer stringByAppendingPathComponent:@"Documents"];
-        if (![fm fileExistsAtPath:aDocs]) {
-            [fm createDirectoryAtPath:aDocs withIntermediateDirectories:YES attributes:nil error:nil];
-        }
         NSString *aProfPath = [aDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
         if ([sharedDict writeToFile:aProfPath atomically:YES]) {
+            chown([aProfPath UTF8String], 501, 501);
             chmod([aProfPath UTF8String], 0666);
         }
         NSString *aPrefDir = [aidaContainer stringByAppendingPathComponent:@"Library/Preferences"];
         if ([fm fileExistsAtPath:aPrefDir]) {
             NSString *aPrefPath = [aPrefDir stringByAppendingPathComponent:@"com.ztech.profile.plist"];
             if ([sharedDict writeToFile:aPrefPath atomically:YES]) {
+                chown([aPrefPath UTF8String], 501, 501);
                 chmod([aPrefPath UTF8String], 0666);
             }
         }
@@ -507,14 +516,22 @@ extern char **environ;
     NSArray *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
     for (NSString *item in items) {
         if ([item isEqualToString:@".com.apple.mobile_container_manager.metadata.plist"] ||
-            [item hasPrefix:@".GlobalPreferences"] ||
-            [item hasPrefix:@"com.apple."] ||
+            [item isEqualToString:@"SystemData"] ||
             [item isEqualToString:@"_zt_last_reset_token.txt"] ||
             [item isEqualToString:@"_zt_zalo_marker.txt"] ||
-            [item isEqualToString:@"_zt_active_profile.plist"]) {
+            [item isEqualToString:@"_zt_active_profile.plist"] ||
+            [item isEqualToString:@"ztech_hook_trace.log"] ||
+            [item isEqualToString:@"ztech_crash.log"]) {
             continue;
         }
         NSString *fullPath = [dirPath stringByAppendingPathComponent:item];
+        struct stat st;
+        if (lstat([fullPath UTF8String], &st) == 0 && S_ISLNK(st.st_mode)) {
+            if (unlink([fullPath UTF8String]) == 0) {
+                count++;
+            }
+            continue;
+        }
         if ([fm removeItemAtPath:fullPath error:nil]) {
             count++;
         }
@@ -525,11 +542,24 @@ extern char **environ;
 + (void)repairContainerStructureAtPath:(NSString *)containerPath fileManager:(NSFileManager *)fm {
     if (!containerPath || containerPath.length == 0) return;
 
+    // Actively remove any broken .GlobalPreferences.plist symlink that could trigger CFPreferences LIBSYSTEM EXC_GUARD fault
+    NSString *gpLink = [containerPath stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
+    struct stat st;
+    if (lstat([gpLink UTF8String], &st) == 0) {
+        unlink([gpLink UTF8String]);
+    }
+    NSString *gpLinkM = [containerPath stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences_m.plist"];
+    if (lstat([gpLinkM UTF8String], &st) == 0) {
+        unlink([gpLinkM UTF8String]);
+    }
+
     BOOL isAppGroup = [containerPath containsString:@"/Shared/AppGroup/"];
     NSArray<NSString *> *subDirs = isAppGroup ? @[
         @"Library",
         @"Library/Caches",
-        @"Library/Preferences"
+        @"Library/Preferences",
+        @"Library/Application Support",
+        @"Documents"
     ] : @[
         @"Documents",
         @"tmp",
@@ -546,20 +576,15 @@ extern char **environ;
             [fm createDirectoryAtPath:p withIntermediateDirectories:YES attributes:nil error:nil];
         }
         chown([p UTF8String], 501, 501);
-        chmod([p UTF8String], 0777);
+        chmod([p UTF8String], 0755);
     }
 
-    if (!isAppGroup) {
-        NSString *globalPrefsLink = [containerPath stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
-        if (![fm fileExistsAtPath:globalPrefsLink]) {
-            const char *target = [fm fileExistsAtPath:@"/var/mobile/Library/Preferences/.GlobalPreferences.plist"] ?
-                                 "/var/mobile/Library/Preferences/.GlobalPreferences.plist" :
-                                 "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist";
-            if ([fm fileExistsAtPath:[NSString stringWithUTF8String:target]]) {
-                symlink(target, [globalPrefsLink UTF8String]);
-                lchown([globalPrefsLink UTF8String], 501, 501);
-            }
-        }
+    // Ensure container root is 0755 and metadata.plist is 0644 (never 0777!)
+    chown([containerPath UTF8String], 501, 501);
+    chmod([containerPath UTF8String], 0755);
+    NSString *metaPath = [containerPath stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+    if ([fm fileExistsAtPath:metaPath]) {
+        chmod([metaPath UTF8String], 0644);
     }
 }
 
@@ -585,16 +610,32 @@ extern char **environ;
     }
 
     for (NSString *containerPath in zaloContainers) {
-        [self repairContainerStructureAtPath:containerPath fileManager:fm];
-        NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support"];
+        // 1. Clean all interior sub-directories first (preserving trace logs in Documents/Caches)
+        NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support", @"Library/SplashBoard", @"Library/HTTPStorages", @"Library/Saved Application State", @"Library"];
         for (NSString *sub in subDirs) {
             NSString *targetSub = [containerPath stringByAppendingPathComponent:sub];
             if ([fm fileExistsAtPath:targetSub]) {
                 cleanedItems += [self cleanDirectoryContents:targetSub fileManager:fm];
             }
         }
+        // 2. For AppGroup containers (e.g. group.vn.com.vng.zingalo), also clean root-level MMKV/SQLite/session files
+        if ([containerPath containsString:@"/Shared/AppGroup/"]) {
+            cleanedItems += [self cleanDirectoryContents:containerPath fileManager:fm];
+        }
+        // 3. Reconstruct clean standard iOS container directory tree & permissions (0755 dirs, 0644 metadata.plist)
         [self repairContainerStructureAtPath:containerPath fileManager:fm];
         [ZTechVaultManager runFastChownAndChmod:containerPath];
+    }
+
+    // Flush cfprefsd so iOS reloads clean NSUserDefaults for Zalo and its AppGroups
+    NSArray<NSString *> *killBins = @[@"/var/jb/usr/bin/killall", @"/usr/bin/killall"];
+    for (NSString *bin in killBins) {
+        if ([fm isExecutableFileAtPath:bin]) {
+            pid_t pid;
+            const char *args[] = { [bin UTF8String], "-9", "cfprefsd", NULL };
+            posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ);
+            break;
+        }
     }
     sync();
 

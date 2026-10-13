@@ -28,27 +28,38 @@ if [ -d "/Library/MobileSubstrate/DynamicLibraries" ] && [ ! -d "/var/jb" ]; the
     fi
 fi
 
+# Terminate Zalo prior to container repair
+killall -9 Zalo vn.com.vng.zalo >/dev/null 2>&1 || true
+
 # Targeted repair ONLY for Zalo & AIDA64 data containers and AppGroups
-for ROOT_DIR in "/var/mobile/Containers/Data/Application" "/var/mobile/Containers/Shared/AppGroup"; do
+for ROOT_DIR in "/var/mobile/Containers/Data/Application" "/private/var/mobile/Containers/Data/Application" "/var/mobile/Containers/Shared/AppGroup" "/private/var/mobile/Containers/Shared/AppGroup"; do
     if [ -d "$ROOT_DIR" ]; then
         for CONT in "$ROOT_DIR"/*; do
             if [ -d "$CONT" ]; then
                 IS_TARGET=0
                 META="$CONT/.com.apple.mobile_container_manager.metadata.plist"
                 if [ -f "$META" ]; then
-                    if grep -qiE "zalo|vng|aida64" "$META" 2>/dev/null; then
+                    if grep -qiE "zalo|zingalo|vng|aida64" "$META" 2>/dev/null; then
                         IS_TARGET=1
                     fi
                 fi
-                if [ "$IS_TARGET" -eq 1 ] || [ -f "$CONT/Documents/_zt_zalo_marker.txt" ] || [ -f "$CONT/Documents/_zt_active_profile.plist" ]; then
-                    mkdir -p "$CONT/Documents" "$CONT/tmp" "$CONT/Library/Caches" "$CONT/Library/Preferences" >/dev/null 2>&1 || true
-                    chown -R 501:501 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" 2>/dev/null || true
-                    chmod -R 0777 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" 2>/dev/null || true
+                if [ "$IS_TARGET" -eq 1 ] || [ -f "$CONT/Documents/_zt_zalo_marker.txt" ] || [ -f "$CONT/Documents/_zt_active_profile.plist" ] || [ -f "$CONT/_zt_active_profile.plist" ]; then
+                    rm -f "$CONT/Library/Preferences/.GlobalPreferences.plist" "$CONT/Library/Preferences/.GlobalPreferences_m.plist" >/dev/null 2>&1 || true
+                    mkdir -p "$CONT/Documents" "$CONT/tmp" "$CONT/Library/Caches" "$CONT/Library/Preferences" "$CONT/Library/Application Support" >/dev/null 2>&1 || true
+                    chown 501:501 "$CONT" >/dev/null 2>&1 || true
+                    chmod 0755 "$CONT" >/dev/null 2>&1 || true
+                    if [ -f "$META" ]; then
+                        chmod 0644 "$META" >/dev/null 2>&1 || true
+                    fi
+                    chown -R 501:501 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" >/dev/null 2>&1 || true
+                    chmod -R 0755 "$CONT/Documents" "$CONT/tmp" "$CONT/Library" >/dev/null 2>&1 || true
                 fi
             fi
         done
     fi
 done
+
+killall -9 cfprefsd >/dev/null 2>&1 || true
 
 for APP_DIR in "/var/jb/Applications/ZTech.app" "/Applications/ZTech.app"; do
     if [ -d "$APP_DIR" ]; then

@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.4
+Version: 5.5.5
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.4 - Dứt Điểm Crash Zalo Trên ARM64E & iOS 15, Bổ Sung Section 6 Crash Trace Tự Động
+Description: gaulmt -Tech v5.5.5 - Tự Động Sửa Lỗi Container/AppGroup Zalo, Xoá Symlink GlobalPreferences & Chẩn Đoán JSON IPS Toàn Diện
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

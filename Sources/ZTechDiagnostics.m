@@ -136,6 +136,25 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         [outStr appendFormat:@"  * %@: %@\n", tp, ZTechFormatFilePerms(tp, fm)];
     }
 
+    // List all installed tweaks in TweakInject / DynamicLibraries to detect conflicts
+    NSArray<NSString *> *injectDirs = @[
+        @"/var/jb/usr/lib/TweakInject",
+        @"/Library/MobileSubstrate/DynamicLibraries"
+    ];
+    for (NSString *idir in injectDirs) {
+        if ([fm fileExistsAtPath:idir]) {
+            NSArray<NSString *> *dfiles = [fm contentsOfDirectoryAtPath:idir error:nil];
+            NSMutableArray<NSString *> *dylibs = [NSMutableArray array];
+            for (NSString *df in dfiles) {
+                if ([df hasSuffix:@".dylib"]) {
+                    [dylibs addObject:df];
+                }
+            }
+            [outStr appendFormat:@"- Danh sách Tweak trong %@ (%lu dylib): %@\n",
+             idir, (unsigned long)dylibs.count, dylibs.count > 0 ? [dylibs componentsJoinedByString:@", "] : @"Trống"];
+        }
+    }
+
     // Binaries
     NSArray<NSString *> *bins = @[
         @"/var/jb/usr/bin/chown",
@@ -159,22 +178,26 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
     [outStr appendString:@"3. THÔNG TIN & CẤU TRÚC ỨNG DỤNG ZALO:\n"];
     NSString *zaloContainer = [ZTechVaultManager findZaloDataContainerPath];
     if (zaloContainer && zaloContainer.length > 0) {
-        [outStr appendFormat:@"- Data Container: %@\n", zaloContainer];
+        [outStr appendFormat:@"- Data Container: %@ (%@)\n", zaloContainer, ZTechFormatFilePerms(zaloContainer, fm)];
+        NSString *zMeta = [zaloContainer stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
         NSString *zDocs = [zaloContainer stringByAppendingPathComponent:@"Documents"];
         NSString *zPrefs = [zaloContainer stringByAppendingPathComponent:@"Library/Preferences"];
         NSString *zActiveProf = [zDocs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
+        NSString *zGpLink = [zPrefs stringByAppendingPathComponent:@".GlobalPreferences.plist"];
+        [outStr appendFormat:@"  * metadata.plist: %@\n", ZTechFormatFilePerms(zMeta, fm)];
         [outStr appendFormat:@"  * Documents: %@\n", ZTechFormatFilePerms(zDocs, fm)];
-        [outStr appendFormat:@"  * Library/Preferences: %@\n", ZTechFormatFilePerms(zPrefs, fm)];
-        [outStr appendFormat:@"  * _zt_active_profile.plist: %@\n", ZTechFormatFilePerms(zActiveProf, fm)];
-
-        // Check SQLite
-        NSArray<NSString *> *dbNames = @[@"app_data.db", @"message.db", @"contact.db"];
-        for (NSString *dbn in dbNames) {
-            NSString *dbp = [zDocs stringByAppendingPathComponent:dbn];
-            if ([fm fileExistsAtPath:dbp]) {
-                [outStr appendFormat:@"  * SQLite %@: %@\n", dbn, ZTechFormatFilePerms(dbp, fm)];
-            }
+        NSArray<NSString *> *docItems = [fm contentsOfDirectoryAtPath:zDocs error:nil];
+        if (docItems.count > 0) {
+            NSArray *previewDocs = (docItems.count > 10) ? [docItems subarrayWithRange:NSMakeRange(0, 10)] : docItems;
+            [outStr appendFormat:@"    + Tệp trong Documents (%lu): %@\n", (unsigned long)docItems.count, [previewDocs componentsJoinedByString:@", "]];
         }
+        [outStr appendFormat:@"  * Library/Preferences: %@\n", ZTechFormatFilePerms(zPrefs, fm)];
+        NSArray<NSString *> *prefItems = [fm contentsOfDirectoryAtPath:zPrefs error:nil];
+        if (prefItems.count > 0) {
+            [outStr appendFormat:@"    + Tệp trong Preferences (%lu): %@\n", (unsigned long)prefItems.count, [prefItems componentsJoinedByString:@", "]];
+        }
+        [outStr appendFormat:@"  * Symlink .GlobalPreferences.plist: %@\n", ZTechFormatFilePerms(zGpLink, fm)];
+        [outStr appendFormat:@"  * _zt_active_profile.plist: %@\n", ZTechFormatFilePerms(zActiveProf, fm)];
     } else {
         [outStr appendString:@"- Data Container Zalo: ⚠️ [CHƯA TÌM THẤY] (Hãy mở Zalo ít nhất 1 lần)\n"];
     }
@@ -184,6 +207,10 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
     for (NSString *gid in zGroups) {
         NSString *gp = zGroups[gid];
         [outStr appendFormat:@"  * %@ ➜ %@\n", gid, ZTechFormatFilePerms(gp, fm)];
+        NSArray<NSString *> *gItems = [fm contentsOfDirectoryAtPath:gp error:nil];
+        if (gItems.count > 0) {
+            [outStr appendFormat:@"    + Mục gốc (%lu): %@\n", (unsigned long)gItems.count, [gItems componentsJoinedByString:@", "]];
+        }
     }
     [outStr appendString:@"\n"];
 
@@ -220,64 +247,97 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
             break;
         }
     }
+
     // 6. THÔNG TIN CRASH REPORTER & TRACE NHẬT KÝ ZALO
     [outStr appendString:@"\n6. BÁO CÁO NHẬT KÝ CRASH & HOOK TRACE CỦA ZALO:\n"];
 
-    // 6.1 Check in-process Hook Trace
-    NSString *tracePath = @"/var/tmp/ztech_hook_trace.log";
-    if ([fm fileExistsAtPath:tracePath]) {
-        NSString *traceContent = [NSString stringWithContentsOfFile:tracePath encoding:NSUTF8StringEncoding error:nil];
-        if (traceContent && traceContent.length > 0) {
-            NSArray<NSString *> *lines = [traceContent componentsSeparatedByString:@"\n"];
-            NSInteger startIdx = (lines.count > 15) ? (lines.count - 15) : 0;
-            [outStr appendString:@"- Hook Trace gần nhất (15 dòng cuối):\n"];
-            for (NSInteger i = startIdx; i < lines.count; i++) {
-                if (lines[i].length > 0) {
-                    [outStr appendFormat:@"  * %@\n", lines[i]];
-                }
-            }
-        } else {
-            [outStr appendString:@"- Hook Trace: [Tệp rỗng]\n"];
-        }
-    } else {
-        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace]\n"];
+    // 6.1 Check in-process Hook Trace (inside Zalo container first, then /var/tmp)
+    NSMutableArray<NSString *> *traceCandidates = [NSMutableArray array];
+    if (zaloContainer.length > 0) {
+        [traceCandidates addObject:[zaloContainer stringByAppendingPathComponent:@"Documents/ztech_hook_trace.log"]];
+        [traceCandidates addObject:[zaloContainer stringByAppendingPathComponent:@"Library/Caches/ztech_hook_trace.log"]];
     }
+    if (aidaContainer.length > 0) {
+        [traceCandidates addObject:[aidaContainer stringByAppendingPathComponent:@"Documents/ztech_hook_trace.log"]];
+    }
+    [traceCandidates addObject:@"/var/tmp/ztech_hook_trace.log"];
 
-    // 6.2 Check in-process Crash Log
-    NSString *inProcessCrashPath = @"/var/tmp/ztech_crash.log";
-    if ([fm fileExistsAtPath:inProcessCrashPath]) {
-        NSString *crashContent = [NSString stringWithContentsOfFile:inProcessCrashPath encoding:NSUTF8StringEncoding error:nil];
-        if (crashContent && crashContent.length > 0) {
-            [outStr appendString:@"\n- Phát hiện Crash Handler nội bộ:\n"];
-            NSArray<NSString *> *cLines = [crashContent componentsSeparatedByString:@"\n"];
-            NSInteger cStart = (cLines.count > 25) ? (cLines.count - 25) : 0;
-            for (NSInteger i = cStart; i < cLines.count; i++) {
-                if (cLines[i].length > 0) {
-                    [outStr appendFormat:@"  * %@\n", cLines[i]];
+    BOOL foundTrace = NO;
+    for (NSString *tPath in traceCandidates) {
+        if ([fm fileExistsAtPath:tPath]) {
+            NSString *traceContent = [NSString stringWithContentsOfFile:tPath encoding:NSUTF8StringEncoding error:nil];
+            if (traceContent && traceContent.length > 0) {
+                foundTrace = YES;
+                NSArray<NSString *> *lines = [traceContent componentsSeparatedByString:@"\n"];
+                NSInteger startIdx = (lines.count > 18) ? (lines.count - 18) : 0;
+                [outStr appendFormat:@"- Hook Trace tại %@:\n", [tPath lastPathComponent]];
+                for (NSInteger i = startIdx; i < lines.count; i++) {
+                    if (lines[i].length > 0) {
+                        [outStr appendFormat:@"  * %@\n", lines[i]];
+                    }
                 }
+                break;
             }
         }
     }
+    if (!foundTrace) {
+        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace — Hãy mở Zalo 1 lần sau khi cập nhật v5.5.5]\n"];
+    }
 
-    // 6.3 Check Apple System CrashReporter (.ips / .plist)
+    // 6.2 Check in-process Crash / AtExit Log (inside Zalo container first, then /var/tmp)
+    NSMutableArray<NSString *> *crashLogCandidates = [NSMutableArray array];
+    if (zaloContainer.length > 0) {
+        [crashLogCandidates addObject:[zaloContainer stringByAppendingPathComponent:@"Documents/ztech_crash.log"]];
+        [crashLogCandidates addObject:[zaloContainer stringByAppendingPathComponent:@"Library/Caches/ztech_crash.log"]];
+    }
+    [crashLogCandidates addObject:@"/var/tmp/ztech_crash.log"];
+
+    for (NSString *cPath in crashLogCandidates) {
+        if ([fm fileExistsAtPath:cPath]) {
+            NSString *crashContent = [NSString stringWithContentsOfFile:cPath encoding:NSUTF8StringEncoding error:nil];
+            if (crashContent && crashContent.length > 0) {
+                [outStr appendFormat:@"\n- Nhật ký Crash / Exit nội bộ (%@):\n", [cPath lastPathComponent]];
+                NSArray<NSString *> *cLines = [crashContent componentsSeparatedByString:@"\n"];
+                NSInteger cStart = (cLines.count > 30) ? (cLines.count - 30) : 0;
+                for (NSInteger i = cStart; i < cLines.count; i++) {
+                    if (cLines[i].length > 0) {
+                        [outStr appendFormat:@"  * %@\n", cLines[i]];
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // 6.3 Check Apple System CrashReporter (.ips / .plist) including Retired folder
     NSArray<NSString *> *crashDirs = @[
         @"/var/mobile/Library/Logs/CrashReporter",
+        @"/var/mobile/Library/Logs/CrashReporter/Retired",
+        @"/private/var/mobile/Library/Logs/CrashReporter",
+        @"/private/var/mobile/Library/Logs/CrashReporter/Retired",
         @"/Library/Logs/CrashReporter",
         @"/var/jb/var/mobile/Library/Logs/CrashReporter"
     ];
     NSString *latestCrashFile = nil;
     NSDate *latestDate = [NSDate distantPast];
+    NSMutableArray<NSDictionary *> *allRecentLogs = [NSMutableArray array];
+    NSMutableSet<NSString *> *seenFiles = [NSMutableSet set];
 
     for (NSString *cd in crashDirs) {
         if (![fm fileExistsAtPath:cd]) continue;
         NSArray<NSString *> *files = [fm contentsOfDirectoryAtPath:cd error:nil];
         for (NSString *file in files) {
+            if ([seenFiles containsObject:file]) continue;
+            NSString *fullPath = [cd stringByAppendingPathComponent:file];
+            NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+            if ([attrs[NSFileType] isEqualToString:NSFileTypeDirectory]) continue;
+            [seenFiles addObject:file];
+            NSDate *modDate = attrs[NSFileModificationDate] ?: [NSDate distantPast];
+            [allRecentLogs addObject:@{@"name": file, @"date": modDate, @"path": fullPath}];
+
             NSString *lower = [file lowercaseString];
             if ([lower containsString:@"zalo"] || [lower containsString:@"zingalo"]) {
-                NSString *fullPath = [cd stringByAppendingPathComponent:file];
-                NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
-                NSDate *modDate = attrs[NSFileModificationDate];
-                if (modDate && [modDate compare:latestDate] == NSOrderedDescending) {
+                if ([modDate compare:latestDate] == NSOrderedDescending) {
                     latestDate = modDate;
                     latestCrashFile = fullPath;
                 }
@@ -285,35 +345,103 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         }
     }
 
+    [allRecentLogs sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [b[@"date"] compare:a[@"date"]];
+    }];
+    if (allRecentLogs.count > 0) {
+        [outStr appendString:@"\n- 5 tệp CrashReporter mới nhất trên hệ thống:\n"];
+        NSInteger limit = MIN((NSInteger)allRecentLogs.count, 5);
+        for (NSInteger i = 0; i < limit; i++) {
+            NSDictionary *item = allRecentLogs[i];
+            [outStr appendFormat:@"  * %@ (%@)\n", item[@"name"], item[@"date"]];
+        }
+    }
+
     if (latestCrashFile) {
-        [outStr appendFormat:@"\n- Phát hiện tệp CrashReporter hệ thống: %@\n", [latestCrashFile lastPathComponent]];
+        [outStr appendFormat:@"\n- Chi tiết tệp CrashReporter Zalo: %@\n", [latestCrashFile lastPathComponent]];
         [outStr appendFormat:@"  * Thời điểm ghi nhận: %@\n", latestDate];
         NSString *rawIps = [NSString stringWithContentsOfFile:latestCrashFile encoding:NSUTF8StringEncoding error:nil];
         if (rawIps && rawIps.length > 0) {
-            NSArray<NSString *> *ipsLines = [rawIps componentsSeparatedByString:@"\n"];
-            BOOL printBacktrace = NO;
-            int btCount = 0;
-            for (NSString *line in ipsLines) {
-                if ([line hasPrefix:@"Exception Type:"] ||
-                    [line hasPrefix:@"Exception Subtype:"] ||
-                    [line hasPrefix:@"Exception Codes:"] ||
-                    [line hasPrefix:@"Termination Reason:"] ||
-                    [line hasPrefix:@"Triggered by Thread:"] ||
-                    [line containsString:@"\"exception\""] ||
-                    [line containsString:@"\"termination\""]) {
-                    [outStr appendFormat:@"  * %@\n", line];
+            // Try parsing iOS 15+ IPS v2 JSON payload (starts after the first newline)
+            NSRange firstNl = [rawIps rangeOfString:@"\n"];
+            NSDictionary *ipsJson = nil;
+            if (firstNl.location != NSNotFound && firstNl.location + 1 < rawIps.length) {
+                NSString *jsonBody = [rawIps substringFromIndex:firstNl.location + 1];
+                NSData *jData = [jsonBody dataUsingEncoding:NSUTF8StringEncoding];
+                if (jData) {
+                    ipsJson = [NSJSONSerialization JSONObjectWithData:jData options:0 error:nil];
                 }
-                if ([line containsString:@"Thread 0 Crashed:"] || [line containsString:@"Crashed:"]) {
-                    printBacktrace = YES;
-                    [outStr appendFormat:@"  * %@\n", line];
-                    continue;
+            }
+
+            if ([ipsJson isKindOfClass:[NSDictionary class]]) {
+                if (ipsJson[@"exception"]) {
+                    [outStr appendFormat:@"  * Exception: %@\n", ipsJson[@"exception"]];
                 }
-                if (printBacktrace) {
-                    if (btCount < 10 && line.length > 0) {
-                        [outStr appendFormat:@"    %@\n", line];
-                        btCount++;
-                    } else if (line.length == 0 || [line hasPrefix:@"Thread "]) {
-                        printBacktrace = NO;
+                if (ipsJson[@"termination"]) {
+                    [outStr appendFormat:@"  * Termination: %@\n", ipsJson[@"termination"]];
+                }
+                if (ipsJson[@"asi"]) {
+                    [outStr appendFormat:@"  * ASI (Nguyên nhân trực tiếp): %@\n", ipsJson[@"asi"]];
+                }
+                NSArray *usedImages = [ipsJson[@"usedImages"] isKindOfClass:[NSArray class]] ? ipsJson[@"usedImages"] : nil;
+                NSArray *threads = [ipsJson[@"threads"] isKindOfClass:[NSArray class]] ? ipsJson[@"threads"] : nil;
+                NSInteger faultIdx = [ipsJson[@"faultingThread"] integerValue];
+                NSDictionary *targetThread = nil;
+                for (NSDictionary *th in threads) {
+                    if ([th isKindOfClass:[NSDictionary class]] && [th[@"triggered"] boolValue]) {
+                        targetThread = th;
+                        break;
+                    }
+                }
+                if (!targetThread && faultIdx >= 0 && faultIdx < (NSInteger)threads.count) {
+                    targetThread = threads[faultIdx];
+                }
+                if (targetThread && [targetThread[@"frames"] isKindOfClass:[NSArray class]]) {
+                    NSArray *frames = targetThread[@"frames"];
+                    NSInteger fLimit = MIN((NSInteger)frames.count, 15);
+                    [outStr appendFormat:@"  * Backtrace Thread Fault (%ld frames):\n", (long)fLimit];
+                    for (NSInteger f = 0; f < fLimit; f++) {
+                        NSDictionary *fr = frames[f];
+                        if (![fr isKindOfClass:[NSDictionary class]]) continue;
+                        NSInteger imgIdx = [fr[@"imageIndex"] integerValue];
+                        NSString *imgName = @"?";
+                        if (usedImages && imgIdx >= 0 && imgIdx < (NSInteger)usedImages.count) {
+                            NSDictionary *img = usedImages[imgIdx];
+                            imgName = img[@"name"] ?: [img[@"path"] lastPathComponent] ?: @"?";
+                        }
+                        NSString *sym = fr[@"symbol"] ?: @"";
+                        NSNumber *off = fr[@"imageOffset"] ?: @0;
+                        [outStr appendFormat:@"    [%02ld] %@ + %@ %@\n", (long)f, imgName, off, sym];
+                    }
+                }
+            } else {
+                // Legacy iOS 12-14 plain-text .ips parsing
+                NSArray<NSString *> *ipsLines = [rawIps componentsSeparatedByString:@"\n"];
+                BOOL printBacktrace = NO;
+                int btCount = 0;
+                for (NSString *line in ipsLines) {
+                    if ([line hasPrefix:@"Exception Type:"] ||
+                        [line hasPrefix:@"Exception Subtype:"] ||
+                        [line hasPrefix:@"Exception Codes:"] ||
+                        [line hasPrefix:@"Termination Reason:"] ||
+                        [line hasPrefix:@"Triggered by Thread:"] ||
+                        [line containsString:@"\"exception\""] ||
+                        [line containsString:@"\"termination\""] ||
+                        [line containsString:@"\"asi\""]) {
+                        [outStr appendFormat:@"  * %@\n", line];
+                    }
+                    if ([line containsString:@"Thread 0 Crashed:"] || [line containsString:@"Crashed:"]) {
+                        printBacktrace = YES;
+                        [outStr appendFormat:@"  * %@\n", line];
+                        continue;
+                    }
+                    if (printBacktrace) {
+                        if (btCount < 12 && line.length > 0) {
+                            [outStr appendFormat:@"    %@\n", line];
+                            btCount++;
+                        } else if (line.length == 0 || [line hasPrefix:@"Thread "]) {
+                            printBacktrace = NO;
+                        }
                     }
                 }
             }

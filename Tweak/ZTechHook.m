@@ -759,6 +759,14 @@ static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     return hooked_MGCopyAnswerWithError(prop, NULL);
 }
 
+typedef struct {
+    uintptr_t start;
+    uintptr_t end;
+} ZTechAddrRange;
+
+static ZTechAddrRange gAppImageRanges[128];
+static volatile int gAppImageRangeCount = 0;
+
 static void ZTechRebindImageAndRecordRange(const struct mach_header *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
     Dl_info info;

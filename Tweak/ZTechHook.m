@@ -527,7 +527,34 @@ static NSDictionary *ZTechLoadProfileOnce(void) {
     return gCachedProfile;
 }
 
-#pragma mark - Lock-Free Pure C Function Hooks (Zero-Trampoline uname, sysctlbyname, sysctl via __sysctl)
+#pragma mark - Caller-Aware App Image Range Tracking & Mach-O GOT Rebinding
+
+typedef struct {
+    uintptr_t start;
+    uintptr_t end;
+} ZTechAddrRange;
+
+static ZTechAddrRange gAppImageRanges[128];
+static volatile int gAppImageRangeCount = 0;
+
+static inline int ZTechIsCallerFromApp(const void *retAddr) {
+    if (gIsAidaProcess) return 1;
+    uintptr_t addr = (uintptr_t)retAddr;
+#if __has_feature(ptrauth_calls)
+    addr = (uintptr_t)ptrauth_strip(retAddr, ptrauth_key_return_address);
+#else
+    addr &= 0x0000007FFFFFFFFFULL;
+#endif
+    int count = gAppImageRangeCount;
+    for (int i = 0; i < count; ++i) {
+        if (addr >= gAppImageRanges[i].start && addr < gAppImageRanges[i].end) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#pragma mark - Lock-Free Pure C Function Hooks (Zero-Trampoline uname, sysctlbyname, sysctl, MGCopyAnswer)
 
 static int (*orig_uname)(struct utsname *buf) = NULL;
 static int hooked_uname(struct utsname *buf) {
@@ -540,19 +567,22 @@ static int hooked_uname(struct utsname *buf) {
         strncpy(buf->nodename, "iPhone", sizeof(buf->nodename) - 1);
         strncpy(buf->release, "21.5.0", sizeof(buf->release) - 1);
         strncpy(buf->version, "Darwin Kernel Version 21.5.0", sizeof(buf->version) - 1);
+        strncpy(buf->machine, gRealMachineCStr, sizeof(buf->machine) - 1);
     }
-    strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
-    buf->machine[sizeof(buf->machine) - 1] = '\0';
-    if (gIsAidaProcess && gModelNameCStr[0] != '\0') {
-        strncpy(buf->nodename, gModelNameCStr, sizeof(buf->nodename) - 1);
-        buf->nodename[sizeof(buf->nodename) - 1] = '\0';
+    if (ZTechIsCallerFromApp(__builtin_return_address(0))) {
+        strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
+        buf->machine[sizeof(buf->machine) - 1] = '\0';
+        if (gIsAidaProcess && gModelNameCStr[0] != '\0') {
+            strncpy(buf->nodename, gModelNameCStr, sizeof(buf->nodename) - 1);
+            buf->nodename[sizeof(buf->nodename) - 1] = '\0';
+        }
     }
     return 0;
 }
 
 static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name != NULL && namelen >= 2 && name[0] == CTL_HW) {
+    if (name != NULL && namelen >= 2 && name[0] == CTL_HW && ZTechIsCallerFromApp(__builtin_return_address(0))) {
         if (name[1] == HW_MACHINE) {
             size_t len = strlen(gMachineCStr) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -617,82 +647,199 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (name != NULL) {
-        if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0) {
-            size_t len = strlen(gMachineCStr) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gMachineCStr, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
-        } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
-            size_t len = strlen(gBoardIdCStr) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gBoardIdCStr, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
-        } else if (gIsAidaProcess && strcmp(name, "hw.memsize") == 0) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
-                    memcpy(oldp, &gRamBytes, copyLen);
+        if (ZTechIsCallerFromApp(__builtin_return_address(0))) {
+            if (strcmp(name, "hw.machine") == 0 || strcmp(name, "hw.product") == 0) {
+                size_t len = strlen(gMachineCStr) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, gMachineCStr, copyLen);
                 }
-                *oldlenp = sizeof(uint64_t);
+                if (oldlenp != NULL) {
+                    *oldlenp = len;
+                }
                 return 0;
-            }
-        } else if (gIsAidaProcess && strcmp(name, "hw.physmem") == 0) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    if (*oldlenp >= sizeof(uint64_t)) {
-                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
-                        *oldlenp = sizeof(uint64_t);
-                    } else {
-                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
-                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
-                        memcpy(oldp, &ram32, copyLen);
-                        *oldlenp = sizeof(uint32_t);
+            } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
+                size_t len = strlen(gBoardIdCStr) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, gBoardIdCStr, copyLen);
+                }
+                if (oldlenp != NULL) {
+                    *oldlenp = len;
+                }
+                return 0;
+            } else if (gIsAidaProcess && strcmp(name, "hw.memsize") == 0) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
+                        memcpy(oldp, &gRamBytes, copyLen);
                     }
-                } else {
                     *oldlenp = sizeof(uint64_t);
+                    return 0;
+                }
+            } else if (gIsAidaProcess && strcmp(name, "hw.physmem") == 0) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        if (*oldlenp >= sizeof(uint64_t)) {
+                            memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                            *oldlenp = sizeof(uint64_t);
+                        } else {
+                            uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                            size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
+                            memcpy(oldp, &ram32, copyLen);
+                            *oldlenp = sizeof(uint32_t);
+                        }
+                    } else {
+                        *oldlenp = sizeof(uint64_t);
+                    }
+                    return 0;
+                }
+            } else if (gIsAidaProcess && (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0)) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        int cores = 6;
+                        size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
+                        memcpy(oldp, &cores, copyLen);
+                    }
+                    *oldlenp = sizeof(int);
+                    return 0;
+                }
+            } else if (gIsAidaProcess && strcmp(name, "machdep.cpu.brand_string") == 0) {
+                const char *soc = "Apple A18 Pro";
+                size_t len = strlen(soc) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, soc, copyLen);
+                }
+                if (oldlenp != NULL) {
+                    *oldlenp = len;
                 }
                 return 0;
             }
-        } else if (gIsAidaProcess && (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0)) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    int cores = 6;
-                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
-                    memcpy(oldp, &cores, copyLen);
-                }
-                *oldlenp = sizeof(int);
-                return 0;
-            }
-        } else if (gIsAidaProcess && strcmp(name, "machdep.cpu.brand_string") == 0) {
-            const char *soc = "Apple A18 Pro";
-            size_t len = strlen(soc) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, soc, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
         }
         int name2oid_oid[2] = { 0, 3 };
         int real_oid[CTL_MAXNAME + 2];
         size_t oidlen = sizeof(real_oid);
         int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
         if (err < 0) return err;
-        return hooked_sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
+        return __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
     }
     return -1;
+}
+
+typedef CFTypeRef (*zt_MGCopyAnswer_t)(CFStringRef prop);
+static zt_MGCopyAnswer_t gRealMGCopyAnswer = NULL;
+
+static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
+    if (prop != NULL && CFGetTypeID(prop) == CFStringGetTypeID()) {
+        if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine"))) {
+            return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+        }
+        if (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel"))) {
+            return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
+        }
+        if (CFEqual(prop, CFSTR("DeviceName")) || CFEqual(prop, CFSTR("UserAssignedDeviceName")) || CFEqual(prop, CFSTR("MarketingNameString"))) {
+            return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+        }
+    }
+    if (!gRealMGCopyAnswer) {
+        gRealMGCopyAnswer = (zt_MGCopyAnswer_t)dlsym(RTLD_DEFAULT, "MGCopyAnswer");
+    }
+    return gRealMGCopyAnswer ? gRealMGCopyAnswer(prop) : NULL;
+}
+
+static void ZTechRebindImageAndRecordRange(const struct mach_header *header, intptr_t slide) {
+    if (!header || header->magic != MH_MAGIC_64) return;
+    Dl_info info;
+    if (dladdr(header, &info) == 0 || !info.dli_fname) return;
+
+    const char *fname = info.dli_fname;
+    BOOL isAppImg = (strstr(fname, ".app/") != NULL);
+    BOOL isSelfTweak = (strstr(fname, "ZTechHook") != NULL);
+    if (!isAppImg && !isSelfTweak) return;
+
+    const struct mach_header_64 *mh64 = (const struct mach_header_64 *)header;
+    const struct segment_command_64 *linkedit_seg = NULL;
+    const struct symtab_command *symtab_cmd = NULL;
+    const struct dysymtab_command *dysymtab_cmd = NULL;
+
+    uintptr_t cur = (uintptr_t)mh64 + sizeof(struct mach_header_64);
+    for (uint32_t i = 0; i < mh64->ncmds; ++i) {
+        const struct load_command *lc = (const struct load_command *)cur;
+        if (lc->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            if (strcmp(seg->segname, "__TEXT") == 0) {
+                int idx = gAppImageRangeCount;
+                if (idx < 128) {
+                    uintptr_t start = (uintptr_t)slide + seg->vmaddr;
+                    uintptr_t end = start + seg->vmsize;
+                    BOOL exists = NO;
+                    for (int k = 0; k < idx; ++k) {
+                        if (gAppImageRanges[k].start == start) { exists = YES; break; }
+                    }
+                    if (!exists) {
+                        gAppImageRanges[idx].start = start;
+                        gAppImageRanges[idx].end = end;
+                        gAppImageRangeCount = idx + 1;
+                    }
+                }
+            } else if (strcmp(seg->segname, "__LINKEDIT") == 0) {
+                linkedit_seg = seg;
+            }
+        } else if (lc->cmd == LC_SYMTAB) {
+            symtab_cmd = (const struct symtab_command *)lc;
+        } else if (lc->cmd == LC_DYSYMTAB) {
+            dysymtab_cmd = (const struct dysymtab_command *)lc;
+        }
+        cur += lc->cmdsize;
+    }
+
+    // Only rebind GOT / lazy symbol pointers on pure arm64 app images (skip on arm64e PAC pointers)
+#if !__has_feature(ptrauth_calls)
+    if (!isAppImg || !linkedit_seg || !symtab_cmd || !dysymtab_cmd) return;
+    uintptr_t linkedit_base = (uintptr_t)slide + linkedit_seg->vmaddr - linkedit_seg->fileoff;
+    const struct nlist_64 *symtab = (const struct nlist_64 *)(linkedit_base + symtab_cmd->symoff);
+    const char *strtab = (const char *)(linkedit_base + symtab_cmd->stroff);
+    const uint32_t *indirect_symtab = (const uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
+
+    cur = (uintptr_t)mh64 + sizeof(struct mach_header_64);
+    for (uint32_t i = 0; i < mh64->ncmds; ++i) {
+        const struct load_command *lc = (const struct load_command *)cur;
+        if (lc->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            if (strcmp(seg->segname, "__DATA") == 0 || strcmp(seg->segname, "__DATA_CONST") == 0) {
+                const struct section_64 *sec = (const struct section_64 *)((uintptr_t)seg + sizeof(struct segment_command_64));
+                for (uint32_t j = 0; j < seg->nsects; ++j) {
+                    uint8_t type = sec[j].flags & SECTION_TYPE;
+                    if (type == S_LAZY_SYMBOL_POINTERS || type == S_NON_LAZY_SYMBOL_POINTERS) {
+                        uint32_t *indices = (uint32_t *)(indirect_symtab + sec[j].reserved1);
+                        void **bindings = (void **)((uintptr_t)slide + sec[j].addr);
+                        size_t count = sec[j].size / sizeof(void *);
+                        vm_protect(mach_task_self(), (vm_address_t)bindings, (vm_size_t)sec[j].size, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+                        for (size_t k = 0; k < count; ++k) {
+                            uint32_t sym_idx = indices[k];
+                            if (sym_idx == INDIRECT_SYMBOL_ABS || sym_idx == INDIRECT_SYMBOL_LOCAL ||
+                                sym_idx == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS) || sym_idx >= symtab_cmd->nsyms) {
+                                continue;
+                            }
+                            const char *sym_name = strtab + symtab[sym_idx].n_un.n_strx;
+                            if (strcmp(sym_name, "_uname") == 0) {
+                                bindings[k] = (void *)hooked_uname;
+                            } else if (strcmp(sym_name, "_sysctlbyname") == 0) {
+                                bindings[k] = (void *)hooked_sysctlbyname;
+                            } else if (strcmp(sym_name, "_sysctl") == 0) {
+                                bindings[k] = (void *)hooked_sysctl;
+                            } else if (strcmp(sym_name, "_MGCopyAnswer") == 0) {
+                                bindings[k] = (void *)hooked_MGCopyAnswer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        cur += lc->cmdsize;
+    }
+#endif
 }
 
 
@@ -1398,7 +1545,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.8 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.9 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -1541,7 +1688,9 @@ static void ZTechHookInit(void) {
             ZTechHookTrace([[NSString stringWithFormat:@"[4/6 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
         }
 
-        // 3. Hardware Model Spoofing (uname, sysctlbyname, sysctl) for BOTH Zalo & AIDA64 (Zero-Trampoline via __sysctl)
+        // 3. Caller-Aware Hardware Model Spoofing (Mach-O GOT Rebinding + Zero-Trampoline uname/sysctl via __sysctl)
+        _dyld_register_func_for_add_image(&ZTechRebindImageAndRecordRange);
+
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
         zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");
         if (!pMSHook) {
@@ -1563,16 +1712,16 @@ static void ZTechHookInit(void) {
             void *raw_sysctl = dlsym(RTLD_DEFAULT, "sysctl");
             if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
             if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
-
-            struct utsname verifyUts;
-            memset(&verifyUts, 0, sizeof(verifyUts));
-            uname(&verifyUts);
-            char verifyMach[64] = {0};
-            size_t verifyLen = sizeof(verifyMach);
-            sysctlbyname("hw.machine", verifyMach, &verifyLen, NULL, 0);
-            ZTechHookTrace([[NSString stringWithFormat:@"[4.5/6] Hardware spoofing active: uname.machine=%s, sysctl(hw.machine)=%s, board=%s",
-                             verifyUts.machine, verifyMach, gBoardIdCStr] UTF8String]);
         }
+
+        struct utsname verifyUts;
+        memset(&verifyUts, 0, sizeof(verifyUts));
+        uname(&verifyUts);
+        char verifyMach[64] = {0};
+        size_t verifyLen = sizeof(verifyMach);
+        sysctlbyname("hw.machine", verifyMach, &verifyLen, NULL, 0);
+        ZTechHookTrace([[NSString stringWithFormat:@"[4.5/6] Caller-aware hardware spoofing active (appRanges=%d): uname.machine=%s, sysctl(hw.machine)=%s, board=%s",
+                         gAppImageRangeCount, verifyUts.machine, verifyMach, gBoardIdCStr] UTF8String]);
 
         // 4. Extra Diagnostic Spoofing (NSProcessInfo & Metal GPU) for AIDA64 ONLY
         if (isAida) {

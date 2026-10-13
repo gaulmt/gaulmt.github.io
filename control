@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.8
+Version: 5.5.9
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.8 - Đồng Bộ Giả Lập Dòng Máy Phần Cứng (uname / sysctl / UIDevice) Cho Zalo & AIDA64 Trên ARM64E (Zero-Trampoline)
+Description: gaulmt -Tech v5.5.9 - Giả Lập Phần Cứng Có Chọn Lọc Theo Module (Caller-Aware + Mach-O GOT Rebinding), Miễn Dịch 100% Crash Driver Hệ Thống
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

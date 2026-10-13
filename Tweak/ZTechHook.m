@@ -485,41 +485,44 @@ static NSDictionary *ZTechLoadProfileOnce(void) {
         return gCachedProfile;
     }
 
-    // 1. Check inside app's own sandbox container FIRST via getenv("HOME") (100% sandbox-safe, zero XPC, zero /var/jb access)
+    NSMutableArray<NSString *> *allPaths = [NSMutableArray array];
     const char *homeC = getenv("HOME");
     if (homeC && homeC[0] != '\0') {
         NSString *home = [NSString stringWithUTF8String:homeC];
         if (home.length > 0) {
-            NSArray<NSString *> *localPaths = @[
-                [home stringByAppendingPathComponent:@"Documents/_zt_active_profile.plist"],
-                [home stringByAppendingPathComponent:@"Library/Preferences/com.ztech.profile.plist"]
-            ];
-            for (NSString *lp in localPaths) {
-                NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:lp];
-                if (d && [d isKindOfClass:[NSDictionary class]] && d.count > 0) {
-                    NSDictionary *norm = ZTechNormalizeProfile(d);
-                    ZTechApplyCachedProfileValues(norm);
-                    return gCachedProfile;
-                }
-            }
+            [allPaths addObject:[home stringByAppendingPathComponent:@"Documents/_zt_active_profile.plist"]];
+            [allPaths addObject:[home stringByAppendingPathComponent:@"Library/Preferences/com.ztech.profile.plist"]];
         }
     }
-
-    // 2. Fallback to shared global paths
-    NSArray<NSString *> *globalPaths = @[
+    [allPaths addObjectsFromArray:@[
         @"/var/jb/var/mobile/Library/Preferences/com.ztech.profile.plist",
         @"/var/mobile/Library/Preferences/com.ztech.profile.plist",
         @"/var/jb/Library/Preferences/ZTechShared/com.ztech.profile.plist",
         @"/Library/Preferences/ZTechShared/com.ztech.profile.plist",
         @"/var/tmp/com.ztech.profile.plist"
-    ];
-    for (NSString *path in globalPaths) {
-        NSDictionary *dict = [NSDictionary dictionaryWithContentsOfFile:path];
-        if (dict && [dict isKindOfClass:[NSDictionary class]] && dict.count > 0) {
-            NSDictionary *norm = ZTechNormalizeProfile(dict);
-            ZTechApplyCachedProfileValues(norm);
-            return gCachedProfile;
+    ]];
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSDictionary *newestDict = nil;
+    NSDate *newestDate = nil;
+
+    for (NSString *p in allPaths) {
+        if (![fm fileExistsAtPath:p]) continue;
+        NSDictionary *attrs = [fm attributesOfItemAtPath:p error:nil];
+        NSDate *mod = attrs[NSFileModificationDate];
+        NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:p];
+        if (d && [d isKindOfClass:[NSDictionary class]] && d.count > 0) {
+            if (!newestDate || (mod && [mod compare:newestDate] == NSOrderedDescending)) {
+                newestDate = mod ?: [NSDate distantPast];
+                newestDict = d;
+            }
         }
+    }
+
+    if (newestDict) {
+        NSDictionary *norm = ZTechNormalizeProfile(newestDict);
+        ZTechApplyCachedProfileValues(norm);
+        return gCachedProfile;
     }
 
     NSDictionary *norm = ZTechNormalizeProfile(nil);
@@ -630,7 +633,22 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
             }
         }
     }
-    return __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    int ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
+        char *buf = (char *)oldp;
+        if (strstr(buf, "iPhone12,1") != NULL) {
+            size_t len = strlen(gMachineCStr) + 1;
+            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+            memcpy(oldp, gMachineCStr, copyLen);
+            *oldlenp = len;
+        } else if (strstr(buf, "iPhone 11") != NULL) {
+            size_t len = strlen(gModelNameCStr) + 1;
+            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+            memcpy(oldp, gModelNameCStr, copyLen);
+            *oldlenp = len;
+        }
+    }
+    return ret;
 }
 
 static int (*orig_sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
@@ -712,7 +730,22 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
         size_t oidlen = sizeof(real_oid);
         int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
         if (err < 0) return err;
-        return __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
+        int ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
+        if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
+            char *buf = (char *)oldp;
+            if (strstr(buf, "iPhone12,1") != NULL) {
+                size_t len = strlen(gMachineCStr) + 1;
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, gMachineCStr, copyLen);
+                *oldlenp = len;
+            } else if (strstr(buf, "iPhone 11") != NULL) {
+                size_t len = strlen(gModelNameCStr) + 1;
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, gModelNameCStr, copyLen);
+                *oldlenp = len;
+            }
+        }
+        return ret;
     }
     return -1;
 }
@@ -746,17 +779,71 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
             return (__bridge_retained CFTypeRef)[@"22B83" copy];
         }
     }
+    CFTypeRef res = NULL;
     if (orig_MGCopyAnswerWithError) {
-        return orig_MGCopyAnswerWithError(prop, error);
+        res = orig_MGCopyAnswerWithError(prop, error);
+    } else if (orig_MGCopyAnswer) {
+        res = orig_MGCopyAnswer(prop);
     }
-    if (orig_MGCopyAnswer) {
-        return orig_MGCopyAnswer(prop);
+    if (res != NULL && CFGetTypeID(res) == CFStringGetTypeID()) {
+        NSString *val = (__bridge NSString *)res;
+        if ([val hasPrefix:@"iPhone"] && [val containsString:@","]) {
+            CFRelease(res);
+            return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+        }
+        if ([val localizedCaseInsensitiveContainsString:@"iPhone 11"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone 12"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone 13"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone 14"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone 15"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone X"] ||
+            [val localizedCaseInsensitiveContainsString:@"iPhone 8"]) {
+            CFRelease(res);
+            return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+        }
+        if ([val isEqualToString:@"N104AP"]) {
+            CFRelease(res);
+            return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
+        }
+        if ([val isEqualToString:@"15.5"] || [val isEqualToString:@"15.5.0"]) {
+            CFRelease(res);
+            return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
+        }
     }
-    return NULL;
+    return res;
 }
 
 static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     return hooked_MGCopyAnswerWithError(prop, NULL);
+}
+
+typedef CFTypeRef (*zt_IORegistryEntryCreateCFProperty_t)(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options);
+static zt_IORegistryEntryCreateCFProperty_t orig_IORegistryEntryCreateCFProperty = NULL;
+
+static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
+    if (key != NULL && CFGetTypeID(key) == CFStringGetTypeID()) {
+        if (CFEqual(key, CFSTR("product-name")) || CFEqual(key, CFSTR("model"))) {
+            return (__bridge_retained CFTypeRef)[gMachineIdObj dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        if (CFEqual(key, CFSTR("board-id"))) {
+            return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] dataUsingEncoding:NSUTF8StringEncoding];
+        }
+    }
+    CFTypeRef res = orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
+    if (res != NULL) {
+        if (CFGetTypeID(res) == CFStringGetTypeID()) {
+            NSString *s = (__bridge NSString *)res;
+            if ([s hasPrefix:@"iPhone"] && [s containsString:@","]) return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+            if ([s localizedCaseInsensitiveContainsString:@"iPhone 11"]) return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+        } else if (CFGetTypeID(res) == CFDataGetTypeID()) {
+            NSData *d = (__bridge NSData *)res;
+            NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
+            if (s && [s hasPrefix:@"iPhone"] && [s containsString:@","]) {
+                return (__bridge_retained CFTypeRef)[[gMachineIdObj stringByAppendingString:@"\0"] dataUsingEncoding:NSUTF8StringEncoding];
+            }
+        }
+    }
+    return res;
 }
 
 typedef struct {
@@ -987,19 +1074,86 @@ static NSString *swizzled_model(id self, SEL _cmd) {
 
 static SEL gZTechOrigDefCfgSel = NULL;
 static SEL gZTechOrigEphCfgSel = NULL;
+static SEL gZTechOrigSetHdrSel = NULL;
+
+static void ZTechSanitizeHeadersDict(NSMutableDictionary *headers) {
+    if (!headers) return;
+    for (NSString *key in [headers allKeys]) {
+        id val = headers[key];
+        if ([val isKindOfClass:[NSString class]]) {
+            NSString *v = (NSString *)val;
+            BOOL changed = NO;
+            if ([v localizedCaseInsensitiveContainsString:@"iPhone12,1"]) {
+                v = [v stringByReplacingOccurrencesOfString:@"iPhone12,1" withString:(gMachineIdObj ?: @"iPhone17,2")];
+                changed = YES;
+            }
+            if ([v localizedCaseInsensitiveContainsString:@"iPhone 11"]) {
+                v = [v stringByReplacingOccurrencesOfString:@"iPhone 11" withString:(gModelNameObj ?: @"iPhone 16 Pro Max")];
+                changed = YES;
+            }
+            if ([v containsString:@"15.5"]) {
+                v = [v stringByReplacingOccurrencesOfString:@"15.5" withString:(gIosVersionObj ?: @"18.2.1")];
+                changed = YES;
+            }
+            if ([v containsString:@"15_5"]) {
+                v = [v stringByReplacingOccurrencesOfString:@"15_5" withString:@"18_2_1"];
+                changed = YES;
+            }
+            if ([v containsString:@"Scale/2.00"]) {
+                v = [v stringByReplacingOccurrencesOfString:@"Scale/2.00" withString:@"Scale/3.00"];
+                changed = YES;
+            }
+            if (changed) {
+                headers[key] = v;
+            }
+        }
+    }
+}
+
+static void swizzled_setValueForHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
+    if (value && [value isKindOfClass:[NSString class]]) {
+        NSString *v = value;
+        if ([v localizedCaseInsensitiveContainsString:@"iPhone12,1"]) {
+            v = [v stringByReplacingOccurrencesOfString:@"iPhone12,1" withString:(gMachineIdObj ?: @"iPhone17,2")];
+        }
+        if ([v localizedCaseInsensitiveContainsString:@"iPhone 11"]) {
+            v = [v stringByReplacingOccurrencesOfString:@"iPhone 11" withString:(gModelNameObj ?: @"iPhone 16 Pro Max")];
+        }
+        if ([v containsString:@"15.5"]) {
+            v = [v stringByReplacingOccurrencesOfString:@"15.5" withString:(gIosVersionObj ?: @"18.2.1")];
+        }
+        if ([v containsString:@"15_5"]) {
+            v = [v stringByReplacingOccurrencesOfString:@"15_5" withString:@"18_2_1"];
+        }
+        if ([v containsString:@"Scale/2.00"]) {
+            v = [v stringByReplacingOccurrencesOfString:@"Scale/2.00" withString:@"Scale/3.00"];
+        }
+        value = v;
+    }
+    if (gZTechOrigSetHdrSel && [self respondsToSelector:gZTechOrigSetHdrSel]) {
+        ((void (*)(id, SEL, id, id))objc_msgSend)(self, gZTechOrigSetHdrSel, value, field);
+    }
+}
 
 static NSURLSessionConfiguration *swizzled_defaultSessionConfig(id self, SEL _cmd) {
     NSURLSessionConfiguration *cfg = nil;
     if (gZTechOrigDefCfgSel && [self respondsToSelector:gZTechOrigDefCfgSel]) {
         cfg = ((NSURLSessionConfiguration *(*)(id, SEL))objc_msgSend)(self, gZTechOrigDefCfgSel);
     }
-    if (cfg && gProxyEnabled && gCachedProxyDict) {
+    if (cfg) {
         @try {
-            cfg.connectionProxyDictionary = gCachedProxyDict;
-            if (gCachedProxyAuthHeader.length > 0) {
-                NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders ?: @{}];
-                headers[@"Proxy-Authorization"] = gCachedProxyAuthHeader;
+            if (cfg.HTTPAdditionalHeaders) {
+                NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders];
+                ZTechSanitizeHeadersDict(headers);
                 cfg.HTTPAdditionalHeaders = headers;
+            }
+            if (gProxyEnabled && gCachedProxyDict) {
+                cfg.connectionProxyDictionary = gCachedProxyDict;
+                if (gCachedProxyAuthHeader.length > 0) {
+                    NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders ?: @{}];
+                    headers[@"Proxy-Authorization"] = gCachedProxyAuthHeader;
+                    cfg.HTTPAdditionalHeaders = headers;
+                }
             }
         } @catch (NSException *e) {}
     }
@@ -1011,13 +1165,20 @@ static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _
     if (gZTechOrigEphCfgSel && [self respondsToSelector:gZTechOrigEphCfgSel]) {
         cfg = ((NSURLSessionConfiguration *(*)(id, SEL))objc_msgSend)(self, gZTechOrigEphCfgSel);
     }
-    if (cfg && gProxyEnabled && gCachedProxyDict) {
+    if (cfg) {
         @try {
-            cfg.connectionProxyDictionary = gCachedProxyDict;
-            if (gCachedProxyAuthHeader.length > 0) {
-                NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders ?: @{}];
-                headers[@"Proxy-Authorization"] = gCachedProxyAuthHeader;
+            if (cfg.HTTPAdditionalHeaders) {
+                NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders];
+                ZTechSanitizeHeadersDict(headers);
                 cfg.HTTPAdditionalHeaders = headers;
+            }
+            if (gProxyEnabled && gCachedProxyDict) {
+                cfg.connectionProxyDictionary = gCachedProxyDict;
+                if (gCachedProxyAuthHeader.length > 0) {
+                    NSMutableDictionary *headers = [NSMutableDictionary dictionaryWithDictionary:cfg.HTTPAdditionalHeaders ?: @{}];
+                    headers[@"Proxy-Authorization"] = gCachedProxyAuthHeader;
+                    cfg.HTTPAdditionalHeaders = headers;
+                }
             }
         } @catch (NSException *e) {}
     }
@@ -1575,7 +1736,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.0 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.1 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -1675,27 +1836,37 @@ static void ZTechHookInit(void) {
                 }
             }
 
-            // Only swizzle NSURLSessionConfiguration when proxy is enabled, using arm64e PAC-safe method_exchangeImplementations
-            if (gProxyEnabled && gCachedProxyDict) {
-                Class urlCfgCls = objc_getClass("NSURLSessionConfiguration");
-                Class urlCfgMeta = urlCfgCls ? object_getClass(urlCfgCls) : nil;
-                if (urlCfgCls && urlCfgMeta) {
-                    gZTechOrigDefCfgSel = sel_registerName("_ztech_orig_defaultSessionConfiguration");
-                    Method mDefCfg = class_getClassMethod(urlCfgCls, @selector(defaultSessionConfiguration));
-                    if (mDefCfg && class_addMethod(urlCfgMeta, gZTechOrigDefCfgSel, (IMP)swizzled_defaultSessionConfig, method_getTypeEncoding(mDefCfg))) {
-                        Method mSwizDef = class_getClassMethod(urlCfgCls, gZTechOrigDefCfgSel);
-                        if (mSwizDef) method_exchangeImplementations(mDefCfg, mSwizDef);
-                    }
+            // Always swizzle NSURLSessionConfiguration & NSMutableURLRequest to sanitize HTTP User-Agent & Headers
+            Class urlCfgCls = objc_getClass("NSURLSessionConfiguration");
+            Class urlCfgMeta = urlCfgCls ? object_getClass(urlCfgCls) : nil;
+            if (urlCfgCls && urlCfgMeta) {
+                gZTechOrigDefCfgSel = sel_registerName("_ztech_orig_defaultSessionConfiguration");
+                Method mDefCfg = class_getClassMethod(urlCfgCls, @selector(defaultSessionConfiguration));
+                if (mDefCfg && class_addMethod(urlCfgMeta, gZTechOrigDefCfgSel, (IMP)swizzled_defaultSessionConfig, method_getTypeEncoding(mDefCfg))) {
+                    Method mSwizDef = class_getClassMethod(urlCfgCls, gZTechOrigDefCfgSel);
+                    if (mSwizDef) method_exchangeImplementations(mDefCfg, mSwizDef);
+                }
 
-                    gZTechOrigEphCfgSel = sel_registerName("_ztech_orig_ephemeralSessionConfiguration");
-                    Method mEphCfg = class_getClassMethod(urlCfgCls, @selector(ephemeralSessionConfiguration));
-                    if (mEphCfg && class_addMethod(urlCfgMeta, gZTechOrigEphCfgSel, (IMP)swizzled_ephemeralSessionConfig, method_getTypeEncoding(mEphCfg))) {
-                        Method mSwizEph = class_getClassMethod(urlCfgCls, gZTechOrigEphCfgSel);
-                        if (mSwizEph) method_exchangeImplementations(mEphCfg, mSwizEph);
+                gZTechOrigEphCfgSel = sel_registerName("_ztech_orig_ephemeralSessionConfiguration");
+                Method mEphCfg = class_getClassMethod(urlCfgCls, @selector(ephemeralSessionConfiguration));
+                if (mEphCfg && class_addMethod(urlCfgMeta, gZTechOrigEphCfgSel, (IMP)swizzled_ephemeralSessionConfig, method_getTypeEncoding(mEphCfg))) {
+                    Method mSwizEph = class_getClassMethod(urlCfgCls, gZTechOrigEphCfgSel);
+                    if (mSwizEph) method_exchangeImplementations(mEphCfg, mSwizEph);
+                }
+            }
+
+            Class reqCls = objc_getClass("NSMutableURLRequest");
+            if (reqCls) {
+                Method mSetHdr = class_getInstanceMethod(reqCls, @selector(setValue:forHTTPHeaderField:));
+                if (mSetHdr) {
+                    gZTechOrigSetHdrSel = sel_registerName("_ztech_orig_setValue:forHTTPHeaderField:");
+                    if (class_addMethod(reqCls, gZTechOrigSetHdrSel, (IMP)swizzled_setValueForHTTPHeaderField, method_getTypeEncoding(mSetHdr))) {
+                        Method mSwizHdr = class_getInstanceMethod(reqCls, gZTechOrigSetHdrSel);
+                        if (mSwizHdr) method_exchangeImplementations(mSetHdr, mSwizHdr);
                     }
                 }
             }
-            ZTechHookTrace("[3/6] UIDevice & NSUbiquitousKeyValueStore swizzled (arm64e PAC-safe)");
+            ZTechHookTrace("[3/6] UIDevice, NSURLSessionConfiguration & Request headers swizzled (arm64e PAC-safe)");
         } @catch (NSException *e) {
             ZTechHookTrace([[NSString stringWithFormat:@"[3/6 ERROR] UIDevice swizzle exception: %@", e] UTF8String]);
         }
@@ -1732,7 +1903,7 @@ static void ZTechHookInit(void) {
             ZTechHookTrace([[NSString stringWithFormat:@"[4/6 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
         }
 
-        // 3. Hardware Model & MobileGestalt Spoofing (ElleKit MSHookFunction + Mach-O GOT Rebinding)
+        // 3. Hardware Model, MobileGestalt & IOKit Spoofing (ElleKit MSHookFunction + Mach-O GOT Rebinding)
         _dyld_register_func_for_add_image(&ZTechRebindImageAndRecordRange);
 
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
@@ -1764,6 +1935,15 @@ static void ZTechHookInit(void) {
             }
             if (raw_MGWithError) {
                 pMSHook(raw_MGWithError, (void *)hooked_MGCopyAnswerWithError, (void **)&orig_MGCopyAnswerWithError);
+            }
+
+            void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
+            if (!raw_IOReg) {
+                void *hIO = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_GLOBAL | RTLD_LAZY);
+                if (hIO) raw_IOReg = dlsym(hIO, "IORegistryEntryCreateCFProperty");
+            }
+            if (raw_IOReg) {
+                pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
             }
         }
 

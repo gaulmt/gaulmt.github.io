@@ -107,11 +107,11 @@ jobs:
           Origin: gaulmt -Tech Official Repo
           Label: gaulmt -Tech
           Suite: stable
-          Version: 5.6.0
+          Version: 5.6.1
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.6.0 truc tiep tren Sileo & Zebra (MobileGestalt MGCopyAnswerWithError + Pure C Hardware Spoofing)
+          Description: Nguon cai dat gaulmt -Tech v5.6.1 truc tiep tren Sileo & Zebra (360-Degree Hardware Spoofing + MobileGestalt Return Interception)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.6.0 - MobileGestalt MGCopyAnswerWithError + Pure C Hardware Spoofing"
+                    "title": "gaulmt -Tech v5.6.1 - 360-Degree Hardware Spoofing (MobileGestalt + Sysctl + IOKit + Headers)"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản phát hành tối ưu **gaulmt -Tech v5.6.0** giải quyết triệt để vấn đề Zalo nhận diện thiết bị ảo:\n\n- **MobileGestalt Interception (`MGCopyAnswerWithError`)**: Can thiệp trực tiếp hàm gốc `MGCopyAnswerWithError` trong `libMobileGestalt.dylib` bằng ElleKit an toàn, trả về chuẩn xác `ProductType`, `MarketingNameString`, `DeviceName`, `HWModelStr`, `ProductVersion` cho Zalo.\n- **Zero-Trampoline Pure C Hardware Spoofing**: Cung cấp `uname` và `sysctlbyname(\"hw.machine\")` trực tiếp cho mọi module ứng dụng đồng thời bảo vệ driver Metal GPU đồ họa.\n- **Đồng Bộ Đầy Đủ UIDevice & NSProcessInfo**: Swizzle toàn diện `systemVersion`, `name`, `model`, `localizedModel`, `_rawDeviceName`, `_deviceInfoForKey:` và `NSProcessInfo` cho cả Zalo và AIDA64."
+                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.6.1** triệt tiêu 100% việc Zalo nhận nhầm máy thật khi tạo tài khoản mới:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Kiểm soát cả key mã hoá lẫn giá trị chuỗi trả về, tự động ghi đè mọi dữ liệu `iPhone 11` / `iPhone12,1` / `N104AP` / `15.5` thành thông số máy ảo đã chọn.\n- **Hậu Xử Lý Sysctl & IOKit**: Quét sạch giá trị phần cứng thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent**: Tự động thay thế `User-Agent`, `Scale/2.00` và header thiết bị trong `NSMutableURLRequest` và `NSURLSessionConfiguration` thành chuẩn `@3x` của dòng máy mới.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
                   }
                 ]
               }

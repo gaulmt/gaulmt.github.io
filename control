@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.6.0
+Version: 5.6.1
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.6.0 - MobileGestalt MGCopyAnswerWithError + Pure-C Hardware Spoofing + Full UIDevice/NSProcessInfo, Triệt Để Nhận Diện Mọi Thiết Bị Ảo Trực Tiếp Trong Zalo
+Description: gaulmt -Tech v5.6.1 - 360-Degree Hardware Spoofing (MobileGestalt Return-Value Interception + Sysctl Post-Processing + IOKit + HTTP Headers Rewrite), 100% Khong Sot Dau Vet May That Trong Zalo
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

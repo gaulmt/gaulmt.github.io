@@ -122,9 +122,11 @@ extern char **environ;
             int count = (int)(size / sizeof(struct kinfo_proc));
             for (int i = 0; i < count; i++) {
                 const char *name = procs[i].kp_proc.p_comm;
-                if (name && (strcasecmp(name, "Zalo") == 0 ||
-                             strcasecmp(name, "vn.com.vng.zalo") == 0 ||
-                             strcasecmp(name, "AIDA64") == 0)) {
+                if (name && strcasecmp(name, "ZTech") != 0 &&
+                    (strcasecmp(name, "Zalo") == 0 ||
+                     strcasestr(name, "zalo") != NULL ||
+                     strcasestr(name, "zingalo") != NULL ||
+                     strcasestr(name, "aida64") != NULL)) {
                     kill(procs[i].kp_proc.p_pid, SIGKILL);
                 }
             }
@@ -729,6 +731,18 @@ extern char **environ;
 
     NSString *docsDir = [zaloContainer stringByAppendingPathComponent:@"Documents"];
     [fm createDirectoryAtPath:docsDir withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
+
+    NSString *restoreTrigger = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
+    [@"1" writeToFile:restoreTrigger atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    chmod([restoreTrigger UTF8String], 0666);
+
+    if (restoredProfile.identifier.length > 0) {
+        NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
+        [restoredProfile.identifier writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        chmod([boundUuidFile UTF8String], 0666);
+    }
+
     NSString *markerFile = [docsDir stringByAppendingPathComponent:@"_zt_zalo_marker.txt"];
     [@"vn.com.vng.zalo" writeToFile:markerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
     chmod([markerFile UTF8String], 0666);

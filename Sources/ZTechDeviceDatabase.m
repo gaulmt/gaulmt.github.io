@@ -413,7 +413,12 @@ extern char **environ;
         }
     }
 
-    NSDictionary *sharedDict = [profile toDictionary];
+    NSDictionary<NSString *, NSString *> *zaloGroups = [ZTechVaultManager findZaloAppGroupContainers];
+    NSMutableDictionary *mutableShared = [NSMutableDictionary dictionaryWithDictionary:[profile toDictionary]];
+    if (zaloGroups.count > 0) {
+        mutableShared[@"appGroupPaths"] = zaloGroups.allValues;
+    }
+    NSDictionary *sharedDict = [mutableShared copy];
 
     CFPreferencesSetValue(CFSTR("ZTechGlobalProfile"),
                           (__bridge CFPropertyListRef)sharedDict,
@@ -443,12 +448,12 @@ extern char **environ;
         }
     }
 
-    // One-time automatic repair of any corrupted v5.5.0-v5.5.4 Zalo container/AppGroup state on upgrade
+    // One-time automatic repair of any corrupted Zalo container/AppGroup/Keychain state on v5.5.6 upgrade
     NSString *repairFlag = [fm fileExistsAtPath:@"/var/jb/var/mobile/Library/Preferences"]
-        ? @"/var/jb/var/mobile/Library/Preferences/_zt_v555_repaired.flag"
-        : @"/var/mobile/Library/Preferences/_zt_v555_repaired.flag";
+        ? @"/var/jb/var/mobile/Library/Preferences/_zt_v556_repaired.flag"
+        : @"/var/mobile/Library/Preferences/_zt_v556_repaired.flag";
     if (![fm fileExistsAtPath:repairFlag]) {
-        [@"5.5.5" writeToFile:repairFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [@"5.5.6" writeToFile:repairFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
         chmod([repairFlag UTF8String], 0666);
         [self cleanResetAllProfileDataAndCache];
     }
@@ -473,7 +478,6 @@ extern char **environ;
         }
     }
 
-    NSDictionary<NSString *, NSString *> *zaloGroups = [ZTechVaultManager findZaloAppGroupContainers];
     for (NSString *grpPath in zaloGroups.allValues) {
         if (grpPath.length > 0) {
             [self repairContainerStructureAtPath:grpPath fileManager:fm];
@@ -513,6 +517,7 @@ extern char **environ;
 
 + (NSInteger)cleanDirectoryContents:(NSString *)dirPath fileManager:(NSFileManager *)fm {
     NSInteger count = 0;
+    chmod([dirPath UTF8String], 0755);
     NSArray *items = [fm contentsOfDirectoryAtPath:dirPath error:nil];
     for (NSString *item in items) {
         if ([item isEqualToString:@".com.apple.mobile_container_manager.metadata.plist"] ||
@@ -520,8 +525,13 @@ extern char **environ;
             [item isEqualToString:@"_zt_last_reset_token.txt"] ||
             [item isEqualToString:@"_zt_zalo_marker.txt"] ||
             [item isEqualToString:@"_zt_active_profile.plist"] ||
+            [item isEqualToString:@"com.ztech.profile.plist"] ||
+            [item isEqualToString:@"_zt_wipe_keychain.flag"] ||
             [item isEqualToString:@"ztech_hook_trace.log"] ||
-            [item isEqualToString:@"ztech_crash.log"]) {
+            [item isEqualToString:@"ztech_crash.log"] ||
+            [item isEqualToString:@"Library"] ||
+            [item isEqualToString:@"Documents"] ||
+            [item isEqualToString:@"tmp"]) {
             continue;
         }
         NSString *fullPath = [dirPath stringByAppendingPathComponent:item];
@@ -532,8 +542,21 @@ extern char **environ;
             }
             continue;
         }
+        chflags([fullPath UTF8String], 0);
+        chmod([fullPath UTF8String], 0755);
         if ([fm removeItemAtPath:fullPath error:nil]) {
             count++;
+        } else {
+            NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:fullPath];
+            NSString *rel = nil;
+            while ((rel = [enumerator nextObject])) {
+                NSString *subP = [fullPath stringByAppendingPathComponent:rel];
+                chflags([subP UTF8String], 0);
+                chmod([subP UTF8String], 0755);
+            }
+            if ([fm removeItemAtPath:fullPath error:nil]) {
+                count++;
+            }
         }
     }
     return count;
@@ -592,8 +615,9 @@ extern char **environ;
     NSInteger cleanedItems = 0;
     NSFileManager *fm = [NSFileManager defaultManager];
 
-    // Guarantee Zalo, AIDA64 and Safari are terminated via kernel sysctl and clean Safari cookies/cache
+    // Guarantee Zalo, Zalo extensions, AIDA64 and Safari are terminated via kernel sysctl and release SQLite/MMKV locks
     [ZTechVaultManager killZaloProcess];
+    usleep(120000);
     [ZTechVaultManager cleanSafariCookiesAndWebsiteData];
     cleanedItems += 5;
 
@@ -610,8 +634,11 @@ extern char **environ;
     }
 
     for (NSString *containerPath in zaloContainers) {
-        // 1. Clean all interior sub-directories first (preserving trace logs in Documents/Caches)
-        NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support", @"Library/SplashBoard", @"Library/HTTPStorages", @"Library/Saved Application State", @"Library"];
+        // 0. Normalize ownership and permissions first so no read-only subdirectories block deletion
+        [ZTechVaultManager runFastChownAndChmod:containerPath];
+
+        // 1. Clean all interior sub-directories (preserving trace logs and active profile in Documents/Preferences)
+        NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support", @"Library/SplashBoard", @"Library/HTTPStorages", @"Library/Saved Application State"];
         for (NSString *sub in subDirs) {
             NSString *targetSub = [containerPath stringByAppendingPathComponent:sub];
             if ([fm fileExistsAtPath:targetSub]) {
@@ -625,6 +652,16 @@ extern char **environ;
         // 3. Reconstruct clean standard iOS container directory tree & permissions (0755 dirs, 0644 metadata.plist)
         [self repairContainerStructureAtPath:containerPath fileManager:fm];
         [ZTechVaultManager runFastChownAndChmod:containerPath];
+    }
+
+    // Write _zt_wipe_keychain.flag and remove _zt_bound_uuid.txt so ZTechHookInit purges Zalo's Keychain (e.g. 466042823) on next Zalo launch
+    if (mainZalo.length > 0) {
+        NSString *zDocs = [mainZalo stringByAppendingPathComponent:@"Documents"];
+        [fm removeItemAtPath:[zDocs stringByAppendingPathComponent:@"_zt_bound_uuid.txt"] error:nil];
+        NSString *wipeFlag = [zDocs stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"];
+        [@"1" writeToFile:wipeFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        chown([wipeFlag UTF8String], 501, 501);
+        chmod([wipeFlag UTF8String], 0666);
     }
 
     // Flush cfprefsd so iOS reloads clean NSUserDefaults for Zalo and its AppGroups

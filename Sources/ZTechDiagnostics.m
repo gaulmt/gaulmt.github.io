@@ -198,6 +198,10 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         }
         [outStr appendFormat:@"  * Symlink .GlobalPreferences.plist: %@\n", ZTechFormatFilePerms(zGpLink, fm)];
         [outStr appendFormat:@"  * _zt_active_profile.plist: %@\n", ZTechFormatFilePerms(zActiveProf, fm)];
+        NSString *boundUuidPath = [zDocs stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
+        NSString *boundVal = [[NSString stringWithContentsOfFile:boundUuidPath encoding:NSUTF8StringEncoding error:nil]
+                              stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        [outStr appendFormat:@"  * _zt_bound_uuid.txt (Keychain Sync): %@\n", boundVal.length > 0 ? boundVal : @"[Chưa đồng bộ / Đang chờ làm sạch]"];
     } else {
         [outStr appendString:@"- Data Container Zalo: ⚠️ [CHƯA TÌM THẤY] (Hãy mở Zalo ít nhất 1 lần)\n"];
     }
@@ -269,7 +273,7 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
             if (traceContent && traceContent.length > 0) {
                 foundTrace = YES;
                 NSArray<NSString *> *lines = [traceContent componentsSeparatedByString:@"\n"];
-                NSInteger startIdx = (lines.count > 18) ? (lines.count - 18) : 0;
+                NSInteger startIdx = (lines.count > 24) ? (lines.count - 24) : 0;
                 [outStr appendFormat:@"- Hook Trace tại %@:\n", [tPath lastPathComponent]];
                 for (NSInteger i = startIdx; i < lines.count; i++) {
                     if (lines[i].length > 0) {
@@ -281,7 +285,7 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         }
     }
     if (!foundTrace) {
-        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace — Hãy mở Zalo 1 lần sau khi cập nhật v5.5.5]\n"];
+        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace — Hãy mở Zalo 1 lần sau khi cập nhật v5.5.6]\n"];
     }
 
     // 6.2 Check in-process Crash / AtExit Log (inside Zalo container first, then /var/tmp)

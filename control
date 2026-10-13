@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: gaulmt -Tech
-Version: 5.5.6
+Version: 5.5.7
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.5.6 - Đồng Bộ Keychain & Container Zalo Nội Tuyến (SecItemDelete), Khôi Phục Proxy & Bắt Signal Crash Tự Động
+Description: gaulmt -Tech v5.5.7 - Triệt Tiêu Lỗi PAC NSURLSession & SyncedDefaults EXC_GUARD Trên ARM64E, Đồng Bộ Keychain Zalo Nội Tuyến
 Maintainer: gaulmt -Tech
 Author: gaulmt -Tech
 Section: Utilities

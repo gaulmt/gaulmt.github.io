@@ -760,9 +760,14 @@ static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
     return (unsigned long long)gRamBytes;
 }
 
-static NSURLSessionConfiguration *(*orig_defaultSessionConfig)(id, SEL) = NULL;
+static SEL gZTechOrigDefCfgSel = NULL;
+static SEL gZTechOrigEphCfgSel = NULL;
+
 static NSURLSessionConfiguration *swizzled_defaultSessionConfig(id self, SEL _cmd) {
-    NSURLSessionConfiguration *cfg = orig_defaultSessionConfig ? orig_defaultSessionConfig(self, _cmd) : nil;
+    NSURLSessionConfiguration *cfg = nil;
+    if (gZTechOrigDefCfgSel && [self respondsToSelector:gZTechOrigDefCfgSel]) {
+        cfg = ((NSURLSessionConfiguration *(*)(id, SEL))objc_msgSend)(self, gZTechOrigDefCfgSel);
+    }
     if (cfg && gProxyEnabled && gCachedProxyDict) {
         @try {
             cfg.connectionProxyDictionary = gCachedProxyDict;
@@ -776,9 +781,11 @@ static NSURLSessionConfiguration *swizzled_defaultSessionConfig(id self, SEL _cm
     return cfg;
 }
 
-static NSURLSessionConfiguration *(*orig_ephemeralSessionConfig)(id, SEL) = NULL;
 static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _cmd) {
-    NSURLSessionConfiguration *cfg = orig_ephemeralSessionConfig ? orig_ephemeralSessionConfig(self, _cmd) : nil;
+    NSURLSessionConfiguration *cfg = nil;
+    if (gZTechOrigEphCfgSel && [self respondsToSelector:gZTechOrigEphCfgSel]) {
+        cfg = ((NSURLSessionConfiguration *(*)(id, SEL))objc_msgSend)(self, gZTechOrigEphCfgSel);
+    }
     if (cfg && gProxyEnabled && gCachedProxyDict) {
         @try {
             cfg.connectionProxyDictionary = gCachedProxyDict;
@@ -790,6 +797,190 @@ static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _
         } @catch (NSException *e) {}
     }
     return cfg;
+}
+
+#pragma mark - In-Memory NSUbiquitousKeyValueStore Stub (Prevents SyncedDefaults EXC_GUARD & iCloud KVS Leaks)
+
+@interface ZTechUbiquitousStoreStub : NSObject {
+    NSMutableDictionary<NSString *, id> *_store;
+    NSLock *_lock;
+}
++ (instancetype)sharedStore;
+- (void)resetStore;
+@end
+
+@implementation ZTechUbiquitousStoreStub
+
++ (instancetype)sharedStore {
+    static ZTechUbiquitousStoreStub *sStub = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sStub = [[ZTechUbiquitousStoreStub alloc] init];
+    });
+    return sStub;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _store = [[NSMutableDictionary alloc] init];
+        _lock = [[NSLock alloc] init];
+    }
+    return self;
+}
+
+- (void)resetStore {
+    [_lock lock];
+    [_store removeAllObjects];
+    [_lock unlock];
+}
+
+- (BOOL)isKindOfClass:(Class)aClass {
+    Class kvsCls = objc_getClass("NSUbiquitousKeyValueStore");
+    if (kvsCls && (aClass == kvsCls || [kvsCls isSubclassOfClass:aClass])) {
+        return YES;
+    }
+    return [super isKindOfClass:aClass];
+}
+
+- (id)objectForKey:(NSString *)aKey {
+    if (!aKey) return nil;
+    [_lock lock];
+    id val = _store[aKey];
+    [_lock unlock];
+    return val;
+}
+
+- (void)setObject:(id)anObject forKey:(NSString *)aKey {
+    if (!aKey) return;
+    [_lock lock];
+    if (anObject) {
+        _store[aKey] = anObject;
+    } else {
+        [_store removeObjectForKey:aKey];
+    }
+    [_lock unlock];
+}
+
+- (void)removeObjectForKey:(NSString *)aKey {
+    if (!aKey) return;
+    [_lock lock];
+    [_store removeObjectForKey:aKey];
+    [_lock unlock];
+}
+
+- (NSString *)stringForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    return [v isKindOfClass:[NSString class]] ? v : nil;
+}
+
+- (NSArray *)arrayForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    return [v isKindOfClass:[NSArray class]] ? v : nil;
+}
+
+- (NSDictionary<NSString *, id> *)dictionaryForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    return [v isKindOfClass:[NSDictionary class]] ? v : nil;
+}
+
+- (NSData *)dataForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    return [v isKindOfClass:[NSData class]] ? v : nil;
+}
+
+- (long long)longLongForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    if ([v respondsToSelector:@selector(longLongValue)]) return [v longLongValue];
+    return 0;
+}
+
+- (double)doubleForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    if ([v respondsToSelector:@selector(doubleValue)]) return [v doubleValue];
+    return 0.0;
+}
+
+- (BOOL)boolForKey:(NSString *)aKey {
+    id v = [self objectForKey:aKey];
+    if ([v respondsToSelector:@selector(boolValue)]) return [v boolValue];
+    return NO;
+}
+
+- (void)setString:(NSString *)aString forKey:(NSString *)aKey {
+    [self setObject:aString forKey:aKey];
+}
+
+- (void)setData:(NSData *)aData forKey:(NSString *)aKey {
+    [self setObject:aData forKey:aKey];
+}
+
+- (void)setArray:(NSArray *)anArray forKey:(NSString *)aKey {
+    [self setObject:anArray forKey:aKey];
+}
+
+- (void)setDictionary:(NSDictionary<NSString *, id> *)aDictionary forKey:(NSString *)aKey {
+    [self setObject:aDictionary forKey:aKey];
+}
+
+- (void)setLongLong:(long long)value forKey:(NSString *)aKey {
+    [self setObject:@(value) forKey:aKey];
+}
+
+- (void)setDouble:(double)value forKey:(NSString *)aKey {
+    [self setObject:@(value) forKey:aKey];
+}
+
+- (void)setBool:(BOOL)value forKey:(NSString *)aKey {
+    [self setObject:@(value) forKey:aKey];
+}
+
+- (NSDictionary<NSString *, id> *)dictionaryRepresentation {
+    [_lock lock];
+    NSDictionary *copy = [_store copy] ?: @{};
+    [_lock unlock];
+    return copy;
+}
+
+- (BOOL)synchronize {
+    return YES;
+}
+
+- (id)valueForKey:(NSString *)key {
+    return [self objectForKey:key];
+}
+
+- (void)setValue:(id)value forKey:(NSString *)key {
+    [self setObject:value forKey:key];
+}
+
+- (id)objectForKeyedSubscript:(NSString *)key {
+    return [self objectForKey:key];
+}
+
+- (void)setObject:(id)obj forKeyedSubscript:(NSString *)key {
+    [self setObject:obj forKey:key];
+}
+
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
+    NSMethodSignature *sig = [super methodSignatureForSelector:aSelector];
+    if (!sig) {
+        sig = [NSMethodSignature signatureWithObjCTypes:"@@:"];
+    }
+    return sig;
+}
+
+- (void)forwardInvocation:(NSInvocation *)anInvocation {
+    id nilVal = nil;
+    if (anInvocation.methodSignature.methodReturnLength == sizeof(id)) {
+        [anInvocation setReturnValue:&nilVal];
+    }
+}
+
+@end
+
+static id swizzled_ubiquitousDefaultStore(id self, SEL _cmd) {
+    return [ZTechUbiquitousStoreStub sharedStore];
 }
 
 #pragma mark - In-Process Zalo Keychain, Container & AppGroup Synchronization
@@ -921,7 +1112,7 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
         NSString *wipeFlag = [docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"];
         NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
 
-        // Case 1: Vault Restore Triggered
+        // Case 1: Vault Restore Triggered (Write plist directly to disk without initializing CFPreferences during dyld constructor)
         if ([fm fileExistsAtPath:restoreTrigger]) {
             [fm removeItemAtPath:restoreTrigger error:nil];
             [fm removeItemAtPath:wipeFlag error:nil];
@@ -929,8 +1120,12 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
             NSString *prefsSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"];
             NSDictionary *savedPrefs = [NSDictionary dictionaryWithContentsOfFile:prefsSnapPath];
             if (savedPrefs && [savedPrefs isKindOfClass:[NSDictionary class]] && bundleId.length > 0) {
-                [[NSUserDefaults standardUserDefaults] setPersistentDomain:savedPrefs forName:bundleId];
-                [[NSUserDefaults standardUserDefaults] synchronize];
+                NSString *prefsDir = [home stringByAppendingPathComponent:@"Library/Preferences"];
+                [fm createDirectoryAtPath:prefsDir withIntermediateDirectories:YES attributes:nil error:nil];
+                chmod([prefsDir UTF8String], 0755);
+                NSString *destPlist = [prefsDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.plist", bundleId]];
+                [savedPrefs writeToFile:destPlist atomically:YES];
+                chmod([destPlist UTF8String], 0644);
             }
 
             NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
@@ -980,6 +1175,7 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
             [fm removeItemAtPath:wipeFlag error:nil];
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"] error:nil];
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"] error:nil];
+            [[ZTechUbiquitousStoreStub sharedStore] resetStore];
 
             // 1. Purge all Zalo Keychain items (prevents stale account e.g. 466042823 from auto-restoring & crashing on new UUID)
             NSArray *secClasses = @[
@@ -1003,6 +1199,8 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
             ZTechHookTrace([[NSString stringWithFormat:@"[2.2/6] Zalo Keychain purged across 5 classes (matched=%d)", matchedClasses] UTF8String]);
 
             // 2. Wipe Zalo container subdirectories from inside Zalo's own process (uid 501)
+            // Note: Do NOT call [NSUserDefaults standardUserDefaults] during __attribute__((constructor))
+            // because initializing CFPreferences while dyld holds the loader lock causes SyncedDefaults/CFPrefs EXC_GUARD faults.
             NSArray<NSString *> *subDirs = @[
                 @"Documents",
                 @"tmp",
@@ -1038,13 +1236,7 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
                 }
             }
 
-            // 4. Clear in-memory / cfprefsd NSUserDefaults domain for Zalo
-            if (bundleId.length > 0) {
-                [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:bundleId];
-                [[NSUserDefaults standardUserDefaults] synchronize];
-            }
-
-            // 5. Bind the new UUID so subsequent launches of the same session preserve login data
+            // 4. Bind the new UUID so subsequent launches of the same session preserve login data
             if (gUuidObj.length > 0) {
                 [gUuidObj writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
                 chmod([boundUuidFile UTF8String], 0666);
@@ -1155,7 +1347,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.6 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.5.7 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         struct utsname realUts;
@@ -1173,6 +1365,18 @@ static void ZTechHookInit(void) {
         // Synchronize Zalo Keychain, Container & AppGroup state before Zalo's main() runs
         if (isZalo) {
             ZTechSyncZaloSessionAndKeychain(bundleId);
+
+            // Swizzle +[NSUbiquitousKeyValueStore defaultStore] to return in-memory stub
+            // Eliminates SyncedDefaults (SYDRemotePreferencesSource) EXC_GUARD fault & blocks iCloud KVS tracking
+            @try {
+                Class kvsCls = objc_getClass("NSUbiquitousKeyValueStore");
+                if (kvsCls) {
+                    Method mDefStore = class_getClassMethod(kvsCls, @selector(defaultStore));
+                    if (mDefStore) {
+                        method_setImplementation(mDefStore, (IMP)swizzled_ubiquitousDefaultStore);
+                    }
+                }
+            } @catch (NSException *e) {}
 
             [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification
                                                               object:nil
@@ -1219,20 +1423,27 @@ static void ZTechHookInit(void) {
                 }
             }
 
-            Class urlCfgCls = objc_getClass("NSURLSessionConfiguration");
-            if (urlCfgCls) {
-                Method mDefCfg = class_getClassMethod(urlCfgCls, @selector(defaultSessionConfiguration));
-                if (mDefCfg) {
-                    orig_defaultSessionConfig = (void *)method_getImplementation(mDefCfg);
-                    method_setImplementation(mDefCfg, (IMP)swizzled_defaultSessionConfig);
-                }
-                Method mEphCfg = class_getClassMethod(urlCfgCls, @selector(ephemeralSessionConfiguration));
-                if (mEphCfg) {
-                    orig_ephemeralSessionConfig = (void *)method_getImplementation(mEphCfg);
-                    method_setImplementation(mEphCfg, (IMP)swizzled_ephemeralSessionConfig);
+            // Only swizzle NSURLSessionConfiguration when proxy is enabled, using arm64e PAC-safe method_exchangeImplementations
+            if (gProxyEnabled && gCachedProxyDict) {
+                Class urlCfgCls = objc_getClass("NSURLSessionConfiguration");
+                Class urlCfgMeta = urlCfgCls ? object_getClass(urlCfgCls) : nil;
+                if (urlCfgCls && urlCfgMeta) {
+                    gZTechOrigDefCfgSel = sel_registerName("_ztech_orig_defaultSessionConfiguration");
+                    Method mDefCfg = class_getClassMethod(urlCfgCls, @selector(defaultSessionConfiguration));
+                    if (mDefCfg && class_addMethod(urlCfgMeta, gZTechOrigDefCfgSel, (IMP)swizzled_defaultSessionConfig, method_getTypeEncoding(mDefCfg))) {
+                        Method mSwizDef = class_getClassMethod(urlCfgCls, gZTechOrigDefCfgSel);
+                        if (mSwizDef) method_exchangeImplementations(mDefCfg, mSwizDef);
+                    }
+
+                    gZTechOrigEphCfgSel = sel_registerName("_ztech_orig_ephemeralSessionConfiguration");
+                    Method mEphCfg = class_getClassMethod(urlCfgCls, @selector(ephemeralSessionConfiguration));
+                    if (mEphCfg && class_addMethod(urlCfgMeta, gZTechOrigEphCfgSel, (IMP)swizzled_ephemeralSessionConfig, method_getTypeEncoding(mEphCfg))) {
+                        Method mSwizEph = class_getClassMethod(urlCfgCls, gZTechOrigEphCfgSel);
+                        if (mSwizEph) method_exchangeImplementations(mEphCfg, mSwizEph);
+                    }
                 }
             }
-            ZTechHookTrace("[3/6] UIDevice & NSURLSessionConfiguration swizzled successfully");
+            ZTechHookTrace("[3/6] UIDevice & NSUbiquitousKeyValueStore swizzled (arm64e PAC-safe)");
         } @catch (NSException *e) {
             ZTechHookTrace([[NSString stringWithFormat:@"[3/6 ERROR] UIDevice swizzle exception: %@", e] UTF8String]);
         }
@@ -1328,14 +1539,16 @@ static void ZTechHookInit(void) {
             }
         }
 
-        // Observe UIApplicationDidFinishLaunchingNotification to confirm app reached UI loop
+        // Observe UIApplicationDidFinishLaunchingNotification to confirm app reached UI loop & re-assert signal handlers
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification * _Nonnull note) {
+            ZTechInstallSignalHandlers();
             ZTechHookTrace("[6/6] UIApplicationDidFinishLaunchingNotification reached OK!");
         }];
 
         ZTechHookTrace("[5/6] ZTechHookInit completed 100% OK");
     }
 }
+

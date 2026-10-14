@@ -36,7 +36,7 @@ extern char **environ;
                               matchChip:(BOOL)matchChip {
     NSString *modeText = lockModel ? @"Khoá Đời Máy" : @"Fake Tất Cả";
     return [NSString stringWithFormat:
-            @"=== gaulmt -Tech Device Report v4.6 ===\n"
+            @"=== quang lam marketing Device Report ===\n"
             @"ID: %@\n"
             @"Device: %@ (%@) - iOS %@\n"
             @"Chip/RAM: %@ (%ldGB) - Screen: %@\n"

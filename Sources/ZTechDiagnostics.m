@@ -37,7 +37,7 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
     NSFileManager *fm = [NSFileManager defaultManager];
 
     [outStr appendString:@"========================================================\n"];
-    [outStr appendString:@"   🔍 GAULMT -TECH BÁO CÁO CHẨN ĐOÁN THIẾT BỊ TOÀN DIỆN\n"];
+    [outStr appendString:@"   🔍 QUANG LAM MARKETING BÁO CÁO CHẨN ĐOÁN THIẾT BỊ TOÀN DIỆN\n"];
     [outStr appendString:@"========================================================\n\n"];
 
     // 1. THIẾT BỊ GỐC (KERNEL & HARDWARE)
@@ -131,7 +131,7 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         @"/Library/MobileSubstrate/DynamicLibraries/ZTechHook.dylib",
         @"/Library/MobileSubstrate/DynamicLibraries/ZTechHook.plist"
     ];
-    [outStr appendString:@"- Tệp Tweak gaulmt -Tech Hook:\n"];
+    [outStr appendString:@"- Tệp Tweak quang lam marketing Hook:\n"];
     for (NSString *tp in tweakPaths) {
         [outStr appendFormat:@"  * %@: %@\n", tp, ZTechFormatFilePerms(tp, fm)];
     }

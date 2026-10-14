@@ -596,7 +596,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appTitle = [[UILabel alloc] init];
     appTitle.translatesAutoresizingMaskIntoConstraints = NO;
-    appTitle.text = @"gaulmt -Tech";
+    appTitle.text = @"quang lam marketing";
     appTitle.font = [UIFont systemFontOfSize:17.5 weight:UIFontWeightHeavy];
     appTitle.textColor = [self primaryTextColor];
     appTitle.adjustsFontSizeToFitWidth = YES;

@@ -58,7 +58,7 @@ jobs:
           if [ -f "ZTech_iOS/Makefile" ]; then cd ZTech_iOS; fi
           cp control control.bak
           sed -i '' 's/^Package: com.ztech.devicechanger/Package: com.ztech.devicechanger.rootless/' control
-          sed -i '' 's/^Name: gaulmt -Tech/Name: gaulmt -Tech (Rootless)/' control
+          sed -i '' 's/^Name: quang lam marketing/Name: quang lam marketing (Rootless)/' control
           sed -i '' 's/^Depends: .*/Depends: firmware (>= 12.0), ellekit/' control
           chmod 0755 layout/DEBIAN/postinst
           rm -rf packages .theos
@@ -104,14 +104,14 @@ jobs:
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_TrollStore.tipa" "$STAGE_DIR/debs/ZTech_TrollStore.tipa"
 
           cat << 'EOF' > Release
-          Origin: gaulmt -Tech Official Repo
-          Label: gaulmt -Tech
+          Origin: quang lam marketing Official Repo
+          Label: quang lam marketing
           Suite: stable
-          Version: 5.6.1
+          Version: 5.6.2
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat gaulmt -Tech v5.6.1 truc tiep tren Sileo & Zebra (360-Degree Hardware Spoofing + MobileGestalt Return Interception)
+          Description: Nguon cai dat quang lam marketing v5.6.2 truc tiep tren Sileo & Zebra (Universal Dynamic Hardware Spoofing across all 37 iPhone models)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -126,11 +126,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "gaulmt -Tech v5.6.1 - 360-Degree Hardware Spoofing (MobileGestalt + Sysctl + IOKit + Headers)"
+                    "title": "quang lam marketing v5.6.2 - Universal Dynamic Hardware Spoofing"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản phát hành đặc biệt **gaulmt -Tech v5.6.1** triệt tiêu 100% việc Zalo nhận nhầm máy thật khi tạo tài khoản mới:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Kiểm soát cả key mã hoá lẫn giá trị chuỗi trả về, tự động ghi đè mọi dữ liệu `iPhone 11` / `iPhone12,1` / `N104AP` / `15.5` thành thông số máy ảo đã chọn.\n- **Hậu Xử Lý Sysctl & IOKit**: Quét sạch giá trị phần cứng thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent**: Tự động thay thế `User-Agent`, `Scale/2.00` và header thiết bị trong `NSMutableURLRequest` và `NSURLSessionConfiguration` thành chuẩn `@3x` của dòng máy mới.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
+                    "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.6.2**:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Tự động chặn và ghi đè toàn bộ model, board-id, OS version thật sang thông số máy ảo đã chọn.\n- **Hậu Xử Lý Động Sysctl & IOKit**: Xoá sạch mọi dấu vết model máy thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent Động**: Tự động chuyển đổi `Scale/2.00` và `Scale/3.00`, User-Agent, model header linh hoạt theo thiết bị mục tiêu.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
                   }
                 ]
               }
@@ -144,7 +144,7 @@ jobs:
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-            <title>gaulmt -Tech Official Sileo Repo</title>
+            <title>quang lam marketing Official Sileo Repo</title>
             <style>
               body { background:#0b0d0b; color:#fff; font-family:-apple-system,BlinkMacSystemFont,sans-serif; padding:24px; max-width:480px; margin:0 auto; text-align:center; }
               .card { background:#141714; border:1px solid #333629; border-radius:20px; padding:24px; margin-top:20px; }
@@ -160,8 +160,8 @@ jobs:
           <body>
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
-              <h1>gaulmt -Tech</h1>
-              <div class="sub">Nguồn cài đặt v5.5.9 trực tiếp vào Sileo & Zebra</div>
+              <h1>quang lam marketing</h1>
+              <div class="sub">Nguồn cài đặt v5.6.2 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>

@@ -1,10 +1,10 @@
 Package: com.ztech.devicechanger
-Name: gaulmt -Tech
+Name: quang lam marketing
 Version: 5.6.2
 Architecture: iphoneos-arm
-Description: gaulmt -Tech v5.6.2 - Universal Dynamic Hardware Spoofing across all 37 iPhone models and any physical device, Zero Hardcoding, 100% Khong Sot Dau Vet May That Trong Zalo
-Maintainer: gaulmt -Tech
-Author: gaulmt -Tech
+Description: quang lam marketing v5.6.2 - Universal Dynamic Hardware Spoofing across all 37 iPhone models and any physical device, Zero Hardcoding, 100% Khong Sot Dau Vet May That Trong Zalo
+Maintainer: quang lam marketing
+Author: quang lam marketing
 Section: Utilities
 Depends: firmware (>= 12.0), mobilesubstrate
 Icon: https://gaulmt.github.io/CydiaIcon@3x.png

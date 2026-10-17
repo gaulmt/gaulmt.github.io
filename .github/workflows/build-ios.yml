@@ -85,17 +85,19 @@ jobs:
 
             # 1. Compile & Package Rootful with Theos
             set -o pipefail
-            make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
+            make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen_rootful.log
             BUILD_STATUS=$?
-            if [ $BUILD_STATUS -ne 0 ]; then
-              echo "### ❌ NowEvent Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
+            if [ $BUILD_STATUS -ne 0 ] || [ ! -d packages ] || [ -z "$(ls -A packages/*.deb 2>/dev/null)" ]; then
+              echo "### ❌ NowEvent Rootful Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
-              tail -n 80 build_nen.log >> "$GITHUB_STEP_SUMMARY"
+              tail -n 80 build_nen_rootful.log >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
+            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
+            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb"
 
-            # Locate staged app bundle
+            # Locate staged app bundle containing compiled binary
             NEN_APP=""
             if [ -d ".theos/_/Applications/NowEvent.app" ]; then
               NEN_APP=".theos/_/Applications/NowEvent.app"
@@ -121,7 +123,7 @@ jobs:
             # Copy all resources & assets inside app bundle
             cp -rf Resources/* "$NEN_APP/" 2>/dev/null || true
             chmod 0755 "$NEN_APP/NowEvent"
-            ldid -Sentitlements.xml "$NEN_APP/NowEvent"
+            ldid -Sentitlements.xml "$NEN_APP/NowEvent" 2>/dev/null || true
 
             # Strict verification of the executable
             if [ ! -s "$NEN_APP/NowEvent" ]; then
@@ -150,32 +152,27 @@ jobs:
               exit 1
             fi
 
+            # 3. Build Rootless .deb (Dopamine / palera1n iphoneos-arm64)
             cd "$GITHUB_WORKSPACE/NowEvent_iOS"
+            cp control control.bak
+            sed -i '' 's/^Package: com.gaulmt.noweventnotification/Package: com.gaulmt.noweventnotification.rootless/' control
+            sed -i '' 's/^Name: Now Event Notification (IUH)/Name: Now Event Notification (Rootless)/' control
+            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' control
+            chmod 0755 layout/DEBIAN/postinst
+            rm -rf packages .theos
+            make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 | tee build_nen_rootless.log
+            ROOTLESS_BUILD_STATUS=$?
+            if [ $ROOTLESS_BUILD_STATUS -ne 0 ] || [ ! -d packages ] || [ -z "$(ls -A packages/*.deb 2>/dev/null)" ]; then
+              echo "### ❌ NowEvent Rootless Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              tail -n 80 build_nen_rootless.log >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+            mv control.bak control
 
-            # 3. Direct dpkg-deb Packaging: Rootful (iphoneos-arm)
-            rm -rf deb_rootful
-            mkdir -p deb_rootful/DEBIAN deb_rootful/Applications
-            cp -r "$NEN_APP" deb_rootful/Applications/NowEvent.app
-            cp control deb_rootful/DEBIAN/control
-            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm/' deb_rootful/DEBIAN/control
-            cp layout/DEBIAN/postinst deb_rootful/DEBIAN/postinst
-            chmod 0755 deb_rootful/DEBIAN/postinst
-            dpkg-deb -b -Zxz deb_rootful "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
-            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb"
-
-            # 4. Direct dpkg-deb Packaging: Rootless (iphoneos-arm64)
-            rm -rf deb_rootless
-            mkdir -p deb_rootless/DEBIAN deb_rootless/var/jb/Applications
-            cp -r "$NEN_APP" deb_rootless/var/jb/Applications/NowEvent.app
-            cp control deb_rootless/DEBIAN/control
-            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' deb_rootless/DEBIAN/control
-            sed -i '' 's/^Package: com.gaulmt.noweventnotification/Package: com.gaulmt.noweventnotification.rootless/' deb_rootless/DEBIAN/control
-            sed -i '' 's/^Name: Now Event Notification (IUH)/Name: Now Event Notification (Rootless)/' deb_rootless/DEBIAN/control
-            cp layout/DEBIAN/postinst deb_rootless/DEBIAN/postinst
-            chmod 0755 deb_rootless/DEBIAN/postinst
-            dpkg-deb -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
-
-            # Verify both .deb packages contain the binary
+            # 4. Verify both .deb packages contain the binary
             echo "=== Verifying Rootful .deb contents ==="
             dpkg-deb -c "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" | grep "NowEvent"
             echo "=== Verifying Rootless .deb contents ==="

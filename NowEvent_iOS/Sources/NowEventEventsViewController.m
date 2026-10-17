@@ -206,7 +206,7 @@
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:4.0];
     
     NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-        dispatch_async(dispatch_main_queue(), ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
             [self.loadingIndicator stopAnimating];
             [self.refreshControl endRefreshing];
             [self updateLastRefreshTimestamp];

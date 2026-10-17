@@ -84,9 +84,8 @@ jobs:
             rm -rf packages .theos
 
             # 1. Compile & Package Rootful with Theos
-            set -o pipefail
             make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen_rootful.log
-            BUILD_STATUS=$?
+            BUILD_STATUS=${PIPESTATUS[0]}
             if [ $BUILD_STATUS -ne 0 ] || [ ! -d packages ] || [ -z "$(ls -A packages/*.deb 2>/dev/null)" ]; then
               echo "### ❌ NowEvent Rootful Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -141,21 +140,8 @@ jobs:
             rm -rf "$STAGED_APP"
             cp -r "$NEN_APP" "$STAGED_APP"
 
-            # 2. Build TrollStore .tipa & .ipa
-            mkdir -p "$GITHUB_WORKSPACE/build_out/Payload"
-            cp -r "$STAGED_APP" "$GITHUB_WORKSPACE/build_out/Payload/NowEvent.app"
-            cd "$GITHUB_WORKSPACE/build_out"
-            zip -r9 NowEventNotification.tipa Payload
-            cp NowEventNotification.tipa NowEventNotification.ipa
-            rm -rf Payload
-
-            # Verify TrollStore .tipa contains NowEvent binary!
-            echo "=== Verifying TrollStore .tipa contents ==="
-            unzip -l NowEventNotification.tipa | grep "NowEvent"
-            if ! unzip -l NowEventNotification.tipa | grep -q "Payload/NowEvent.app/NowEvent"; then
-              echo "### ❌ FATAL: NowEventNotification.tipa does not contain Payload/NowEvent.app/NowEvent!" >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
+            # 2. Build TrollStore .tipa & .ipa using pack_tipa.py
+            python3 "$GITHUB_WORKSPACE/scripts/pack_tipa.py" "$STAGED_APP" "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa"
 
             # 3. Build Rootless .deb (Dopamine / palera1n iphoneos-arm64)
             cd "$GITHUB_WORKSPACE/NowEvent_iOS"
@@ -189,16 +175,8 @@ jobs:
             python3 "$GITHUB_WORKSPACE/scripts/pack_deb.py" deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             rm -rf deb_rootless
 
-            # 4. Verify built packages exist and are non-empty
-            echo "=== Verifying Built Packages ==="
-            for PKG in "NowEventNotification_Rootful_arm.deb" "NowEventNotification_Rootless_arm64.deb" "NowEventNotification.tipa" "NowEventNotification.ipa"; do
-              if [ -s "$GITHUB_WORKSPACE/build_out/$PKG" ]; then
-                echo "Found $PKG: $(wc -c < "$GITHUB_WORKSPACE/build_out/$PKG" | tr -d ' ') bytes"
-              else
-                echo "### ❌ Missing or empty package: $PKG" >> "$GITHUB_STEP_SUMMARY"
-                exit 1
-              fi
-            done
+            # 4. Verify all output packages exist and are valid size (>50KB)
+            python3 "$GITHUB_WORKSPACE/scripts/verify_packages.py" "$GITHUB_WORKSPACE/build_out"
 
             cd "$GITHUB_WORKSPACE"
           fi

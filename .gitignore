@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.theos/
+packages/
+build_out/
+sileo_stage/
+sileo_repo/

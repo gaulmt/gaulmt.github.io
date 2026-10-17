@@ -13,7 +13,7 @@ ZTech_CODESIGN_FLAGS = -Sentitlements.xml
 
 TWEAK_NAME = ZTechHook
 ZTechHook_FILES = Tweak/ZTechHook.m
-ZTechHook_FRAMEWORKS = UIKit Foundation Security CFNetwork
+ZTechHook_FRAMEWORKS = UIKit Foundation Security CFNetwork WebKit
 ZTechHook_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-error
 ZTechHook_USE_SUBSTRATE = 0
 

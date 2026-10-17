@@ -3,6 +3,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <CFNetwork/CFNetwork.h>
 #import <Security/Security.h>
+#import <WebKit/WebKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <sys/utsname.h>
@@ -58,6 +59,15 @@ static NSString *gTargetScaleStr = @"Scale/3.00";
 static NSString *gCarrierNameObj = @"Viettel";
 static NSString *gActiveProxyObj = @"";
 static float gBatteryFloat = 0.76f;
+static NSInteger gScreenWidth = 440;
+static NSInteger gScreenHeight = 956;
+static float gScreenScale = 3.0f;
+static NSInteger gCpuCores = 6;
+static NSInteger gRamGB = 8;
+static NSString *gGpuNameObj = @"Apple A18 Pro GPU";
+static NSString *gWebKitUserAgent = nil;
+
+static NSString *ZTechGPUNameForMachine(NSString *machine);
 
 static NSUncaughtExceptionHandler *gPrevUncaughtHandler = NULL;
 static time_t gProcessStartTime = 0;
@@ -541,6 +551,35 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
 
     NSInteger pct = [prof[@"batteryPercent"] integerValue];
     gBatteryFloat = (pct > 0 && pct <= 100) ? ((float)pct / 100.0f) : 0.76f;
+
+    NSString *screenKey = prof[@"screenKey"];
+    if (screenKey && [screenKey containsString:@"x"]) {
+        NSArray *parts = [screenKey componentsSeparatedByString:@"x"];
+        if (parts.count == 2) {
+            gScreenWidth = [parts[0] integerValue];
+            gScreenHeight = [parts[1] integerValue];
+        }
+    }
+    if (gScreenWidth <= 0 || gScreenHeight <= 0) {
+        if ([gMachineIdObj isEqualToString:@"iPhone17,2"] || [gMachineIdObj isEqualToString:@"iPhone16,2"] ||
+            [gMachineIdObj isEqualToString:@"iPhone15,3"] || [gMachineIdObj isEqualToString:@"iPhone14,3"]) {
+            gScreenWidth = 440; gScreenHeight = 956;
+        } else if ([gMachineIdObj isEqualToString:@"iPhone17,1"] || [gMachineIdObj isEqualToString:@"iPhone16,1"]) {
+            gScreenWidth = 402; gScreenHeight = 874;
+        } else if ([gMachineIdObj isEqualToString:@"iPhone17,3"] || [gMachineIdObj isEqualToString:@"iPhone15,4"] ||
+                   [gMachineIdObj isEqualToString:@"iPhone15,2"] || [gMachineIdObj isEqualToString:@"iPhone14,7"]) {
+            gScreenWidth = 393; gScreenHeight = 852;
+        } else if ([gMachineIdObj isEqualToString:@"iPhone12,1"] || [gMachineIdObj isEqualToString:@"iPhone11,8"]) {
+            gScreenWidth = 414; gScreenHeight = 896;
+        } else {
+            gScreenWidth = 393; gScreenHeight = 852;
+        }
+    }
+    gScreenScale = [gTargetScaleStr containsString:@"2.00"] ? 2.0f : 3.0f;
+    gCpuCores = 6;
+    gRamGB = ramGB;
+    gGpuNameObj = ZTechGPUNameForMachine(gMachineIdObj);
+    gWebKitUserAgent = [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
 
     ZTechRebuildCachedProxyState(gActiveProxyObj);
 }
@@ -1272,6 +1311,194 @@ static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _
     return cfg;
 }
 
+#pragma mark - WebKit In-App Browser Fingerprint & Anti-Leak Engine
+
+static SEL gZTechOrigWKInitWithFrameSel = NULL;
+static SEL gZTechOrigWKSetUASel = NULL;
+
+static NSString *ZTechGenerateWebKitFingerprintScript(void) {
+    NSString *fakeUA = gWebKitUserAgent ?: [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
+    NSString *fakeAppVer = [NSString stringWithFormat:@"5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
+    NSString *fakeGPU = gGpuNameObj ?: @"Apple A18 Pro GPU";
+
+    return [NSString stringWithFormat:
+        @"(() => {\n"
+        @"  try {\n"
+        @"    const fakeUA = '%@';\n"
+        @"    const fakeAppVer = '%@';\n"
+        @"    const fakeW = %ld;\n"
+        @"    const fakeH = %ld;\n"
+        @"    const fakeScale = %.1f;\n"
+        @"    const fakeCores = %ld;\n"
+        @"    const fakeRAM = %ld;\n"
+        @"    const fakeGPU = '%@';\n"
+        @"    // 1. Navigator Spoofing\n"
+        @"    Object.defineProperty(navigator, 'userAgent', { get: () => fakeUA, configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'appVersion', { get: () => fakeAppVer, configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'platform', { get: () => 'iPhone', configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => fakeCores, configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'deviceMemory', { get: () => fakeRAM, configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5, configurable: true });\n"
+        @"    Object.defineProperty(navigator, 'vendor', { get: () => 'Apple Computer, Inc.', configurable: true });\n"
+        @"    // 2. Screen & DPR Spoofing\n"
+        @"    Object.defineProperty(window.screen, 'width', { get: () => fakeW, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'availWidth', { get: () => fakeW, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'height', { get: () => fakeH, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'availHeight', { get: () => fakeH, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'colorDepth', { get: () => 32, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'pixelDepth', { get: () => 32, configurable: true });\n"
+        @"    Object.defineProperty(window.screen, 'devicePixelRatio', { get: () => fakeScale, configurable: true });\n"
+        @"    // 3. WebGL GPU Spoofing\n"
+        @"    const patchGL = (proto) => {\n"
+        @"      if (!proto || !proto.getParameter) return;\n"
+        @"      const orig = proto.getParameter;\n"
+        @"      proto.getParameter = function(p) {\n"
+        @"        if (p === 0x9245 || p === 0x1F00) return 'Apple Inc.';\n"
+        @"        if (p === 0x9246 || p === 0x1F01) return fakeGPU;\n"
+        @"        return orig.apply(this, arguments);\n"
+        @"      };\n"
+        @"    };\n"
+        @"    if (window.WebGLRenderingContext) patchGL(window.WebGLRenderingContext.prototype);\n"
+        @"    if (window.WebGL2RenderingContext) patchGL(window.WebGL2RenderingContext.prototype);\n"
+        @"    // 4. WebRTC Leak Shield\n"
+        @"    if (window.RTCPeerConnection) {\n"
+        @"      const origCreateOffer = window.RTCPeerConnection.prototype.createOffer;\n"
+        @"      window.RTCPeerConnection.prototype.createOffer = function(opts) {\n"
+        @"        return origCreateOffer.apply(this, arguments);\n"
+        @"      };\n"
+        @"    }\n"
+        @"  } catch(e) {}\n"
+        @"})();",
+        fakeUA, fakeAppVer, (long)gScreenWidth, (long)gScreenHeight, gScreenScale, (long)gCpuCores, (long)gRamGB, fakeGPU];
+}
+
+static id swizzled_WKWebView_initWithFrame_configuration(id self, SEL _cmd, CGRect frame, WKWebViewConfiguration *configuration) {
+    if (!configuration) {
+        configuration = [[WKWebViewConfiguration alloc] init];
+    }
+    if (!configuration.userContentController) {
+        configuration.userContentController = [[WKUserContentController alloc] init];
+    }
+
+    NSString *jsSource = ZTechGenerateWebKitFingerprintScript();
+    WKUserScript *script = [[WKUserScript alloc] initWithSource:jsSource
+                                                  injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                               forMainFrameOnly:NO];
+    [configuration.userContentController addUserScript:script];
+
+    id view = nil;
+    if (gZTechOrigWKInitWithFrameSel && [self respondsToSelector:gZTechOrigWKInitWithFrameSel]) {
+        view = ((id (*)(id, SEL, CGRect, id))objc_msgSend)(self, gZTechOrigWKInitWithFrameSel, frame, configuration);
+    }
+    if (view && [view isKindOfClass:[WKWebView class]]) {
+        WKWebView *wv = (WKWebView *)view;
+        NSString *fakeUA = gWebKitUserAgent ?: [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
+        @try {
+            [wv setCustomUserAgent:fakeUA];
+        } @catch (NSException *e) {}
+    }
+    return view;
+}
+
+static void swizzled_WKWebView_setCustomUserAgent(id self, SEL _cmd, NSString *userAgent) {
+    NSString *sanitized = ZTechSanitizeHeaderString(userAgent);
+    if (!sanitized || sanitized.length == 0 || [sanitized containsString:@"15_5"] || [sanitized containsString:@"15.5"]) {
+        sanitized = gWebKitUserAgent ?: [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
+    }
+    if (gZTechOrigWKSetUASel && [self respondsToSelector:gZTechOrigWKSetUASel]) {
+        ((void (*)(id, SEL, id))objc_msgSend)(self, gZTechOrigWKSetUASel, sanitized);
+    }
+}
+
+#pragma mark - Anti-Jailbreak File System & Dyld Cloaking Engine
+
+static inline BOOL ZTechIsJailbreakPath(const char *path) {
+    if (!path || path[0] == '\0') return NO;
+    if (strstr(path, "com.ztech") != NULL || strstr(path, "_zt_") != NULL || strstr(path, "ztech_") != NULL) {
+        return NO;
+    }
+    if (strstr(path, "/var/jb") != NULL ||
+        strstr(path, "libellekit") != NULL ||
+        strstr(path, "libsubstrate") != NULL ||
+        strstr(path, "libsubstitute") != NULL ||
+        strstr(path, "TweakInject") != NULL ||
+        strstr(path, "MobileSubstrate") != NULL ||
+        strstr(path, "Sileo") != NULL ||
+        strstr(path, "Cydia") != NULL ||
+        strstr(path, "Zebra") != NULL ||
+        strstr(path, "Filza") != NULL ||
+        strstr(path, "/bin/sh") != NULL ||
+        strstr(path, "/bin/bash") != NULL ||
+        strstr(path, "/private/var/lib/apt") != NULL ||
+        strstr(path, "/var/lib/apt") != NULL ||
+        strstr(path, "/var/lib/dpkg") != NULL ||
+        strstr(path, "/etc/apt") != NULL ||
+        strstr(path, "/Library/MobileSubstrate") != NULL ||
+        strstr(path, "/Applications/Cydia.app") != NULL ||
+        strstr(path, "/Applications/Sileo.app") != NULL ||
+        strstr(path, "/Applications/Zebra.app") != NULL ||
+        strstr(path, "/Applications/Filza.app") != NULL) {
+        return YES;
+    }
+    return NO;
+}
+
+static int (*orig_access)(const char *path, int mode) = NULL;
+static int hooked_access(const char *path, int mode) {
+    if (ZTechIsJailbreakPath(path)) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (orig_access) return orig_access(path, mode);
+    return access(path, mode);
+}
+
+static int (*orig_stat)(const char *path, struct stat *buf) = NULL;
+static int hooked_stat(const char *path, struct stat *buf) {
+    if (ZTechIsJailbreakPath(path)) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (orig_stat) return orig_stat(path, buf);
+    return stat(path, buf);
+}
+
+static int (*orig_lstat)(const char *path, struct stat *buf) = NULL;
+static int hooked_lstat(const char *path, struct stat *buf) {
+    if (ZTechIsJailbreakPath(path)) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (orig_lstat) return orig_lstat(path, buf);
+    return lstat(path, buf);
+}
+
+static const char *(*orig_dyld_get_image_name)(uint32_t image_index) = NULL;
+static const char *hooked_dyld_get_image_name(uint32_t image_index) {
+    const char *name = orig_dyld_get_image_name ? orig_dyld_get_image_name(image_index) : _dyld_get_image_name(image_index);
+    if (name && ZTechIsJailbreakPath(name)) {
+        return "/System/Library/Frameworks/Foundation.framework/Foundation";
+    }
+    return name;
+}
+
+static BOOL (*orig_canOpenURL)(id, SEL, NSURL *) = NULL;
+static BOOL swizzled_canOpenURL(id self, SEL _cmd, NSURL *url) {
+    if (url) {
+        NSString *scheme = [[url scheme] lowercaseString];
+        if ([scheme isEqualToString:@"cydia"] ||
+            [scheme isEqualToString:@"sileo"] ||
+            [scheme isEqualToString:@"zbra"] ||
+            [scheme isEqualToString:@"filza"] ||
+            [scheme isEqualToString:@"undecimus"] ||
+            [scheme isEqualToString:@"santander"]) {
+            return NO;
+        }
+    }
+    if (orig_canOpenURL) return orig_canOpenURL(self, _cmd, url);
+    return NO;
+}
+
 #pragma mark - In-Memory NSUbiquitousKeyValueStore Stub (Prevents SyncedDefaults EXC_GUARD & iCloud KVS Leaks)
 
 @interface ZTechUbiquitousStoreStub : NSObject {
@@ -1823,7 +2050,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.2 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.3 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -1980,7 +2207,42 @@ static void ZTechHookInit(void) {
                     }
                 }
             }
-            ZTechHookTrace("[3/6] UIDevice, NSURLSessionConfiguration & Request headers swizzled (arm64e PAC-safe)");
+
+            // Swizzle UIApplication canOpenURL: to hide jailbreak URL schemes
+            Class appCls = objc_getClass("UIApplication");
+            if (appCls) {
+                Method mCanOpen = class_getInstanceMethod(appCls, @selector(canOpenURL:));
+                if (mCanOpen) {
+                    orig_canOpenURL = (void *)method_getImplementation(mCanOpen);
+                    method_setImplementation(mCanOpen, (IMP)swizzled_canOpenURL);
+                }
+            }
+
+            // Swizzle WKWebView for in-app browser fingerprinting & WebRTC protection
+            Class wkCls = objc_getClass("WKWebView");
+            if (wkCls) {
+                Method mInit = class_getInstanceMethod(wkCls, @selector(initWithFrame:configuration:));
+                if (mInit) {
+                    SEL origSel = sel_registerName("_ztech_orig_initWithFrame:configuration:");
+                    if (class_addMethod(wkCls, origSel, (IMP)swizzled_WKWebView_initWithFrame_configuration, method_getTypeEncoding(mInit))) {
+                        Method mSwizInit = class_getInstanceMethod(wkCls, origSel);
+                        if (mSwizInit) method_exchangeImplementations(mInit, mSwizInit);
+                        gZTechOrigWKInitWithFrameSel = origSel;
+                    }
+                }
+                Method mSetUA = class_getInstanceMethod(wkCls, @selector(setCustomUserAgent:));
+                if (mSetUA) {
+                    SEL origSel = sel_registerName("_ztech_orig_setCustomUserAgent:");
+                    if (class_addMethod(wkCls, origSel, (IMP)swizzled_WKWebView_setCustomUserAgent, method_getTypeEncoding(mSetUA))) {
+                        Method mSwizSetUA = class_getInstanceMethod(wkCls, origSel);
+                        if (mSwizSetUA) method_exchangeImplementations(mSetUA, mSwizSetUA);
+                        gZTechOrigWKSetUASel = origSel;
+                    }
+                }
+                ZTechHookTrace("[WebKit] WKWebView fingerprinted & isolated with DocumentStart UserScript");
+            }
+
+            ZTechHookTrace("[3/6] UIDevice, NSURLSessionConfiguration, WKWebView & Request headers swizzled (arm64e PAC-safe)");
         } @catch (NSException *e) {
             ZTechHookTrace([[NSString stringWithFormat:@"[3/6 ERROR] UIDevice swizzle exception: %@", e] UTF8String]);
         }
@@ -2059,6 +2321,18 @@ static void ZTechHookInit(void) {
             if (raw_IOReg) {
                 pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
             }
+
+            void *raw_access = dlsym(RTLD_DEFAULT, "access");
+            if (raw_access) pMSHook(raw_access, (void *)hooked_access, (void **)&orig_access);
+
+            void *raw_stat = dlsym(RTLD_DEFAULT, "stat");
+            if (raw_stat) pMSHook(raw_stat, (void *)hooked_stat, (void **)&orig_stat);
+
+            void *raw_lstat = dlsym(RTLD_DEFAULT, "lstat");
+            if (raw_lstat) pMSHook(raw_lstat, (void *)hooked_lstat, (void **)&orig_lstat);
+
+            void *raw_dyld = dlsym(RTLD_DEFAULT, "_dyld_get_image_name");
+            if (raw_dyld) pMSHook(raw_dyld, (void *)hooked_dyld_get_image_name, (void **)&orig_dyld_get_image_name);
         }
 
         struct utsname verifyUts;

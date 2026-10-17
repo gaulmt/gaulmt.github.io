@@ -113,11 +113,11 @@ jobs:
           Origin: quang lam marketing Official Repo
           Label: quang lam marketing
           Suite: stable
-          Version: 5.6.2
+          Version: 5.6.3
           Codename: ios
           Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
           Components: main
-          Description: Nguon cai dat quang lam marketing v5.6.2 truc tiep tren Sileo & Zebra (Universal Dynamic Hardware Spoofing across all 37 iPhone models)
+          Description: Nguon cai dat quang lam marketing v5.6.3 truc tiep tren Sileo & Zebra (WebKit Browser Fingerprint Spoofing + Anti-Jailbreak Shield)
           EOF
 
           cat << 'EOF' > depiction.json
@@ -132,11 +132,11 @@ jobs:
                   {
                     "class": "DepictionSubheaderView",
                     "useBoldText": true,
-                    "title": "quang lam marketing v5.6.2 - Universal Dynamic Hardware Spoofing"
+                    "title": "quang lam marketing v5.6.3 - WebKit Fingerprint Spoofing & Anti-Jailbreak"
                   },
                   {
                     "class": "DepictionMarkdownView",
-                    "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.6.2**:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Tự động chặn và ghi đè toàn bộ model, board-id, OS version thật sang thông số máy ảo đã chọn.\n- **Hậu Xử Lý Động Sysctl & IOKit**: Xoá sạch mọi dấu vết model máy thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent Động**: Tự động chuyển đổi `Scale/2.00` và `Scale/3.00`, User-Agent, model header linh hoạt theo thiết bị mục tiêu.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
+                    "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.6.3**:\n\n- **WebKit In-App Browser Fingerprint Engine**: Tiêm UserScript chế độ DocumentStart vào `WKWebView`, fake toàn diện `navigator.userAgent`, `screen.width/height`, `devicePixelRatio`, `hardwareConcurrency`, `deviceMemory` và WebGL GPU (`Apple A18 Pro GPU`), chặn rò rỉ IP qua WebRTC.\n- **Lá Chắn Ẩn Môi Trường Jailbreak (Anti-Jailbreak Shield)**: Chặn đứng các lệnh kiểm tra file hệ thống `access`, `stat`, `lstat` với các tệp jailbreak (`/var/jb`, `Sileo`, `TweakInject`...), ẩn dylib trong `_dyld_get_image_name` và vô hiệu hoá URL schemes `canOpenURL:`.\n- **Bắt Trọn Kết Quả MobileGestalt & Sysctl**: Tự động chặn và ghi đè toàn bộ model, board-id, OS version thật sang thông số máy ảo đã chọn.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
                   }
                 ]
               }
@@ -167,7 +167,7 @@ jobs:
             <div class="card">
               <img class="logo" src="CydiaIcon@3x.png" alt="GT Logo">
               <h1>quang lam marketing</h1>
-              <div class="sub">Nguồn cài đặt v5.6.2 trực tiếp vào Sileo & Zebra</div>
+              <div class="sub">Nguồn cài đặt v5.6.3 trực tiếp vào Sileo & Zebra</div>
               <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">➕ Thêm nguồn vào Sileo ngay</a>
               <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">➕ Thêm nguồn vào Zebra</a>
               <a class="btn btn-zebra" href="apple-magnifier://install?url=https://gaulmt.github.io/debs/gaulmt_Tech_TrollStore.tipa">⚡ Cài trực tiếp qua TrollStore</a>

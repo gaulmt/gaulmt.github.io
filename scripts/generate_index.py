@@ -203,17 +203,18 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.6.2 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.6.3 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
-        <span class="badge badge-gold">Universal Spoofing</span>
+        <span class="badge badge-gold">WebKit Fingerprint</span>
+        <span class="badge badge-gold">Anti-Jailbreak</span>
         <span class="badge badge-ios">Rootless</span>
         <span class="badge badge-ios">Rootful</span>
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bộ công cụ đổi thông số máy 37 dòng iPhone không sót dấu vết máy thật trong Zalo & AIDA64. Hỗ trợ Respring tự động và MobileGestalt hook.
+        Bản phát hành v5.6.3: WebKit In-App Browser Fingerprint Spoofing, Lá chắn ẩn môi trường Jailbreak (Anti-Jailbreak Shield), MobileGestalt &amp; Sysctl Hook, 100% không sót dấu vết máy thật trong Zalo &amp; AIDA64.
       </div>
       <div class="product-actions">
         <a class="action-link" href="sileo://package/com.ztech.devicechanger">Cài trên Sileo</a>

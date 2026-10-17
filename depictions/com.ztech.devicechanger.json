@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.6.2"
+          "title": "quang lam marketing v5.6.3 - WebKit Fingerprint Spoofing & Anti-Jailbreak"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Công cụ **quang lam marketing v5.6.2**:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Tự động chặn và ghi đè model, board-id, OS version thật sang thông số máy ảo.\n- **Hậu Xử Lý Động Sysctl & IOKit**: Xoá sạch mọi dấu vết model máy thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent Động**: Tự động chuyển đổi `Scale/2.00` và `Scale/3.00`, User-Agent, model header linh hoạt theo thiết bị mục tiêu.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Tương thích hoàn toàn Zalo, AIDA64 và các ứng dụng quét phần cứng."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.6.3**:\n\n- **WebKit In-App Browser Fingerprint Engine**: Tiêm UserScript chế độ DocumentStart vào `WKWebView`, fake toàn diện `navigator.userAgent`, `screen.width/height`, `devicePixelRatio`, `hardwareConcurrency`, `deviceMemory` và WebGL GPU (`Apple A18 Pro GPU`), chặn rò rỉ IP qua WebRTC.\n- **Lá Chắn Ẩn Môi Trường Jailbreak (Anti-Jailbreak Shield)**: Chặn đứng các lệnh kiểm tra file hệ thống `access`, `stat`, `lstat` với các tệp jailbreak (`/var/jb`, `Sileo`, `TweakInject`...), ẩn dylib trong `_dyld_get_image_name` và vô hiệu hoá URL schemes `canOpenURL:`.\n- **Bắt Trọn Kết Quả MobileGestalt & Sysctl**: Tự động chặn và ghi đè toàn bộ model, board-id, OS version thật sang thông số máy ảo đã chọn.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Thuật toán so khớp dấu thời gian đảm bảo Zalo luôn nạp đúng profile vừa lưu trên tool."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.6.2"
+          "text": "5.6.3"
         },
         {
           "class": "DepictionTableTextView",

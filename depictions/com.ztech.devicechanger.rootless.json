@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/CydiaIcon@3x.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "quang lam marketing (Rootless) v5.6.4"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Bản phát hành đặc biệt **Rootless v5.6.4** dành cho Dopamine, palera1n (iOS 15 - 16+):\n\n- **Hook Toàn Diện MGCopyAnswer & MobileGestalt**: Sửa triệt để lỗi rò rỉ model gốc (iPhone 11) khi tạo tài khoản Zalo. MGCopyAnswer, MGCopyAnswerWithError được hook qua cả Substrate/ElleKit pMSHook và Mach-O GOT Rebinding.\n- **Đồng Bộ Dấu Vân Tay Phần Cứng Siêu Sâu**: Giả lập toàn bộ SerialNumber, UDID, MAC Address (Wifi & Bluetooth), IMEI, SystemConfiguration (ComputerName / LocalHostName), CFCopySystemVersionDictionary chuẩn chỉ 100% không còn xung đột giữa các tầng hệ điều hành.\n- **Chuẩn Hóa POSIX uname & sysctl**: Trả về nodename 'iPhone' chuẩn Apple, bổ sung kern.osversion, kern.hostname, loại trừ nguy cơ bị bộ lọc Anti-Fraud của Zalo gắn cờ nghi vấn máy ảo.\n- **WebKit In-App Browser Fingerprint Engine**: Tiêm UserScript DocumentStart vào WKWebView, chặn rò rỉ WebGL / WebRTC."
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Nhà phát triển",
+          "text": "quang lam marketing"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "5.6.4"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Môi trường",
+          "text": "Rootless (Dopamine / palera1n)"
+        }
+      ]
+    }
+  ]
+}

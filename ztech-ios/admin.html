@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>gaulmt -Tech · Hệ Thống Quản Trị Bản Quyền iOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #070807;
+      --bg-surface: #0f120f;
+      --bg-elevated: #161a16;
+      --bg-input: #0a0c0a;
+      --border-subtle: rgba(222, 200, 130, 0.14);
+      --border-strong: rgba(222, 200, 130, 0.35);
+      --gold-primary: #e5d196;
+      --gold-bright: #f3e5b5;
+      --gold-dim: rgba(229, 209, 150, 0.12);
+      --text-main: #f4f6f4;
+      --text-secondary: #9ca59c;
+      --text-muted: #646d64;
+      --green-text: #4ade80;
+      --green-bg: rgba(74, 222, 128, 0.10);
+      --green-border: rgba(74, 222, 128, 0.28);
+      --red-text: #f87171;
+      --red-bg: rgba(248, 113, 113, 0.10);
+      --red-border: rgba(248, 113, 113, 0.28);
+      --amber-text: #fbbf24;
+      --amber-bg: rgba(251, 191, 36, 0.10);
+      --amber-border: rgba(251, 191, 36, 0.28);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-base);
+      background-image:
+        radial-gradient(circle at 15% 0%, rgba(229, 209, 150, 0.06) 0%, transparent 45%),
+        radial-gradient(circle at 85% 10%, rgba(74, 222, 128, 0.03) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 28px 24px 72px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    svg.icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex-shrink: 0;
+    }
+    svg.icon-sm { width: 14px; height: 14px; }
+    svg.icon-lg { width: 20px; height: 20px; }
+
+    /* Top Navigation Bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      margin-bottom: 22px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #1b1f19, #0d100d);
+      border: 1.5px solid var(--gold-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(229, 209, 150, 0.15);
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .version-chip {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--gold-dim);
+      color: var(--gold-primary);
+      border: 1px solid var(--border-strong);
+      letter-spacing: 0.4px;
+    }
+
+    .brand-sub {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .conn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 13px;
+      border-radius: 10px;
+      background: var(--green-bg);
+      border: 1px solid var(--green-border);
+      color: var(--green-text);
+      font-size: 12.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    /* Metric Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    @media (max-width: 860px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .topbar { flex-direction: column; align-items: flex-start; }
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border-strong); }
+
+    .stat-info .stat-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .stat-info .stat-value {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .stat-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Section Cards */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 22px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      flex-wrap: wrap;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: var(--gold-dim);
+      border: 1px solid var(--border-strong);
+      color: var(--gold-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.1px;
+    }
+
+    .card-subtitle {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    /* Form Controls */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 720px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .field-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrap svg.field-icon {
+      position: absolute;
+      left: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    input, select {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px 0 40px;
+      background: var(--bg-input);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 11px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input::placeholder {
+      color: var(--text-muted);
+      text-transform: none;
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+    }
+
+    input.mono-upper {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--gold-primary);
+      box-shadow: 0 0 0 3px rgba(229, 209, 150, 0.12);
+    }
+
+    /* Buttons */
+    .btn {
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      height: 40px;
+      padding: 0 15px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 13.5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary {
+      height: 46px;
+      width: 100%;
+      background: linear-gradient(180deg, var(--gold-bright), var(--gold-primary));
+      color: #17150d;
+      font-weight: 700;
+      font-size: 14.5px;
+      box-shadow: 0 4px 16px rgba(229, 209, 150, 0.20);
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+
+    .btn-ghost {
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.10);
+    }
+    .btn-ghost:hover {
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+    }
+
+    .btn-sm {
+      height: 32px;
+      padding: 0 10px;
+      font-size: 12px;
+      border-radius: 8px;
+      gap: 5px;
+    }
+
+    .btn-success {
+      background: var(--green-bg);
+      color: var(--green-text);
+      border-color: var(--green-border);
+    }
+    .btn-success:hover { background: rgba(74, 222, 128, 0.18); }
+
+    .btn-danger {
+      background: var(--red-bg);
+      color: var(--red-text);
+      border-color: var(--red-border);
+    }
+    .btn-danger:hover { background: rgba(248, 113, 113, 0.18); }
+
+    .btn-amber {
+      background: var(--amber-bg);
+      color: var(--amber-text);
+      border-color: var(--amber-border);
+    }
+    .btn-amber:hover { background: rgba(251, 191, 36, 0.18); }
+
+    /* Created Key Result Banner */
+    .result-banner {
+      display: none;
+      margin-top: 16px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      background: rgba(229, 209, 150, 0.07);
+      border: 1px dashed var(--gold-primary);
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .result-banner.show { display: flex; }
+
+    .result-key-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--gold-bright);
+      letter-spacing: 0.5px;
+    }
+
+    /* Data Table */
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      background: var(--bg-input);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 820px;
+    }
+
+    th {
+      text-align: left;
+      padding: 13px 16px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 16px;
+      font-size: 13.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
+
+    .code-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 7px;
+      background: var(--bg-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--gold-bright);
+    }
+
+    .hwid-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    .status-pill.active {
+      background: var(--green-bg);
+      color: var(--green-text);
+      border: 1px solid var(--green-border);
+    }
+    .status-pill.locked {
+      background: var(--red-bg);
+      color: var(--red-text);
+      border: 1px solid var(--red-border);
+    }
+    .status-pill.wait {
+      background: var(--amber-bg);
+      color: var(--amber-text);
+      border: 1px solid var(--amber-border);
+    }
+
+    .actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    /* Login Overlay */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-base);
+      background-image: radial-gradient(circle at 50% 25%, rgba(229, 209, 150, 0.08) 0%, transparent 50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 410px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      padding: 32px 28px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      text-align: center;
+    }
+
+    /* Toast Notification */
+    #toastContainer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: #141814;
+      border: 1px solid var(--gold-primary);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+      animation: slideIn 0.2s ease-out;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toastContainer"></div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="brand-logo" style="width:58px;height:58px;margin:0 auto 16px;border-radius:16px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e5d196" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <h2 style="font-size:21px;font-weight:800;color:#fff;margin-bottom:6px;">gaulmt -Tech Admin</h2>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:22px;">Hệ thống Quản lý Bản quyền Zalo iOS · Enterprise Cloud Server</p>
+
+      <div class="input-wrap" style="margin-bottom:14px;">
+        <svg class="icon field-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input type="password" id="adminPassInput" placeholder="Nhập mật khẩu quản trị viên..." onkeydown="if(event.key==='Enter')checkLogin()">
+      </div>
+
+      <div id="loginErr" style="color:var(--red-text);font-size:12.5px;font-weight:600;margin-bottom:12px;display:none;">
+        Mật khẩu quản trị không chính xác!
+      </div>
+
+      <button class="btn btn-primary" onclick="checkLogin()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Đăng Nhập Hệ Thống
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN DASHBOARD -->
+  <div class="container" id="mainApp" style="display:none;">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e5d196" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">
+            Quản Lý Key Zalo iOS
+            <span class="version-chip">v5.0 ENTERPRISE</span>
+          </div>
+          <div class="brand-sub">Hệ thống Máy chủ Bản quyền Độc quyền · Khoá & Thu hồi quyền truy cập 0ms</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="conn-pill" id="connBadge">
+          <span class="pulse-dot"></span>
+          <span id="connText">Cloud Server Online</span>
+        </div>
+        <button class="btn btn-ghost" onclick="fetchAllKeys()">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Đồng bộ
+        </button>
+        <button class="btn btn-ghost" onclick="logoutAdmin()">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Thoát
+        </button>
+      </div>
+    </div>
+
+    <!-- STATS GRID -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-info">
+          <div class="stat-label">TỔNG SỐ KEY</div>
+          <div class="stat-value" id="statTotal" style="color:var(--gold-bright);">0</div>
+        </div>
+        <div class="stat-icon-box" style="background:var(--gold-dim);color:var(--gold-primary);border:1px solid var(--border-strong);">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-info">
+          <div class="stat-label">ĐANG HOẠT ĐỘNG</div>
+          <div class="stat-value" id="statActive" style="color:var(--green-text);">0</div>
+        </div>
+        <div class="stat-icon-box" style="background:var(--green-bg);color:var(--green-text);border:1px solid var(--green-border);">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-info">
+          <div class="stat-label">ĐÃ GẮN MÁY (HWID)</div>
+          <div class="stat-value" id="statBound" style="color:var(--amber-text);">0</div>
+        </div>
+        <div class="stat-icon-box" style="background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber-border);">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-info">
+          <div class="stat-label">ĐÃ THU HỒI / KHOÁ</div>
+          <div class="stat-value" id="statLocked" style="color:var(--red-text);">0</div>
+        </div>
+        <div class="stat-icon-box" style="background:var(--red-bg);color:var(--red-text);border:1px solid var(--red-border);">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDING DEVICES (1-CLICK APPROVAL) -->
+    <div class="card" id="pendingCard" style="display:none;border-color:var(--border-strong);">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title-icon">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Thiết Bị Đang Chờ Duyệt Mở Khoá Nhanh</div>
+            <div class="card-subtitle">Khách vừa nhấn "Kích hoạt Bản quyền" trên iPhone — bấm Duyệt là máy khách tự mở khoá không cần gõ Key</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã thiết bị (HWID)</th>
+              <th>Thời gian gửi yêu cầu</th>
+              <th>Thao tác duyệt 1-chạm</th>
+            </tr>
+          </thead>
+          <tbody id="pendingTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CREATE NEW KEY -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title-icon">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Khởi Tạo Key Bản Quyền Mới</div>
+            <div class="card-subtitle">Cơ chế bảo vệ 1 Key = 1 Thiết bị (HWID) · Tự động gắn máy ngay lần kích hoạt đầu tiên</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field-group">
+          <label>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Tên khách hàng / Ghi chú Zalo
+          </label>
+          <div class="input-wrap">
+            <svg class="icon field-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input type="text" id="ownerInput" placeholder="Ví dụ: Anh Tuấn - Zalo 0988...">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Gói thời hạn sử dụng
+          </label>
+          <div class="input-wrap">
+            <svg class="icon field-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <select id="durationSelect">
+              <option value="1">1 Ngày (Gói Dùng Thử)</option>
+              <option value="7">7 Ngày (Gói 1 Tuần)</option>
+              <option value="30" selected>30 Ngày (Gói 1 Tháng)</option>
+              <option value="90">90 Ngày (Gói 3 Tháng)</option>
+              <option value="365">365 Ngày (Gói 1 Năm)</option>
+              <option value="LIFETIME">Vĩnh Viễn (Lifetime VIP)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            Mã máy cố định (Để trống = Tự khoá vào máy đầu tiên nhập)
+          </label>
+          <div class="input-wrap">
+            <svg class="icon field-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+            <input type="text" id="hwidInput" class="mono-upper" placeholder="Để trống tự nhận máy, hoặc nhập GT-XXXX-XXXX" oninput="this.value=this.value.toUpperCase()">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            Mã Key tuỳ chỉnh (Để trống = Tự sinh mã ngắn GT-XXXX)
+          </label>
+          <div class="input-wrap">
+            <svg class="icon field-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <input type="text" id="customKeyInput" class="mono-upper" placeholder="Để trống hệ thống tự tạo mã GT-XXXX..." oninput="this.value=this.value.toUpperCase()">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="createLicenseKey()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Khởi Tạo Key Bản Quyền & Kích Hoạt Ngay
+      </button>
+
+      <div class="result-banner" id="resultBox">
+        <div>
+          <div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:4px;">
+            Đã khởi tạo Key thành công cho khách hàng <strong id="resOwner" style="color:#fff;"></strong>:
+          </div>
+          <div class="result-key-code" id="resKey"></div>
+        </div>
+        <button class="btn btn-ghost" onclick="copyGeneratedKey()">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Sao chép mã Key
+        </button>
+      </div>
+    </div>
+
+    <!-- LICENSE TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title-icon">
+            <svg class="icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <div>
+            <div class="card-title">Danh Sách Key Bản Quyền Đang Quản Lý</div>
+            <div class="card-subtitle" id="syncStatus">Đang đồng bộ dữ liệu thời gian thực từ Máy chủ...</div>
+          </div>
+        </div>
+
+        <div class="input-wrap" style="width:320px;max-width:100%;">
+          <svg class="icon field-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchInput" placeholder="Tìm khách hàng, mã Key, mã máy..." oninput="renderTable()" style="height:38px;font-size:13px;">
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Khách hàng</th>
+              <th>Mã Key Bản Quyền</th>
+              <th>Thiết Bị Gắn Kết (HWID)</th>
+              <th>Hạn Sử Dụng</th>
+              <th>Trạng Thái</th>
+              <th style="text-align:right;">Điều Khiển Tức Thì</th>
+            </tr>
+          </thead>
+          <tbody id="keysTableBody">
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Đang đồng bộ dữ liệu...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const CLOUD_API_URL = atob("aHR0cHM6Ly9yaWdodC1jYXQtMjA5NjM5LnVwc3Rhc2guaW8=");
+    const CLOUD_API_TOKEN = atob("Z1FBQUFBQUFBekxuQUFJZ2NERmlZelUwTkRCaU9HSm1ZekUwT1RGbVlXUTJZVFV6WVRnNE0yTXdZbU5sTkE=");
+    const DB_LICENSES_NODE = "ztech:licenses";
+    const DB_PENDING_NODE = "ztech:pending_devices";
+    const ADMIN_PASS = "admin123";
+
+    let allKeysList = [];
+    let pendingList = [];
+    let lastGeneratedKey = "";
+
+    // SVG Icon Helpers
+    const ICONS = {
+      copy: `<svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+      lock: `<svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+      unlock: `<svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
+      refresh: `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>`,
+      plus: `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+      trash: `<svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+      check: `<svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
+      phone: `<svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`
+    };
+
+    function showToast(msg) {
+      const wrap = document.getElementById("toastContainer");
+      const el = document.createElement("div");
+      el.className = "toast";
+      el.innerHTML = `${ICONS.check} <span>${msg}</span>`;
+      wrap.appendChild(el);
+      setTimeout(() => { el.remove(); }, 2800);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      if (sessionStorage.getItem("ztech_admin_logged") === "1") {
+        showMainApp();
+      }
+    });
+
+    function checkLogin() {
+      const val = document.getElementById("adminPassInput").value;
+      if (val === ADMIN_PASS) {
+        sessionStorage.setItem("ztech_admin_logged", "1");
+        document.getElementById("loginErr").style.display = "none";
+        showMainApp();
+      } else {
+        document.getElementById("loginErr").style.display = "block";
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem("ztech_admin_logged");
+      location.reload();
+    }
+
+    function showMainApp() {
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      fetchAllKeys();
+    }
+
+    async function cloudCmd(cmdArray) {
+      const resp = await fetch(CLOUD_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${CLOUD_API_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(cmdArray)
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      return data.result;
+    }
+
+    function randomKeyString() {
+      const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+      const seg = () => Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+      return `GT-${seg()}`;
+    }
+
+    function computeExpiryDate(durVal) {
+      if (durVal === "LIFETIME") return "LIFETIME";
+      const days = parseInt(durVal, 10) || 30;
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    async function fetchAllKeys() {
+      const statusEl = document.getElementById("syncStatus");
+      statusEl.textContent = "Đang đồng bộ dữ liệu thời gian thực từ Máy chủ...";
+      try {
+        const [rawArr, rawPending] = await Promise.all([
+          cloudCmd(["HGETALL", DB_LICENSES_NODE]),
+          cloudCmd(["HGETALL", DB_PENDING_NODE])
+        ]);
+
+        const list = [];
+        if (Array.isArray(rawArr)) {
+          for (let i = 0; i < rawArr.length; i += 2) {
+            const k = rawArr[i];
+            const valStr = rawArr[i + 1];
+            try {
+              const parsed = JSON.parse(valStr);
+              parsed.key = parsed.key || k;
+              list.push(parsed);
+            } catch (e) {}
+          }
+        }
+        list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+        allKeysList = list;
+
+        const pList = [];
+        if (Array.isArray(rawPending)) {
+          for (let i = 0; i < rawPending.length; i += 2) {
+            const h = rawPending[i];
+            const vStr = rawPending[i + 1];
+            try {
+              const pObj = JSON.parse(vStr);
+              pObj.hwid = pObj.hwid || h;
+              pList.push(pObj);
+            } catch (e) {}
+          }
+        }
+        pendingList = pList;
+
+        renderPendingTable();
+        renderTable();
+        statusEl.textContent = `Đã kết nối Máy chủ Bản quyền (${allKeysList.length} Key đang lưu trữ) · Mọi thao tác Khoá / Thu hồi có hiệu lực tức thì`;
+      } catch (err) {
+        statusEl.textContent = "Lỗi kết nối Máy chủ: " + err.message;
+      }
+    }
+
+    function renderPendingTable() {
+      const card = document.getElementById("pendingCard");
+      const tbody = document.getElementById("pendingTableBody");
+      if (!pendingList || pendingList.length === 0) {
+        card.style.display = "none";
+        return;
+      }
+      card.style.display = "block";
+      tbody.innerHTML = pendingList.map(item => `
+        <tr>
+          <td><span class="code-badge">${ICONS.phone} ${item.hwid}</span></td>
+          <td style="color:var(--text-secondary);">${item.requestedAt ? new Date(item.requestedAt).toLocaleString("vi-VN") : "Vừa xong"}</td>
+          <td>
+            <div class="actions-row">
+              <button class="btn btn-success btn-sm" onclick="quickApproveDevice('${item.hwid}', '30')">${ICONS.check} Duyệt 30 Ngày</button>
+              <button class="btn btn-ghost btn-sm" onclick="quickApproveDevice('${item.hwid}', '7')">${ICONS.plus} 7 Ngày</button>
+              <button class="btn btn-amber btn-sm" onclick="quickApproveDevice('${item.hwid}', 'LIFETIME')">${ICONS.check} Vĩnh Viễn</button>
+              <button class="btn btn-danger btn-sm" onclick="dismissPending('${item.hwid}')">${ICONS.trash} Bỏ qua</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function quickApproveDevice(hwid, durVal) {
+      const owner = prompt(`Nhập tên khách hàng cho thiết bị ${hwid}:`, `Khách (${hwid})`);
+      if (owner === null) return;
+      const key = randomKeyString();
+      const expires = computeExpiryDate(durVal);
+      const entry = {
+        key: key,
+        hwid: hwid,
+        owner: owner || `Khách ${hwid}`,
+        expires: expires,
+        status: "active",
+        createdAt: new Date().toISOString()
+      };
+      await cloudCmd(["HSET", DB_LICENSES_NODE, key, JSON.stringify(entry)]);
+      await cloudCmd(["HDEL", DB_PENDING_NODE, hwid]);
+      await fetchAllKeys();
+      showToast(`Đã duyệt thiết bị ${hwid} (Key: ${key})`);
+    }
+
+    async function dismissPending(hwid) {
+      await cloudCmd(["HDEL", DB_PENDING_NODE, hwid]);
+      await fetchAllKeys();
+      showToast(`Đã xoá yêu cầu chờ của ${hwid}`);
+    }
+
+    async function createLicenseKey() {
+      const owner = document.getElementById("ownerInput").value.trim() || "Khách VIP";
+      const dur = document.getElementById("durationSelect").value;
+      const hwid = document.getElementById("hwidInput").value.trim().toUpperCase();
+      const customKey = document.getElementById("customKeyInput").value.trim().toUpperCase();
+
+      const key = customKey || randomKeyString();
+      const expires = computeExpiryDate(dur);
+
+      const entry = {
+        key: key,
+        hwid: hwid,
+        owner: owner,
+        expires: expires,
+        status: "active",
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        await cloudCmd(["HSET", DB_LICENSES_NODE, key, JSON.stringify(entry)]);
+        if (hwid) {
+          await cloudCmd(["HDEL", DB_PENDING_NODE, hwid]);
+        }
+        lastGeneratedKey = key;
+        document.getElementById("resOwner").textContent = owner;
+        document.getElementById("resKey").textContent = key;
+        document.getElementById("resultBox").classList.add("show");
+        document.getElementById("customKeyInput").value = "";
+        await fetchAllKeys();
+        showToast(`Đã tạo Key ${key} thành công!`);
+      } catch (e) {
+        showToast("Lỗi khi lưu Key: " + e.message);
+      }
+    }
+
+    function copyGeneratedKey() {
+      if (!lastGeneratedKey) return;
+      navigator.clipboard.writeText(lastGeneratedKey);
+      showToast("Đã sao chép Key: " + lastGeneratedKey);
+    }
+
+    function copyText(txt) {
+      navigator.clipboard.writeText(txt);
+      showToast("Đã sao chép: " + txt);
+    }
+
+    async function toggleRevokeKey(keyStr) {
+      const item = allKeysList.find(x => x.key === keyStr);
+      if (!item) return;
+      item.status = (item.status === "active") ? "locked" : "active";
+      await cloudCmd(["HSET", DB_LICENSES_NODE, item.key, JSON.stringify(item)]);
+      await fetchAllKeys();
+      showToast(item.status === "active" ? `Đã mở lại Key ${item.key}` : `Đã thu hồi Key ${item.key}`);
+    }
+
+    async function resetDeviceHWID(keyStr) {
+      const item = allKeysList.find(x => x.key === keyStr);
+      if (!item) return;
+      if (!confirm(`Gỡ Mã máy cũ (${item.hwid || "Trống"}) của khách "${item.owner}" để chuyển sang máy mới?`)) return;
+      item.hwid = "";
+      await cloudCmd(["HSET", DB_LICENSES_NODE, item.key, JSON.stringify(item)]);
+      await fetchAllKeys();
+      showToast(`Đã gỡ mã máy cho Key ${item.key}`);
+    }
+
+    async function extend30Days(keyStr) {
+      const item = allKeysList.find(x => x.key === keyStr);
+      if (!item) return;
+      item.expires = computeExpiryDate("30");
+      item.status = "active";
+      await cloudCmd(["HSET", DB_LICENSES_NODE, item.key, JSON.stringify(item)]);
+      await fetchAllKeys();
+      showToast(`Đã gia hạn +30 ngày cho ${item.key}`);
+    }
+
+    async function deleteLicenseKey(keyStr) {
+      const item = allKeysList.find(x => x.key === keyStr);
+      if (!item || !confirm(`Xoá vĩnh viễn Key "${item.key}" của "${item.owner}"?`)) return;
+      await cloudCmd(["HDEL", DB_LICENSES_NODE, item.key]);
+      await fetchAllKeys();
+      showToast(`Đã xoá vĩnh viễn Key ${item.key}`);
+    }
+
+    function renderTable() {
+      const q = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+      const filtered = allKeysList.filter(item => {
+        if (!q) return true;
+        return (item.owner || "").toLowerCase().includes(q) ||
+               (item.key || "").toLowerCase().includes(q) ||
+               (item.hwid || "").toLowerCase().includes(q);
+      });
+
+      document.getElementById("statTotal").textContent = allKeysList.length;
+      document.getElementById("statActive").textContent = allKeysList.filter(x => x.status === "active").length;
+      document.getElementById("statBound").textContent = allKeysList.filter(x => x.hwid && x.hwid.length > 0).length;
+      document.getElementById("statLocked").textContent = allKeysList.filter(x => x.status !== "active").length;
+
+      const tbody = document.getElementById("keysTableBody");
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Không tìm thấy dữ liệu Key phù hợp</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        const isLocked = item.status !== "active";
+        const statusBadge = isLocked
+          ? `<span class="status-pill locked"><span class="pulse-dot"></span>Đã thu hồi</span>`
+          : `<span class="status-pill active"><span class="pulse-dot"></span>Hoạt động</span>`;
+
+        let hwidDisplay = `<span class="status-pill wait">Chờ nhập máy đầu</span>`;
+        if (item.hwid === "*") {
+          hwidDisplay = `<span class="hwid-badge">${ICONS.phone} Tất cả máy (Master)</span>`;
+        } else if (item.hwid) {
+          hwidDisplay = `<span class="hwid-badge">${ICONS.phone} ${item.hwid}</span>`;
+        }
+
+        const lockBtn = isLocked
+          ? `<button class="btn btn-success btn-sm" onclick="toggleRevokeKey('${item.key}')">${ICONS.unlock} Mở lại</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="toggleRevokeKey('${item.key}')">${ICONS.lock} Thu hồi</button>`;
+
+        return `
+          <tr>
+            <td style="font-weight:700;color:#fff;">${item.owner || "Khách hàng"}</td>
+            <td><span class="code-badge">${item.key}</span></td>
+            <td>${hwidDisplay}</td>
+            <td style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-secondary);">${item.expires}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <div class="actions-row" style="justify-content:flex-end;">
+                <button class="btn btn-ghost btn-sm" onclick="copyText('${item.key}')">${ICONS.copy} Copy</button>
+                ${lockBtn}
+                <button class="btn btn-amber btn-sm" onclick="resetDeviceHWID('${item.key}')">${ICONS.refresh} Đổi máy</button>
+                <button class="btn btn-ghost btn-sm" onclick="extend30Days('${item.key}')">${ICONS.plus} 30 Ngày</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteLicenseKey('${item.key}')">${ICONS.trash} Xoá</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+  </script>
+</body>
+</html>

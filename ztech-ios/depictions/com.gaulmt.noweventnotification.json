@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/icons/now_event.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "Now Event Notification (IUH)"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Ứng dụng theo dõi và thông báo sự kiện Đoàn Thanh niên IUH tức thì cho sinh viên:\n\n- **Bắt Sự Kiện Trực Tuyến**: Cập nhật danh sách sự kiện mới nhất ngay khi Đoàn trường vừa đăng tải.\n- **Đo Lường & Cảnh Báo Slot**: Tự động tính toán tỷ lệ slot đăng ký (100%, 50%, <5%) để thông báo sinh viên vào giữ chỗ kịp thời.\n- **Đồng Bộ Nhanh**: Tích hợp máy chủ Crawler & Push Engine thời gian thực.\n\n*Lưu ý: Đối với thiết bị Android, vui lòng tải trực tiếp file APK từ trang chủ của kho repo gaulmt.github.io.*"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Tác giả",
+          "text": "Nguyễn Đăng Dương & Lê Phước Tài"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "2.1.0"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Hạng mục",
+          "text": "Tiện ích & Học tập"
+        }
+      ]
+    }
+  ]
+}

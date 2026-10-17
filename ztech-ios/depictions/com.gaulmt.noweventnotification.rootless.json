@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/icons/now_event.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "Now Event Notification (Rootless)"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Ứng dụng theo dõi và thông báo sự kiện Đoàn Thanh niên IUH tức thì cho sinh viên (Bản Jailbreak Rootless iOS 14.0 - 17.0+):\n\n- **Bắt Sự Kiện Trực Tuyến**: Cập nhật danh sách sự kiện mới nhất ngay khi Đoàn trường vừa đăng tải.\n- **Đo Lường & Cảnh Báo Slot**: Tự động tính toán tỷ lệ slot đăng ký (100%, 50%, <5%) để thông báo sinh viên vào giữ chỗ kịp thời.\n- **Đồng Bộ Nhanh**: Tích hợp máy chủ Crawler & Push Engine thời gian thực.\n- **Hỗ trợ Jailbreak Rootless**: Tương thích hoàn toàn với Dopamine, palera1n (/var/jb)."
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Tác giả",
+          "text": "Nguyễn Đăng Dương & Lê Phước Tài"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "2.1.0 (Rootless)"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Hạng mục",
+          "text": "Tiện ích & Học tập"
+        }
+      ]
+    }
+  ]
+}

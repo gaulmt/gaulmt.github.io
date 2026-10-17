@@ -1,0 +1,149 @@
+Package: com.gaulmt.noweventnotification
+Version: 2.1.0
+Architecture: iphoneos-arm
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0)
+Filename: debs/NowEventNotification_2.1_iphoneos-arm.deb
+Size: 410052
+MD5sum: ca1b5a413fc7dd9cf22675072769b344
+SHA1: 7f8c41b3344b906f63d172f4cf230131ac7f2f25
+SHA256: 68e6dcdc4d73e0bd919f42dc69ead3af0f7a84dc8d6bb4f074bf4f344e672b94
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (IUH)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.json
+
+Package: com.gaulmt.noweventnotification
+Version: 2.1.0
+Architecture: iphoneos-arm
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0)
+Filename: debs/NowEventNotification_Rootful_arm.deb
+Size: 410052
+MD5sum: ca1b5a413fc7dd9cf22675072769b344
+SHA1: 7f8c41b3344b906f63d172f4cf230131ac7f2f25
+SHA256: 68e6dcdc4d73e0bd919f42dc69ead3af0f7a84dc8d6bb4f074bf4f344e672b94
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (IUH)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.json
+
+Package: com.gaulmt.noweventnotification.rootless
+Version: 2.1.0
+Architecture: iphoneos-arm64
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0), ellekit
+Filename: debs/NowEventNotification_Rootless_arm64.deb
+Size: 410136
+MD5sum: 3797b7e523994bf6cab8194b4b4aaee0
+SHA1: 2d8765aced83e43a1e61c972799301e87996b697
+SHA256: 63d1a93dfd83108072dbe32be3dbe8b20a9a758bd2477f19181e382949f9bb6d
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (Rootless)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.rootless.json
+
+Package: com.ztech.devicechanger
+Version: 5.6.4
+Architecture: iphoneos-arm
+Maintainer: quang lam marketing
+Installed-Size: 1136
+Depends: firmware (>= 12.0), mobilesubstrate
+Filename: debs/gaulmt_Tech_Rootful_arm.deb
+Size: 196212
+MD5sum: 494e3d48327cf82069f9f39e3d981105
+SHA1: 7c73b9ed43335b787a24ea4d7c02451a4748ae62
+SHA256: ac8100da1eb302802a7c93eeeb3f8df1f192ff2238e63da3062ac48a40013a62
+Section: Utilities
+Description: quang lam marketing v5.6.4 - Universal MGCopyAnswer + SystemConfiguration & WebKit Browser Deep Spoofing Shield
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger
+Version: 5.6.4
+Architecture: iphoneos-arm
+Maintainer: quang lam marketing
+Installed-Size: 1136
+Depends: firmware (>= 12.0), mobilesubstrate
+Filename: debs/ZTech_Rootful_arm.deb
+Size: 196212
+MD5sum: 494e3d48327cf82069f9f39e3d981105
+SHA1: 7c73b9ed43335b787a24ea4d7c02451a4748ae62
+SHA256: ac8100da1eb302802a7c93eeeb3f8df1f192ff2238e63da3062ac48a40013a62
+Section: Utilities
+Description: quang lam marketing v5.6.4 - Universal MGCopyAnswer + SystemConfiguration & WebKit Browser Deep Spoofing Shield
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.6.4
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1136
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/gaulmt_Tech_Rootless_arm64.deb
+Size: 196964
+MD5sum: afb14ad397916eb1d65460d6e0457119
+SHA1: 5e38ddfe6fcf1ad22710c362504d15b76d86707b
+SHA256: eb842aa50410721f6b008642e1307f1c5abbba4dd9fd63a432b5b447b85e9ed7
+Section: Utilities
+Description: quang lam marketing v5.6.4 - Universal MGCopyAnswer + SystemConfiguration & WebKit Browser Deep Spoofing Shield
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.6.4
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1136
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/ZTech_Rootless_arm64.deb
+Size: 196964
+MD5sum: afb14ad397916eb1d65460d6e0457119
+SHA1: 5e38ddfe6fcf1ad22710c362504d15b76d86707b
+SHA256: eb842aa50410721f6b008642e1307f1c5abbba4dd9fd63a432b5b447b85e9ed7
+Section: Utilities
+Description: quang lam marketing v5.6.4 - Universal MGCopyAnswer + SystemConfiguration & WebKit Browser Deep Spoofing Shield
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.6.4
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1136
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/com.ztech.devicechanger.rootless_5.6.4_iphoneos-arm64.deb
+Size: 196964
+MD5sum: afb14ad397916eb1d65460d6e0457119
+SHA1: 5e38ddfe6fcf1ad22710c362504d15b76d86707b
+SHA256: eb842aa50410721f6b008642e1307f1c5abbba4dd9fd63a432b5b447b85e9ed7
+Section: Utilities
+Description: quang lam marketing v5.6.4 - Universal MGCopyAnswer + SystemConfiguration & WebKit Browser Deep Spoofing Shield
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+

@@ -189,18 +189,16 @@ jobs:
             python3 "$GITHUB_WORKSPACE/scripts/pack_deb.py" deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             rm -rf deb_rootless
 
-            # 4. Verify both .deb packages exist and have valid size
+            # 4. Verify built packages exist and are non-empty
             echo "=== Verifying Built Packages ==="
-            ls -la "$GITHUB_WORKSPACE/build_out/"*.deb
-            ls -la "$GITHUB_WORKSPACE/build_out/"*.tipa
-            if [ ! -s "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" ]; then
-              echo "### ❌ Missing NowEventNotification_Rootful_arm.deb" >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-            if [ ! -s "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" ]; then
-              echo "### ❌ Missing NowEventNotification_Rootless_arm64.deb" >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
+            for PKG in "NowEventNotification_Rootful_arm.deb" "NowEventNotification_Rootless_arm64.deb" "NowEventNotification.tipa" "NowEventNotification.ipa"; do
+              if [ -s "$GITHUB_WORKSPACE/build_out/$PKG" ]; then
+                echo "Found $PKG: $(wc -c < "$GITHUB_WORKSPACE/build_out/$PKG" | tr -d ' ') bytes"
+              else
+                echo "### ❌ Missing or empty package: $PKG" >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+            done
 
             cd "$GITHUB_WORKSPACE"
           fi

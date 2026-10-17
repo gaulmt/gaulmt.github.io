@@ -12,3 +12,7 @@ NowEvent_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-error
 NowEvent_CODESIGN_FLAGS = -Sentitlements.xml
 
 include $(THEOS_MAKE_PATH)/application.mk
+
+after-stage::
+	mkdir -p $(THEOS_STAGING_DIR)/Applications/NowEvent.app
+	cp -r Resources/* $(THEOS_STAGING_DIR)/Applications/NowEvent.app/ 2>/dev/null || true

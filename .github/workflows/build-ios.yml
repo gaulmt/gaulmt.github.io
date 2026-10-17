@@ -93,6 +93,7 @@ jobs:
             mkdir -p "$GITHUB_WORKSPACE/build_out/Payload"
             NEN_APP=$(find .theos -name "NowEvent.app" -type d | head -n 1)
             if [ -n "$NEN_APP" ] && [ -d "$NEN_APP" ]; then
+              cp -r Resources/* "$NEN_APP/" 2>/dev/null || true
               cp -r "$NEN_APP" "$GITHUB_WORKSPACE/build_out/Payload/NowEvent.app"
               cd "$GITHUB_WORKSPACE/build_out"
               zip -r9 NowEventNotification.tipa Payload

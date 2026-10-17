@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Event Radar — Realtime Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #09090b;
+            --surface: #121215;
+            --card: #18181b;
+            --border: #27272a;
+            --border-hover: #3f3f46;
+            --text-1: #f4f4f5;
+            --text-2: #a1a1aa;
+            --text-3: #71717a;
+            --green: #10b981;
+            --green-dim: rgba(16, 185, 129, 0.12);
+            --amber: #f59e0b;
+            --amber-dim: rgba(245, 158, 11, 0.12);
+            --blue: #3b82f6;
+            --blue-dim: rgba(59, 130, 246, 0.12);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-1);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            line-height: 1.45;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* NAVBAR TỐI GIẢN CHUẨN VERCEL */
+        header {
+            border-bottom: 1px solid var(--border);
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 54px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .brand-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--text-1);
+        }
+
+        .brand-text {
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: -0.01em;
+            color: var(--text-1);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: var(--green-dim);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--green);
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.4; transform: scale(0.9); }
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-2);
+            width: 32px;
+            height: 32px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-icon:hover {
+            color: var(--text-1);
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* HERO GỌN GÀNG */
+        .hero {
+            padding: 20px 0 14px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .hero-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-1);
+        }
+
+        .hero-sync {
+            font-size: 12px;
+            color: var(--text-3);
+            font-family: var(--font-mono);
+        }
+
+        /* 2x2 METRICS GRID TRÊN MOBILE - SIÊU GỌN */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-3);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-1);
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .stat-val small {
+            font-size: 12px;
+            color: var(--text-3);
+            font-weight: 400;
+        }
+
+        .badge-mini {
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* CONTROLS (TABS & SEARCH) */
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .filter-bar {
+            display: flex;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-2);
+            font-size: 12px;
+            font-weight: 500;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-btn.active {
+            background: var(--card);
+            color: var(--text-1);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            max-width: 240px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-1);
+            padding: 6px 10px 6px 28px;
+            border-radius: 7px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--blue);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-3);
+            width: 12px;
+            height: 12px;
+        }
+
+        /* EVENT CARDS */
+        .events-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .event-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            transition: border-color 0.15s;
+        }
+
+        .event-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .event-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .event-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-1);
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .status-chip {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 999px;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+        }
+
+        .chip-open {
+            background: var(--green-dim);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .chip-full {
+            background: var(--amber-dim);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .event-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-3);
+            margin-bottom: 12px;
+        }
+
+        .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* COMPACT PROGRESS BAR */
+        .progress-box {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .progress-count {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--text-1);
+        }
+
+        .progress-delta {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .bar-track {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: var(--blue);
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+
+        .bar-fill.full {
+            background: var(--amber);
+        }
+
+        /* FEED NHẬT KÝ */
+        .feed-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 30px;
+        }
+
+        .feed-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .feed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .feed-item {
+            display: flex;
+            gap: 8px;
+            color: var(--text-2);
+            line-height: 1.4;
+        }
+
+        .feed-time { color: var(--text-3); flex-shrink: 0; }
+        .feed-tag { font-weight: 600; flex-shrink: 0; }
+        .tag-SLOT { color: var(--blue); }
+        .tag-NEW { color: var(--green); }
+        .tag-FULL { color: var(--amber); }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 18px 0;
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-3);
+        }
+
+        /* TỐI ƯU GIAO DIỆN MOBILE (< 640px) */
+        @media (max-width: 640px) {
+            .container { padding: 0 12px; }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .stat-card { padding: 10px 12px; }
+            .stat-val { font-size: 18px; }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .search-box {
+                max-width: 100%;
+            }
+            .event-card { padding: 12px 14px; }
+            .event-title { font-size: 13.5px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container nav-inner">
+            <a href="#" class="brand">
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                <span class="brand-text">Event Radar</span>
+            </a>
+            <div class="nav-right">
+                <div class="live-tag" id="livePill">
+                    <div class="live-dot"></div>
+                    <span id="liveStatusText">LIVE 2s</span>
+                </div>
+                <button class="btn-icon" id="soundBtn" title="Âm thanh">🔔</button>
+                <button class="btn-icon" id="refreshBtn" title="Làm mới">↻</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- HEADER GỌN GÀNG -->
+        <section class="hero">
+            <div class="hero-title">Sự kiện Đoàn trường IUH</div>
+            <div class="hero-sync" id="lastSyncLabel">Đang đồng bộ...</div>
+        </section>
+
+        <!-- 2x2 STATS GRID CHO MOBILE -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">
+                    <span>Tổng sự kiện</span>
+                    <span class="badge-mini" style="background:var(--blue-dim); color:var(--blue);" id="badgeOpen">--</span>
+                </div>
+                <div class="stat-val" id="valTotal">--</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">
+                    <span>Chu kỳ quét</span>
+                    <span class="badge-mini" style="background:var(--green-dim); color:var(--green);" id="badgeMode">NORMAL</span>
+                </div>
+                <div class="stat-val" id="valSpeed">10s</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">
+                    <span>Đã đăng ký</span>
+                    <span class="badge-mini" style="background:rgba(255,255,255,0.06); color:var(--text-2);" id="valRate">--%</span>
+                </div>
+                <div class="stat-val" id="valFilled">-- <small id="valMax">/ --</small></div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">
+                    <span>Webhook</span>
+                    <span class="badge-mini" style="background:var(--amber-dim); color:var(--amber);" id="badgeWebhook">ACTIVE</span>
+                </div>
+                <div class="stat-val" id="valWebhooks">0</div>
+            </div>
+        </section>
+
+        <!-- THANH ĐIỀU KHIỂN -->
+        <div class="controls">
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="all">Tất cả (<span id="cAll">0</span>)</button>
+                <button class="filter-btn" data-filter="open">Đang mở (<span id="cOpen">0</span>)</button>
+                <button class="filter-btn" data-filter="full">Đã đầy (<span id="cFull">0</span>)</button>
+            </div>
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="searchInput" class="search-input" placeholder="Tìm sự kiện...">
+            </div>
+        </div>
+
+        <!-- DANH SÁCH SỰ KIỆN -->
+        <div class="events-list" id="eventsList">
+            <div style="text-align:center; padding:30px 0; color:var(--text-3); font-size:13px;">
+                Đang nạp dữ liệu...
+            </div>
+        </div>
+
+        <!-- NHẬT KÝ THỜI GIAN THỰC -->
+        <section class="feed-card">
+            <div class="feed-header">
+                <span>Nhật ký Webhook trực tiếp</span>
+                <span style="font-family:var(--font-mono); font-size:10px; color:var(--text-3);">AUTO-STREAM</span>
+            </div>
+            <div class="feed-list" id="feedList">
+                <div class="feed-item">
+                    <span class="feed-time">00:00:00</span>
+                    <span class="feed-tag tag-NEW">[INIT]</span>
+                    <span>Đang kết nối tới máy chủ cào dữ liệu...</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            IUH Event Radar • Trực tiếp từ Cổng Đoàn trường • Host: learnsql.ct.ws
+        </div>
+    </footer>
+
+    <script>
+        let events = [];
+        let prevSlots = {};
+        let activeTab = 'all';
+        let query = '';
+        let sound = true;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function pingSound() {
+            if (!sound) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(680, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.12);
+            } catch(e) {}
+        }
+
+
+        const INITIAL_DATA = {"events":[{"id":"sk_3d9280fe3e9e834a","ten_su_kien":"HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)","thoi_gian":"09-10-2026","trang_thai":"Đã đủ số lượng","so_luong_hien_tai":170,"so_luong_toi_da":170,"con_slot":false},{"id":"sk_3fb4a0e80a7f09ad","ten_su_kien":"Tham gia Cổ vũ Hội diễn Văn nghệ Khoa Công nghệ Điện tử “FET MUSIC 2026”. (400/400)","thoi_gian":"01-10-2026","trang_thai":"Đã đủ số lượng","so_luong_hien_tai":400,"so_luong_toi_da":400,"con_slot":false},{"id":"sk_10886f145f349588","ten_su_kien":"Sinh viên tham gia cổ vũ hội diễn văn nghệ FITS GOT TALENT 2026 (Khoa Công nghệ Thông tin) (450/450)","thoi_gian":"30-09-2026","trang_thai":"Đã đăng ký","so_luong_hien_tai":450,"so_luong_toi_da":450,"con_slot":false}],"logs":[{"time":"12:49:26","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: Tham gia Cổ vũ Hội diễn Văn nghệ Khoa Công nghệ Điện tử “FET MUSIC 2026”. (399/400)"},{"time":"12:49:26","type":"EVENT_CREATED","message":"Phát hiện SK mới: Tham gia Cổ vũ Hội diễn Văn nghệ Khoa Công nghệ Điện tử “FET MUSIC 2026”. (400/400)"},{"time":"12:49:24","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: Tham gia Cổ vũ Hội diễn Văn nghệ Khoa Công nghệ Điện tử “FET MUSIC 2026”. (400/400)"},{"time":"12:49:24","type":"EVENT_CREATED","message":"Phát hiện SK mới: Tham gia Cổ vũ Hội diễn Văn nghệ Khoa Công nghệ Điện tử “FET MUSIC 2026”. (399/400)"},{"time":"10:27:00","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"10:27:00","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"10:26:45","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"10:26:45","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"09:53:17","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"09:53:17","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"09:53:15","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"09:53:15","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"09:51:13","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"09:51:13","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"09:51:11","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"09:51:11","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (169/170)"},{"time":"09:32:05","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (171/170)"},{"time":"09:32:05","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (170/170)"},{"time":"09:31:55","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (175/170)"},{"time":"09:31:55","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (171/170)"},{"time":"09:31:45","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (176/170)"},{"time":"09:31:45","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (175/170)"},{"time":"09:31:34","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (178/170)"},{"time":"09:31:34","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (176/170)"},{"time":"09:31:24","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (183/170)"},{"time":"09:31:24","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (178/170)"},{"time":"09:31:14","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (187/170)"},{"time":"09:31:14","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (183/170)"},{"time":"09:31:04","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (190/170)"},{"time":"09:31:04","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (187/170)"},{"time":"09:30:53","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (193/170)"},{"time":"09:30:53","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (190/170)"},{"time":"09:30:43","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (197/170)"},{"time":"09:30:43","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (193/170)"},{"time":"09:29:01","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (198/170)"},{"time":"09:29:01","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (197/170)"},{"time":"09:28:51","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (202/170)"},{"time":"09:28:51","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (198/170)"},{"time":"09:28:41","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (206/170)"},{"time":"09:28:41","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (202/170)"},{"time":"09:28:31","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (210/170)"},{"time":"09:28:31","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (206/170)"},{"time":"09:28:20","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (215/170)"},{"time":"09:28:20","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (210/170)"},{"time":"09:28:10","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (216/170)"},{"time":"09:28:10","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (215/170)"},{"time":"09:28:00","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (217/170)"},{"time":"09:28:00","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (216/170)"},{"time":"09:23:45","type":"EVENT_REMOVED","message":"Sự kiện đã bị gỡ bỏ: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (218/170)"},{"time":"09:23:45","type":"EVENT_CREATED","message":"Phát hiện SK mới: HỘI THẢO “Chương trình lái xe an toàn và Chăm sóc xe máy” (217/170)"}],"stats":{"fill_rate":100,"full_events":3,"has_hot_event":false,"last_event_type":"EVENT_REMOVED","last_webhook_at":1790772566,"open_events":0,"total_events":3,"total_slots_filled":1020,"total_slots_max":1020,"webhook_count":464},"status":"online","timestamp":1790778370};
+
+        async function refreshData() {
+            const endpoints = [
+                'https://taile-home.tailb889f1.ts.net/api/events?key=gaulmt29092007&t=' + Date.now(),
+                'https://taile-home.tailb889f1.ts.net/iuh/events?key=gaulmt29092007&t=' + Date.now(),
+                'https://taile-home.tailb889f1.ts.net/api.php?key=gaulmt29092007&t=' + Date.now()
+            ];
+            
+            let loaded = false;
+            for (const ep of endpoints) {
+                try {
+                    const res = await fetch(ep, { timeout: 4000 });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && (data.events || data.stats)) {
+                            renderAll(data);
+                            document.getElementById('liveStatusText').innerText = 'LIVE ONLINE';
+                            document.getElementById('livePill').style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                            loaded = true;
+                            break;
+                        }
+                    }
+                } catch(e) {}
+            }
+            
+            if (!loaded) {
+                document.getElementById('liveStatusText').innerText = 'CACHE SỰ KIỆN';
+                document.getElementById('livePill').style.borderColor = 'rgba(245, 158, 11, 0.4)';
+            }
+        }
+
+        // Render initial data immediately upon launch
+        renderAll(INITIAL_DATA);
+        setTimeout(refreshData, 1000);
+
+
+        function renderAll(d) {
+            const s = d.stats || {};
+            events = d.events || [];
+            const logs = d.logs || [];
+
+            // Stats
+            document.getElementById('valTotal').innerText = s.total_events || 0;
+            document.getElementById('badgeOpen').innerText = `${s.open_events || 0} mở`;
+            
+            if (s.has_hot_event) {
+                document.getElementById('valSpeed').innerText = '2s 🔥';
+                document.getElementById('badgeMode').innerText = 'TURBO';
+                document.getElementById('badgeMode').style.color = '#f59e0b';
+            } else {
+                document.getElementById('valSpeed').innerText = '10s';
+                document.getElementById('badgeMode').innerText = 'NORMAL';
+                document.getElementById('badgeMode').style.color = '#10b981';
+            }
+
+            document.getElementById('valRate').innerText = (s.fill_rate || 0) + '%';
+            document.getElementById('valFilled').innerHTML = `${s.total_slots_filled || 0} <small>/ ${s.total_slots_max || 0}</small>`;
+            document.getElementById('valWebhooks').innerText = s.webhook_count || 0;
+
+            if (s.last_webhook_at) {
+                const sec = Math.max(0, Math.floor((Date.now()/1000) - s.last_webhook_at));
+                document.getElementById('lastSyncLabel').innerText = sec < 3 ? 'Đồng bộ tức thời' : `Cập nhật ${sec}s trước`;
+            }
+
+            // Tab counts
+            document.getElementById('cAll').innerText = events.length;
+            document.getElementById('cOpen').innerText = s.open_events || 0;
+            document.getElementById('cFull').innerText = s.full_events || 0;
+
+            // Check diff sound
+            let changed = false;
+            events.forEach(ev => {
+                if (prevSlots[ev.id] !== undefined && prevSlots[ev.id] !== ev.so_luong_hien_tai) {
+                    changed = true;
+                }
+                prevSlots[ev.id] = ev.so_luong_hien_tai;
+            });
+            if (changed) pingSound();
+
+            renderCards();
+            renderFeed(logs);
+        }
+
+        function renderCards() {
+            const box = document.getElementById('eventsList');
+            const q = query.toLowerCase().trim();
+
+            const list = events.filter(ev => {
+                if (activeTab === 'open' && !ev.con_slot) return false;
+                if (activeTab === 'full' && ev.con_slot) return false;
+                if (q && !(ev.ten_su_kien || '').toLowerCase().includes(q) && !(ev.thoi_gian || '').toLowerCase().includes(q)) return false;
+                return true;
+            });
+
+            if (!list.length) {
+                box.innerHTML = `<div style="text-align:center; padding:32px 0; color:var(--text-3); font-size:13px;">Không có sự kiện phù hợp</div>`;
+                return;
+            }
+
+            box.innerHTML = list.map(ev => {
+                const cur = parseInt(ev.so_luong_hien_tai) || 0;
+                const max = parseInt(ev.so_luong_toi_da) || 0;
+                const isAvail = ev.con_slot && (max === 0 || cur < max);
+                const pct = max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
+                const delta = ev.last_delta || 0;
+
+                const chip = isAvail
+                    ? `<span class="status-chip chip-open">Đang mở • Còn ${max > 0 ? (max - cur) : 'nhiều'}</span>`
+                    : `<span class="status-chip chip-full">Đã đủ số lượng</span>`;
+
+                return `
+                    <div class="event-card">
+                        <div class="event-header">
+                            <div class="event-title">${escape(ev.ten_su_kien || 'Sự kiện')}</div>
+                            ${chip}
+                        </div>
+                        <div class="event-meta">
+                            <span class="meta-tag">🕒 ${escape(ev.thoi_gian || 'Chưa cập nhật')}</span>
+                        </div>
+                        <div class="progress-box">
+                            <div class="progress-labels">
+                                <span class="progress-count">${cur} / ${max > 0 ? max : '∞'} sinh viên</span>
+                                ${delta ? `<span class="progress-delta">${delta > 0 ? '+' + delta : delta} vừa ĐK</span>` : `<span style="color:var(--text-3); font-size:11px;">${pct}%</span>`}
+                            </div>
+                            <div class="bar-track">
+                                <div class="bar-fill ${!isAvail ? 'full' : ''}" style="width:${pct}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderFeed(logs) {
+            const el = document.getElementById('feedList');
+            if (!logs || !logs.length) return;
+            el.innerHTML = logs.slice(0, 15).map(l => {
+                let tag = 'tag-SLOT';
+                let typeName = '[SLOT]';
+                if (l.type === 'EVENT_CREATED') { tag = 'tag-NEW'; typeName = '[MỚI]'; }
+                if (l.type === 'EVENT_FULL') { tag = 'tag-FULL'; typeName = '[FULL]'; }
+                return `
+                    <div class="feed-item">
+                        <span class="feed-time">${l.time || '00:00'}</span>
+                        <span class="feed-tag ${tag}">${typeName}</span>
+                        <span>${escape(l.message || '')}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escape(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // Event listeners
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            b.onclick = () => {
+                document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                activeTab = b.dataset.filter;
+                renderCards();
+            };
+        });
+
+        document.getElementById('searchInput').oninput = e => {
+            query = e.target.value;
+            renderCards();
+        };
+
+        document.getElementById('soundBtn').onclick = () => {
+            sound = !sound;
+            document.getElementById('soundBtn').innerText = sound ? '🔔' : '🔕';
+        };
+
+        document.getElementById('refreshBtn').onclick = refreshData;
+
+        // Chạy polling (3.5 giây để tránh bị hosting chặn giới hạn tần suất)
+        refreshData();
+        setInterval(refreshData, 3500);
+    </script>
+</body>
+</html>

@@ -48,6 +48,10 @@ static NSString *gMachineIdObj = @"iPhone17,2";
 static NSString *gIosVersionObj = @"18.2.1";
 static NSString *gUuidObj = @"7BD46FDA-D93D-45BD-9158-7178669502DD";
 static NSUUID *gCachedVendorUUID = nil;
+static NSString *gSerialNumberObj = @"F17K308P0D7L";
+static NSString *gWifiMacObj = @"3c:06:30:1a:8b:24";
+static NSString *gBtMacObj = @"3c:06:30:1a:8b:25";
+static NSString *gImeiObj = @"354892110294821";
 static NSString *gRealMachineObj = @"";
 static NSString *gRealMarketingObj = @"";
 static NSString *gRealBoardIdObj = @"";
@@ -528,6 +532,20 @@ static void ZTechApplyCachedProfileValues(NSDictionary *prof) {
     gCarrierNameObj = [prof[@"carrier"] ?: @"Viettel" copy];
     gActiveProxyObj = [prof[@"activeProxy"] ?: @"" copy];
 
+    uint32_t seed = (uint32_t)[gUuidObj hash];
+    gSerialNumberObj = [NSString stringWithFormat:@"F17%04X%04X", (unsigned int)(seed & 0xFFFF), (unsigned int)((seed >> 16) & 0xFFFF)];
+    gWifiMacObj = [NSString stringWithFormat:@"3c:%02x:%02x:%02x:%02x:24",
+                   (unsigned int)((seed) & 0xFF),
+                   (unsigned int)((seed >> 8) & 0xFF),
+                   (unsigned int)((seed >> 16) & 0xFF),
+                   (unsigned int)((seed >> 24) & 0xFF)];
+    gBtMacObj = [NSString stringWithFormat:@"3c:%02x:%02x:%02x:%02x:25",
+                 (unsigned int)((seed) & 0xFF),
+                 (unsigned int)((seed >> 8) & 0xFF),
+                 (unsigned int)((seed >> 16) & 0xFF),
+                 (unsigned int)((seed >> 24) & 0xFF)];
+    gImeiObj = [NSString stringWithFormat:@"35%013llu", (unsigned long long)((uint64_t)seed % 9000000000000ULL + 1000000000000ULL)];
+
     const char *mc = [gMachineIdObj UTF8String];
     if (mc) {
         strncpy(gMachineCStr, mc, sizeof(gMachineCStr) - 1);
@@ -667,72 +685,93 @@ static int hooked_uname(struct utsname *buf) {
         strncpy(buf->machine, gMachineCStr, sizeof(buf->machine) - 1);
         buf->machine[sizeof(buf->machine) - 1] = '\0';
     }
-    if (gModelNameCStr[0] != '\0') {
-        strncpy(buf->nodename, gModelNameCStr, sizeof(buf->nodename) - 1);
-        buf->nodename[sizeof(buf->nodename) - 1] = '\0';
-    }
+    // Clean standard iOS nodename (POSIX host)
+    strncpy(buf->nodename, "iPhone", sizeof(buf->nodename) - 1);
+    buf->nodename[sizeof(buf->nodename) - 1] = '\0';
     return 0;
 }
 
 static int (*orig_sysctl)(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) = NULL;
 static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name != NULL && namelen >= 2 && name[0] == CTL_HW) {
-        if (name[1] == HW_MACHINE) {
-            size_t len = strlen(gMachineCStr) + 1;
-            if (oldp != NULL && oldlenp != NULL) {
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gMachineCStr, copyLen);
-            }
-            if (oldlenp != NULL) {
-                *oldlenp = len;
-            }
-            return 0;
-        } else if (name[1] == HW_MODEL) {
-            if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
-                size_t len = strlen(gBoardIdCStr) + 1;
+    if (name != NULL && namelen >= 2) {
+        if (name[0] == CTL_HW) {
+            if (name[1] == HW_MACHINE) {
+                size_t len = strlen(gMachineCStr) + 1;
                 if (oldp != NULL && oldlenp != NULL) {
                     size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                    memcpy(oldp, gBoardIdCStr, copyLen);
+                    memcpy(oldp, gMachineCStr, copyLen);
                 }
                 if (oldlenp != NULL) {
                     *oldlenp = len;
                 }
                 return 0;
-            }
-        } else if (gIsAidaProcess && name[1] == HW_MEMSIZE) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
-                    memcpy(oldp, &gRamBytes, copyLen);
-                }
-                *oldlenp = sizeof(uint64_t);
-                return 0;
-            }
-        } else if (gIsAidaProcess && name[1] == HW_PHYSMEM) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    if (*oldlenp >= sizeof(uint64_t)) {
-                        memcpy(oldp, &gRamBytes, sizeof(uint64_t));
-                        *oldlenp = sizeof(uint64_t);
-                    } else {
-                        uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
-                        size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
-                        memcpy(oldp, &ram32, copyLen);
-                        *oldlenp = sizeof(uint32_t);
+            } else if (name[1] == HW_MODEL) {
+                if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
+                    size_t len = strlen(gBoardIdCStr) + 1;
+                    if (oldp != NULL && oldlenp != NULL) {
+                        size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                        memcpy(oldp, gBoardIdCStr, copyLen);
                     }
-                } else {
+                    if (oldlenp != NULL) {
+                        *oldlenp = len;
+                    }
+                    return 0;
+                }
+            } else if (gIsAidaProcess && name[1] == HW_MEMSIZE) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
+                        memcpy(oldp, &gRamBytes, copyLen);
+                    }
                     *oldlenp = sizeof(uint64_t);
+                    return 0;
                 }
-                return 0;
+            } else if (gIsAidaProcess && name[1] == HW_PHYSMEM) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        if (*oldlenp >= sizeof(uint64_t)) {
+                            memcpy(oldp, &gRamBytes, sizeof(uint64_t));
+                            *oldlenp = sizeof(uint64_t);
+                        } else {
+                            uint32_t ram32 = (gRamBytes > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)gRamBytes;
+                            size_t copyLen = (*oldlenp < sizeof(uint32_t)) ? *oldlenp : sizeof(uint32_t);
+                            memcpy(oldp, &ram32, copyLen);
+                            *oldlenp = sizeof(uint32_t);
+                        }
+                    } else {
+                        *oldlenp = sizeof(uint64_t);
+                    }
+                    return 0;
+                }
+            } else if (gIsAidaProcess && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
+                if (oldlenp != NULL) {
+                    if (oldp != NULL) {
+                        int cores = 6;
+                        size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
+                        memcpy(oldp, &cores, copyLen);
+                    }
+                    *oldlenp = sizeof(int);
+                    return 0;
+                }
             }
-        } else if (gIsAidaProcess && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
-            if (oldlenp != NULL) {
-                if (oldp != NULL) {
-                    int cores = 6;
-                    size_t copyLen = (*oldlenp < sizeof(int)) ? *oldlenp : sizeof(int);
-                    memcpy(oldp, &cores, copyLen);
+        } else if (name[0] == CTL_KERN) {
+            if (name[1] == KERN_HOSTNAME) {
+                const char *host = "iPhone";
+                size_t len = strlen(host) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, host, copyLen);
                 }
-                *oldlenp = sizeof(int);
+                if (oldlenp != NULL) *oldlenp = len;
+                return 0;
+            } else if (name[1] == KERN_OSVERSION) {
+                const char *build = "22B83";
+                size_t len = strlen(build) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, build, copyLen);
+                }
+                if (oldlenp != NULL) *oldlenp = len;
                 return 0;
             }
         }
@@ -785,6 +824,33 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 }
                 return 0;
             }
+        } else if (strcmp(name, "kern.osversion") == 0) {
+            const char *build = "22B83";
+            size_t len = strlen(build) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, build, copyLen);
+            }
+            if (oldlenp != NULL) *oldlenp = len;
+            return 0;
+        } else if (strcmp(name, "kern.osproductversion") == 0) {
+            const char *ver = [gIosVersionObj UTF8String] ?: "18.2.1";
+            size_t len = strlen(ver) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, ver, copyLen);
+            }
+            if (oldlenp != NULL) *oldlenp = len;
+            return 0;
+        } else if (strcmp(name, "kern.hostname") == 0) {
+            const char *host = "iPhone";
+            size_t len = strlen(host) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, host, copyLen);
+            }
+            if (oldlenp != NULL) *oldlenp = len;
+            return 0;
         } else if (gIsAidaProcess && strcmp(name, "hw.memsize") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
@@ -892,6 +958,42 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
             if (error) *error = 0;
             return (__bridge_retained CFTypeRef)[@"22B83" copy];
         }
+        if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
+            if (error) *error = 0;
+            NSString *udid = [[gUuidObj stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
+            if (CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
+                return (__bridge_retained CFTypeRef)[udid dataUsingEncoding:NSUTF8StringEncoding];
+            }
+            return (__bridge_retained CFTypeRef)[udid copy];
+        }
+        if (CFEqual(prop, CFSTR("SerialNumber"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[gSerialNumberObj copy];
+        }
+        if (CFEqual(prop, CFSTR("WifiAddress"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[gWifiMacObj copy];
+        }
+        if (CFEqual(prop, CFSTR("BluetoothAddress"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[gBtMacObj copy];
+        }
+        if (CFEqual(prop, CFSTR("InternationalMobileEquipmentIdentity")) || CFEqual(prop, CFSTR("IMEI"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[gImeiObj copy];
+        }
+        if (CFEqual(prop, CFSTR("ModelNumber"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[@"MU793VN/A" copy];
+        }
+        if (CFEqual(prop, CFSTR("RegionInfo"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[@"VN/A" copy];
+        }
+        if (CFEqual(prop, CFSTR("RegulatoryModelNumber"))) {
+            if (error) *error = 0;
+            return (__bridge_retained CFTypeRef)[@"A3296" copy];
+        }
     }
     CFTypeRef res = NULL;
     if (orig_MGCopyAnswerWithError) {
@@ -924,6 +1026,32 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
 
 static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     return hooked_MGCopyAnswerWithError(prop, NULL);
+}
+
+typedef CFStringRef (*zt_SCDynamicStoreCopyComputerName_t)(CFAllocatorRef allocator, CFStringEncoding *encoding);
+static zt_SCDynamicStoreCopyComputerName_t orig_SCDynamicStoreCopyComputerName = NULL;
+static CFStringRef hooked_SCDynamicStoreCopyComputerName(CFAllocatorRef allocator, CFStringEncoding *encoding) {
+    if (encoding) *encoding = kCFStringEncodingUTF8;
+    return (__bridge_retained CFStringRef)(gModelNameObj ?: @"iPhone");
+}
+
+typedef CFStringRef (*zt_SCDynamicStoreCopyLocalHostName_t)(CFAllocatorRef allocator);
+static zt_SCDynamicStoreCopyLocalHostName_t orig_SCDynamicStoreCopyLocalHostName = NULL;
+static CFStringRef hooked_SCDynamicStoreCopyLocalHostName(CFAllocatorRef allocator) {
+    return CFSTR("iPhone");
+}
+
+typedef CFDictionaryRef (*zt_CFCopySystemVersionDictionary_t)(void);
+static zt_CFCopySystemVersionDictionary_t orig_CFCopySystemVersionDictionary = NULL;
+static CFDictionaryRef hooked_CFCopySystemVersionDictionary(void) {
+    CFDictionaryRef orig = orig_CFCopySystemVersionDictionary ? orig_CFCopySystemVersionDictionary() : NULL;
+    NSMutableDictionary *dict = orig ? [(__bridge NSDictionary *)orig mutableCopy] : [NSMutableDictionary dictionary];
+    dict[@"ProductVersion"] = gIosVersionObj ?: @"18.2.1";
+    dict[@"ProductBuildVersion"] = @"22B83";
+    dict[@"ProductName"] = @"iPhone OS";
+    dict[@"ProductUserVisibleVersion"] = gIosVersionObj ?: @"18.2.1";
+    if (orig) CFRelease(orig);
+    return (__bridge_retained CFDictionaryRef)dict;
 }
 
 typedef CFTypeRef (*zt_IORegistryEntryCreateCFProperty_t)(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options);
@@ -1057,6 +1185,14 @@ static void ZTechRebindImageAndRecordRange(const struct mach_header *header, int
                                 bindings[k] = (void *)hooked_sysctl;
                             } else if (strcmp(sym_name, "_MGCopyAnswer") == 0) {
                                 bindings[k] = (void *)hooked_MGCopyAnswer;
+                            } else if (strcmp(sym_name, "_MGCopyAnswerWithError") == 0) {
+                                bindings[k] = (void *)hooked_MGCopyAnswerWithError;
+                            } else if (strcmp(sym_name, "_SCDynamicStoreCopyComputerName") == 0) {
+                                bindings[k] = (void *)hooked_SCDynamicStoreCopyComputerName;
+                            } else if (strcmp(sym_name, "_SCDynamicStoreCopyLocalHostName") == 0) {
+                                bindings[k] = (void *)hooked_SCDynamicStoreCopyLocalHostName;
+                            } else if (strcmp(sym_name, "__CFCopySystemVersionDictionary") == 0) {
+                                bindings[k] = (void *)hooked_CFCopySystemVersionDictionary;
                             }
                         }
                     }
@@ -1127,6 +1263,10 @@ static NSString *swizzled_systemVersion(id self, SEL _cmd) {
 static NSString *(*orig_deviceName)(id, SEL) = NULL;
 static NSString *swizzled_deviceName(id self, SEL _cmd) {
     return gModelNameObj ?: @"iPhone 16 Pro Max";
+}
+
+static NSString *swizzled_rawDeviceName(id self, SEL _cmd) {
+    return gMachineIdObj ?: @"iPhone17,2";
 }
 
 static float (*orig_batteryLevel)(id, SEL) = NULL;
@@ -2050,7 +2190,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.3 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.4 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2151,7 +2291,7 @@ static void ZTechHookInit(void) {
                 SEL rawNameSel = sel_registerName("_rawDeviceName");
                 Method mRawName = class_getInstanceMethod(uiDeviceCls, rawNameSel);
                 if (mRawName) {
-                    method_setImplementation(mRawName, (IMP)swizzled_deviceName);
+                    method_setImplementation(mRawName, (IMP)swizzled_rawDeviceName);
                 }
 
                 Method mBat = class_getInstanceMethod(uiDeviceCls, @selector(batteryLevel));
@@ -2304,6 +2444,15 @@ static void ZTechHookInit(void) {
             if (raw_sysctlbyname) pMSHook(raw_sysctlbyname, (void *)hooked_sysctlbyname, (void **)&orig_sysctlbyname);
             if (raw_sysctl) pMSHook(raw_sysctl, (void *)hooked_sysctl, (void **)&orig_sysctl);
 
+            void *raw_MGCopyAnswer = dlsym(RTLD_DEFAULT, "MGCopyAnswer");
+            if (!raw_MGCopyAnswer) {
+                void *hMG = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_GLOBAL | RTLD_LAZY);
+                if (hMG) raw_MGCopyAnswer = dlsym(hMG, "MGCopyAnswer");
+            }
+            if (raw_MGCopyAnswer) {
+                pMSHook(raw_MGCopyAnswer, (void *)hooked_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
+            }
+
             void *raw_MGWithError = dlsym(RTLD_DEFAULT, "MGCopyAnswerWithError");
             if (!raw_MGWithError) {
                 void *hMG = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_GLOBAL | RTLD_LAZY);
@@ -2311,6 +2460,29 @@ static void ZTechHookInit(void) {
             }
             if (raw_MGWithError) {
                 pMSHook(raw_MGWithError, (void *)hooked_MGCopyAnswerWithError, (void **)&orig_MGCopyAnswerWithError);
+            }
+
+            void *raw_SCCompName = dlsym(RTLD_DEFAULT, "SCDynamicStoreCopyComputerName");
+            if (!raw_SCCompName) {
+                void *hSC = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_GLOBAL | RTLD_LAZY);
+                if (hSC) raw_SCCompName = dlsym(hSC, "SCDynamicStoreCopyComputerName");
+            }
+            if (raw_SCCompName) {
+                pMSHook(raw_SCCompName, (void *)hooked_SCDynamicStoreCopyComputerName, (void **)&orig_SCDynamicStoreCopyComputerName);
+            }
+
+            void *raw_SCHostName = dlsym(RTLD_DEFAULT, "SCDynamicStoreCopyLocalHostName");
+            if (raw_SCHostName) {
+                pMSHook(raw_SCHostName, (void *)hooked_SCDynamicStoreCopyLocalHostName, (void **)&orig_SCDynamicStoreCopyLocalHostName);
+            }
+
+            void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
+            if (raw_CFCopySysVer) {
+                pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
+            }
+            void *raw_CFCopyServVer = dlsym(RTLD_DEFAULT, "_CFCopyServerVersionDictionary");
+            if (raw_CFCopyServVer) {
+                pMSHook(raw_CFCopyServVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
             }
 
             void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");

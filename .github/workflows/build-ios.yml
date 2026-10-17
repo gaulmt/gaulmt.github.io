@@ -77,14 +77,16 @@ jobs:
       - name: Build NowEvent iOS .deb (Rootful, Rootless) & TrollStore .tipa / .ipa
         run: |
           set -e
+          set -x
           if [ -d "NowEvent_iOS" ]; then
             echo "=== Building NowEvent iOS ==="
             cd NowEvent_iOS
             rm -rf packages .theos build_nen.log
 
-            # 1. Compile Mach-O binary and stage app bundle with Theos
-            make clean all stage FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
-            if [ ! -d ".theos" ]; then
+            # 1. Compile Mach-O binary with Theos
+            make clean all FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
+            BUILD_STATUS=${PIPESTATUS[0]}
+            if [ $BUILD_STATUS -ne 0 ]; then
               echo "### ❌ NowEvent Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               tail -n 80 build_nen.log >> "$GITHUB_STEP_SUMMARY"
@@ -92,49 +94,26 @@ jobs:
               exit 1
             fi
 
-            # Locate staged app bundle containing compiled binary
-            NEN_APP=""
-            if [ -d ".theos/_/Applications/NowEvent.app" ]; then
-              NEN_APP=".theos/_/Applications/NowEvent.app"
-            else
-              NEN_APP=$(find .theos -name "NowEvent.app" -type d | grep -v "/obj/" | head -n 1)
-              if [ -z "$NEN_APP" ]; then
-                NEN_APP=$(find .theos -name "NowEvent.app" -type d | head -n 1)
-              fi
-            fi
-
-            echo "Staged app directory: $NEN_APP"
-
-            # Ensure executable Mach-O binary exists inside $NEN_APP
-            if [ ! -s "$NEN_APP/NowEvent" ]; then
-              echo "⚠️ Binary not found in $NEN_APP/NowEvent, searching .theos for compiled binary..."
-              BIN_FOUND=$(find .theos -type f -name "NowEvent" ! -name "*.*" ! -path "*/.theos/_*" | head -n 1)
-              if [ -n "$BIN_FOUND" ] && [ -s "$BIN_FOUND" ]; then
-                echo "Found binary at $BIN_FOUND, copying to $NEN_APP/NowEvent"
-                cp -f "$BIN_FOUND" "$NEN_APP/NowEvent"
-              fi
-            fi
-
-            # Copy all resources & assets inside app bundle
-            cp -rf Resources/* "$NEN_APP/" 2>/dev/null || true
-            chmod 0755 "$NEN_APP/NowEvent"
-            ldid -Sentitlements.xml "$NEN_APP/NowEvent" 2>/dev/null || true
-
-            # Strict verification of the executable
-            if [ ! -s "$NEN_APP/NowEvent" ]; then
-              echo "### ❌ FATAL: NowEvent executable binary is missing or empty!" >> "$GITHUB_STEP_SUMMARY"
-              ls -laR .theos >> "$GITHUB_STEP_SUMMARY"
+            # Locate compiled binary
+            NEN_BIN=$(find .theos -type f -name "NowEvent" ! -name "*.*" | head -n 1)
+            if [ -z "$NEN_BIN" ] || [ ! -s "$NEN_BIN" ]; then
+              echo "### ❌ FATAL: NowEvent binary not found in .theos!" >> "$GITHUB_STEP_SUMMARY"
+              find .theos -ls >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
               exit 1
             fi
 
             echo "=== Executable Binary Info ==="
-            ls -la "$NEN_APP/NowEvent"
-            file "$NEN_APP/NowEvent"
+            ls -la "$NEN_BIN"
+            file "$NEN_BIN"
 
-            # Save clean staged app bundle to build_out/NowEvent.app
+            # Stage clean NowEvent.app bundle
             STAGED_APP="$GITHUB_WORKSPACE/build_out/NowEvent.app"
             rm -rf "$STAGED_APP"
-            cp -r "$NEN_APP" "$STAGED_APP"
+            mkdir -p "$STAGED_APP"
+            cp -f "$NEN_BIN" "$STAGED_APP/NowEvent"
+            cp -rf Resources/* "$STAGED_APP/" 2>/dev/null || true
+            chmod 0755 "$STAGED_APP/NowEvent"
+            ldid -Sentitlements.xml "$STAGED_APP/NowEvent" 2>/dev/null || true
 
             # 2. Build TrollStore .tipa & .ipa using pack_tipa.py
             python3 "$GITHUB_WORKSPACE/scripts/pack_tipa.py" "$STAGED_APP" "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa"
@@ -265,7 +244,18 @@ jobs:
           git commit -m "Auto-deploy Multi-Product Sileo APT Repository [skip ci]"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
+      - name: Failure Diagnostics
+        if: failure()
+        run: |
+          echo "### ❌ Build Failure Diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "NowEvent_iOS/build_nen.log" ]; then
+            cat NowEvent_iOS/build_nen.log >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Built Packages (.deb, .tipa, .ipa)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gaulmt-Tech-iOS-Packages
@@ -273,4 +263,4 @@ jobs:
             build_out/*.deb
             build_out/*.tipa
             build_out/*.ipa
-          if-no-files-found: error
+          if-no-files-found: warn

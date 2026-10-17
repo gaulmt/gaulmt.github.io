@@ -74,6 +74,17 @@ def generate_index(stage_dir):
       word-break: break-all;
       user-select: all;
     }
+    .instruction-note {
+      background: rgba(56, 139, 253, 0.1);
+      border: 1px solid rgba(56, 139, 253, 0.3);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      color: #79c0ff;
+      margin-top: 14px;
+      line-height: 1.5;
+      text-align: left;
+    }
     .section-title {
       font-size: 18px;
       font-weight: 700;
@@ -88,7 +99,7 @@ def generate_index(stage_dir):
       border: 1px solid #30363d;
       border-radius: 18px;
       padding: 18px;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
       transition: border-color 0.2s ease;
     }
     .product-card:hover { border-color: #58a6ff; }
@@ -136,18 +147,20 @@ def generate_index(stage_dir):
       margin-bottom: 14px;
     }
     .product-actions {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
-      flex-wrap: wrap;
     }
     .action-link {
-      flex: 1;
-      min-width: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       text-align: center;
       text-decoration: none;
       font-size: 13px;
       font-weight: 600;
-      padding: 10px 14px;
+      padding: 10px 12px;
       border-radius: 10px;
       border: 1px solid #30363d;
       color: #e6edf3;
@@ -158,13 +171,27 @@ def generate_index(stage_dir):
       background: #30363d;
       border-color: #8b949e;
     }
-    .action-link.primary {
+    .action-link.primary-troll {
+      background: #8957e5;
+      border-color: #a371f7;
+      color: #fff;
+    }
+    .action-link.primary-troll:hover {
+      background: #9e6ff7;
+    }
+    .action-link.primary-apk {
+      grid-column: span 2;
       background: #238636;
       border-color: #2ea043;
       color: #fff;
+      font-size: 14px;
+      padding: 12px;
     }
-    .action-link.primary:hover {
+    .action-link.primary-apk:hover {
       background: #2ea043;
+    }
+    .action-link.span-2 {
+      grid-column: span 2;
     }
     footer {
       text-align: center;
@@ -179,11 +206,11 @@ def generate_index(stage_dir):
     <div class="header-card">
       <img class="repo-logo" src="CydiaIcon@3x.png" alt="gaulmt Repo Logo">
       <h1>gaulmt Official Repo</h1>
-      <div class="sub">Kho ứng dụng & Tweak Sileo / Zebra chính thức</div>
+      <div class="sub">Kho ứng dụng, Tweak Sileo / Zebra & Bộ cài iOS (.ipa, .tipa, .deb)</div>
 
       <div class="btn-grid">
         <a class="btn btn-sileo" href="sileo://source/https://gaulmt.github.io/">
-          <span>➕</span> Thêm nguồn vào Sileo
+          <span>➕</span> Thêm nguồn vào Sileo ngay
         </a>
         <a class="btn btn-zebra" href="zbra://sources/add/https://gaulmt.github.io/">
           <span>➕</span> Thêm nguồn vào Zebra
@@ -191,6 +218,10 @@ def generate_index(stage_dir):
       </div>
 
       <div class="url-card">https://gaulmt.github.io/</div>
+
+      <div class="instruction-note">
+        💡 <b>Cách cài trên Sileo:</b> Bấm nút màu vàng <i>"Thêm nguồn vào Sileo ngay"</i> ở trên để Sileo thêm repo và nạp đầy đủ gói cài. Sau đó bạn có thể tìm và cài đặt bất kỳ app nào trong danh mục bên dưới!
+      </div>
     </div>
 
     <div class="section-title">
@@ -217,9 +248,18 @@ def generate_index(stage_dir):
         Bản phát hành v5.6.3: WebKit In-App Browser Fingerprint Spoofing, Lá chắn ẩn môi trường Jailbreak (Anti-Jailbreak Shield), MobileGestalt &amp; Sysctl Hook, 100% không sót dấu vết máy thật trong Zalo &amp; AIDA64.
       </div>
       <div class="product-actions">
-        <a class="action-link" href="sileo://package/com.ztech.devicechanger">Cài trên Sileo</a>
-        <a class="action-link" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">TrollStore (.tipa)</a>
-        <a class="action-link" href="debs/gaulmt_Tech_Rootless_arm64.deb">Tải .deb</a>
+        <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">
+          ⚡ Cài qua TrollStore (.tipa)
+        </a>
+        <a class="action-link" href="downloads/gaulmt_Tech_App.ipa">
+          📥 Tải file .IPA
+        </a>
+        <a class="action-link" href="debs/gaulmt_Tech_Rootless_arm64.deb">
+          📥 Tải .DEB Rootless
+        </a>
+        <a class="action-link span-2" href="sileo://source/https://gaulmt.github.io/">
+          ➕ Thêm nguồn vào Sileo
+        </a>
       </div>
     </div>
 
@@ -234,27 +274,31 @@ def generate_index(stage_dir):
       </div>
       <div class="badge-row">
         <span class="badge badge-android">Android (.apk)</span>
-        <span class="badge badge-ios">iOS Sileo (.deb)</span>
+        <span class="badge badge-ios">iOS (.ipa / .tipa)</span>
+        <span class="badge badge-ios">Sileo (.deb)</span>
         <span class="badge badge-gold">Thời gian thực</span>
       </div>
       <div class="product-desc">
-        Ứng dụng theo dõi thông báo sự kiện Đoàn Thanh niên IUH tức thì. Tự động tính toán tỷ lệ slot đăng ký (100%, 50%, &lt;5%) và cảnh báo slot sắp hết.
+        Ứng dụng theo dõi sự kiện &amp; tính toán tỷ lệ slot đăng ký (100%, 50%, &lt;5%) Đoàn Thanh niên IUH tức thì dành cho sinh viên.
       </div>
       <div class="product-actions">
-        <a class="action-link primary" href="downloads/NowEventNotification.apk" download>
-          ⚡ Tải APK Android
+        <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/NowEventNotification.tipa">
+          ⚡ Cài qua TrollStore (.tipa)
         </a>
-        <a class="action-link" href="sileo://package/com.gaulmt.noweventnotification">
-          Cài trên Sileo
+        <a class="action-link" href="downloads/NowEventNotification.ipa">
+          📥 Tải .IPA cho iOS
         </a>
         <a class="action-link" href="debs/NowEventNotification_2.1_iphoneos-arm.deb">
-          Tải .deb iOS
+          📥 Tải .DEB cho iOS
+        </a>
+        <a class="action-link primary-apk" href="downloads/NowEventNotification.apk" download>
+          🤖 Tải APK Android (Cài trên điện thoại Android)
         </a>
       </div>
     </div>
 
     <footer>
-      © 2026 gaulmt Official Repository · Tự động build & đồng bộ bởi GitHub Actions
+      © 2026 gaulmt Official Repository · Tự động build &amp; đồng bộ bởi GitHub Actions
     </footer>
   </div>
 </body>

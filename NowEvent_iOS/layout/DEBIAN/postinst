@@ -1,0 +1,22 @@
+#!/bin/sh
+export PATH="/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+for APP_DIR in "/var/jb/Applications/NowEvent.app" "/Applications/NowEvent.app"; do
+    if [ -d "$APP_DIR" ]; then
+        chmod -R 0755 "$APP_DIR" >/dev/null 2>&1 || true
+        if [ -x "/var/jb/usr/bin/uicache" ]; then
+            /var/jb/usr/bin/uicache -p "$APP_DIR" >/dev/null 2>&1 || true
+        fi
+        if [ -x "/usr/bin/uicache" ]; then
+            /usr/bin/uicache -p "$APP_DIR" >/dev/null 2>&1 || true
+        fi
+    fi
+done
+
+if [ -x "/var/jb/usr/bin/uicache" ]; then
+    /var/jb/usr/bin/uicache -a >/dev/null 2>&1 || true
+elif [ -x "/usr/bin/uicache" ]; then
+    /usr/bin/uicache -a >/dev/null 2>&1 || true
+fi
+
+exit 0

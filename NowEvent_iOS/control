@@ -1,0 +1,12 @@
+Package: com.gaulmt.noweventnotification
+Name: Now Event Notification (IUH)
+Version: 2.1.0
+Architecture: iphoneos-arm
+Description: Ứng dụng theo dõi sự kiện & thông báo Đoàn Thanh niên IUH tức thì cho sinh viên.
+Maintainer: gaulmt <lmtgau@gmail.com>
+Author: Nguyễn Đăng Dương & Lê Phước Tài
+Section: Utilities
+Depends: firmware (>= 14.0)
+Icon: https://gaulmt.github.io/icons/now_event.png
+Depiction: https://gaulmt.github.io/
+SileoDepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.json

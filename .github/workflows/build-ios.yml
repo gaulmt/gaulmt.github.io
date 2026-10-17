@@ -6,9 +6,11 @@ on:
     paths:
       - 'Sources/**'
       - 'Tweak/**'
+      - 'NowEvent_iOS/**'
       - 'Makefile'
       - 'control'
       - 'entitlements.xml'
+      - '.github/workflows/build-ios.yml'
   workflow_dispatch:
 
 permissions:
@@ -72,6 +74,45 @@ jobs:
           cp packages/*.deb "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_Rootless_arm64.deb"
           mv control.bak control
 
+      - name: Build NowEvent iOS .deb (Rootful, Rootless) & TrollStore .tipa / .ipa
+        run: |
+          if [ -d "NowEvent_iOS" ]; then
+            cd NowEvent_iOS
+            tr -d '\r' < layout/DEBIAN/postinst > layout/DEBIAN/postinst.lf
+            mv layout/DEBIAN/postinst.lf layout/DEBIAN/postinst
+            chmod 0755 layout/DEBIAN/postinst
+            rm -rf packages .theos
+
+            # 1. Rootful .deb (iphoneos-arm)
+            make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen_rootful.log || true
+            if [ -d packages ] && [ -n "$(ls -A packages/*.deb 2>/dev/null)" ]; then
+              cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
+            fi
+
+            # TrollStore .tipa / .ipa
+            mkdir -p "$GITHUB_WORKSPACE/build_out/Payload"
+            NEN_APP=$(find .theos -name "NowEvent.app" -type d | head -n 1)
+            if [ -n "$NEN_APP" ] && [ -d "$NEN_APP" ]; then
+              cp -r "$NEN_APP" "$GITHUB_WORKSPACE/build_out/Payload/NowEvent.app"
+              cd "$GITHUB_WORKSPACE/build_out"
+              zip -r9 NowEventNotification.tipa Payload
+              cp NowEventNotification.tipa NowEventNotification.ipa
+              rm -rf Payload
+              cd "$GITHUB_WORKSPACE/NowEvent_iOS"
+            fi
+
+            # 2. Rootless .deb (iphoneos-arm64)
+            cp control control.bak
+            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' control
+            rm -rf packages .theos
+            make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless || true
+            if [ -d packages ] && [ -n "$(ls -A packages/*.deb 2>/dev/null)" ]; then
+              cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+            fi
+            mv control.bak control
+            cd "$GITHUB_WORKSPACE"
+          fi
+
       - name: Generate Multi-Product Sileo APT Repository
         run: |
           STAGE_DIR="$GITHUB_WORKSPACE/sileo_stage"
@@ -85,6 +126,22 @@ jobs:
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_TrollStore.tipa" "$STAGE_DIR/debs/gaulmt_Tech_TrollStore.tipa"
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_TrollStore.tipa" "$STAGE_DIR/debs/ZTech_TrollStore.tipa"
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_TrollStore.tipa" "$STAGE_DIR/downloads/gaulmt_Tech_TrollStore.tipa"
+          cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_App.ipa" "$STAGE_DIR/downloads/gaulmt_Tech_App.ipa" 2>/dev/null || true
+
+          # 2. Copy newly built NowEvent packages
+          if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" ]; then
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" "$STAGE_DIR/debs/"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" ]; then
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" "$STAGE_DIR/debs/"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" ]; then
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$STAGE_DIR/downloads/"
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$STAGE_DIR/debs/"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa" ]; then
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa" "$STAGE_DIR/downloads/"
+          fi
 
           # 2. Copy all other packages from packages/ (including NowEventNotification)
           if [ -d "packages" ]; then

@@ -82,7 +82,9 @@
     // Avatar image (36x36 circular)
     self.avatarImageView = [[UIImageView alloc] init];
     self.avatarImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.avatarImageView.image = [UIImage imageNamed:@"logo.png"];
+    NSString *eventsLogoPath = [[NSBundle mainBundle] pathForResource:@"logo" ofType:@"png"];
+    self.avatarImageView.image = (eventsLogoPath ? [UIImage imageWithContentsOfFile:eventsLogoPath] : nil) ?: [UIImage imageNamed:@"logo"];
+    self.avatarImageView.backgroundColor = [UIColor whiteColor];
     self.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
     self.avatarImageView.layer.cornerRadius = 18.0;
     self.avatarImageView.clipsToBounds = YES;

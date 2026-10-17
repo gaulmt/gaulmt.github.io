@@ -53,7 +53,9 @@
     // Avatar
     UIImageView *avatarView = [[UIImageView alloc] init];
     avatarView.translatesAutoresizingMaskIntoConstraints = NO;
-    avatarView.image = [UIImage imageNamed:@"logo.png"];
+    NSString *settingsLogoPath = [[NSBundle mainBundle] pathForResource:@"logo" ofType:@"png"];
+    avatarView.image = (settingsLogoPath ? [UIImage imageWithContentsOfFile:settingsLogoPath] : nil) ?: [UIImage imageNamed:@"logo"];
+    avatarView.backgroundColor = [UIColor whiteColor];
     avatarView.contentMode = UIViewContentModeScaleAspectFit;
     avatarView.layer.cornerRadius = 40.0;
     avatarView.clipsToBounds = YES;

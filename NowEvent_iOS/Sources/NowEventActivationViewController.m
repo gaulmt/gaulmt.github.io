@@ -34,7 +34,9 @@
     // Logo Small (48x48)
     UIImageView *logoView = [[UIImageView alloc] init];
     logoView.translatesAutoresizingMaskIntoConstraints = NO;
-    logoView.image = [UIImage imageNamed:@"logo.png"];
+    NSString *activationLogoPath = [[NSBundle mainBundle] pathForResource:@"logo" ofType:@"png"];
+    logoView.image = (activationLogoPath ? [UIImage imageWithContentsOfFile:activationLogoPath] : nil) ?: [UIImage imageNamed:@"logo"];
+    logoView.backgroundColor = [UIColor whiteColor];
     logoView.contentMode = UIViewContentModeScaleAspectFit;
     logoView.layer.cornerRadius = 10.0;
     logoView.clipsToBounds = YES;

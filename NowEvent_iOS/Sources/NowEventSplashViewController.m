@@ -27,8 +27,9 @@
     
     // Logo (140x140)
     UIImageView *logoView = [[UIImageView alloc] init];
-    logoView.translatesAutoresizingMaskIntoConstraints = NO;
-    logoView.image = [UIImage imageNamed:@"logo.png"];
+    NSString *splashLogoPath = [[NSBundle mainBundle] pathForResource:@"logo" ofType:@"png"];
+    logoView.image = (splashLogoPath ? [UIImage imageWithContentsOfFile:splashLogoPath] : nil) ?: [UIImage imageNamed:@"logo"];
+    logoView.backgroundColor = [UIColor whiteColor];
     logoView.contentMode = UIViewContentModeScaleAspectFit;
     logoView.layer.cornerRadius = 24.0;
     logoView.clipsToBounds = YES;

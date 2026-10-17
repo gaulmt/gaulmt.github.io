@@ -1,7 +1,6 @@
 #import "NowEventEventsViewController.h"
 #import "NowEventTheme.h"
 #import "NowEventCardCell.h"
-#import <SafariServices/SafariServices.h>
 
 @interface NowEventEventsViewController () <UITableViewDelegate, UITableViewDataSource>
 
@@ -350,8 +349,11 @@
     
     [alert addAction:[UIAlertAction actionWithTitle:@"Mở DoanTN" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         NSURL *url = [NSURL URLWithString:@"https://doantn.iuh.edu.vn"];
-        SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
-        [self presentViewController:safari animated:YES completion:nil];
+        if (@available(iOS 10.0, *)) {
+            [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+        } else {
+            [[UIApplication sharedApplication] openURL:url];
+        }
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];

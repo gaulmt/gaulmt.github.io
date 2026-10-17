@@ -1,7 +1,6 @@
 #import "NowEventHoldToChargeView.h"
 #import "NowEventTheme.h"
 #import <AudioToolbox/AudioToolbox.h>
-#import <AVFoundation/AVFoundation.h>
 
 @interface NowEventHoldToChargeView ()
 
@@ -26,8 +25,6 @@
 @property (nonatomic, strong) UIImpactFeedbackGenerator *hapticMedium;
 @property (nonatomic, strong) UIImpactFeedbackGenerator *hapticHeavy;
 @property (nonatomic, assign) NSTimeInterval lastHapticTime;
-
-@property (nonatomic, strong) AVAudioPlayer *audioPlayer;
 
 @end
 
@@ -62,13 +59,6 @@
     [_hapticLight prepare];
     [_hapticMedium prepare];
     [_hapticHeavy prepare];
-    
-    // Setup Audio
-    NSURL *soundURL = [[NSBundle mainBundle] URLForResource:@"notification_sound" withExtension:@"wav"];
-    if (soundURL) {
-        _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:soundURL error:nil];
-        [_audioPlayer prepareToPlay];
-    }
     
     [self startDisplayLink];
 }
@@ -254,8 +244,15 @@
     self.radarPulseStartTime = CACurrentMediaTime();
     
     // Play notification sound
-    if (self.audioPlayer) {
-        [self.audioPlayer play];
+    static SystemSoundID sIgnitionSound = 0;
+    if (sIgnitionSound == 0) {
+        NSURL *soundURL = [[NSBundle mainBundle] URLForResource:@"notification_sound" withExtension:@"wav"];
+        if (soundURL) {
+            AudioServicesCreateSystemSoundID((__bridge CFURLRef)soundURL, &sIgnitionSound);
+        }
+    }
+    if (sIgnitionSound != 0) {
+        AudioServicesPlaySystemSound(sIgnitionSound);
     } else {
         AudioServicesPlaySystemSound(1007);
     }

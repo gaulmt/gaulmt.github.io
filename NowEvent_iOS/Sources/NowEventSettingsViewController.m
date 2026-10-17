@@ -1,7 +1,5 @@
 #import "NowEventSettingsViewController.h"
 #import "NowEventTheme.h"
-#import "NowEventLoginViewController.h"
-#import "NowEventActivationViewController.h"
 
 @interface NowEventSettingsViewController ()
 
@@ -192,34 +190,6 @@
     self.historyEmptyLabel.numberOfLines = 2;
     [self.historyCard addSubview:self.historyEmptyLabel];
     
-    // 4. Test Ignition Button
-    UIButton *btnReignite = [UIButton buttonWithType:UIButtonTypeCustom];
-    btnReignite.translatesAutoresizingMaskIntoConstraints = NO;
-    btnReignite.backgroundColor = [UIColor colorWithRed:0.94 green:0.95 blue:0.98 alpha:1.0];
-    btnReignite.layer.cornerRadius = 12.0;
-    btnReignite.layer.borderWidth = 1.0;
-    btnReignite.layer.borderColor = [NowEventTheme accentOrange].CGColor;
-    [btnReignite setTitle:@"⚡ Thử kích hoạt lại Trạm Năng Lượng" forState:UIControlStateNormal];
-    [btnReignite setTitleColor:[NowEventTheme accentOrange] forState:UIControlStateNormal];
-    btnReignite.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-    [btnReignite addTarget:self action:@selector(handleReignite) forControlEvents:UIControlEventTouchUpInside];
-    [contentView addSubview:btnReignite];
-    
-    // 5. Logout Button
-    UIButton *btnLogout = [UIButton buttonWithType:UIButtonTypeCustom];
-    btnLogout.translatesAutoresizingMaskIntoConstraints = NO;
-    btnLogout.backgroundColor = [NowEventTheme dangerRed];
-    btnLogout.layer.cornerRadius = 14.0;
-    btnLogout.layer.shadowColor = [NowEventTheme dangerRed].CGColor;
-    btnLogout.layer.shadowOpacity = 0.3;
-    btnLogout.layer.shadowRadius = 8.0;
-    btnLogout.layer.shadowOffset = CGSizeMake(0, 4);
-    [btnLogout setTitle:@"Đăng xuất" forState:UIControlStateNormal];
-    [btnLogout setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    btnLogout.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    [btnLogout addTarget:self action:@selector(handleLogout) forControlEvents:UIControlEventTouchUpInside];
-    [contentView addSubview:btnLogout];
-    
     // Constraints
     [NSLayoutConstraint activateConstraints:@[
         [self.scrollView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
@@ -311,19 +281,7 @@
         [self.historyEmptyLabel.leadingAnchor constraintEqualToAnchor:self.historyCard.leadingAnchor constant:16],
         [self.historyEmptyLabel.trailingAnchor constraintEqualToAnchor:self.historyCard.trailingAnchor constant:-16],
         [self.historyEmptyLabel.bottomAnchor constraintEqualToAnchor:self.historyCard.bottomAnchor constant:-24],
-        
-        // Reignite Button
-        [btnReignite.topAnchor constraintEqualToAnchor:self.historyCard.bottomAnchor constant:20],
-        [btnReignite.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
-        [btnReignite.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
-        [btnReignite.heightAnchor constraintEqualToConstant:46],
-        
-        // Logout Button
-        [btnLogout.topAnchor constraintEqualToAnchor:btnReignite.bottomAnchor constant:14],
-        [btnLogout.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
-        [btnLogout.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
-        [btnLogout.heightAnchor constraintEqualToConstant:52],
-        [btnLogout.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30]
+        [self.historyCard.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30]
     ]];
 }
 
@@ -331,39 +289,6 @@
     UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
     [haptic impactOccurred];
     self.historyEmptyLabel.text = @"Đã xóa toàn bộ lịch sử thông báo!";
-}
-
-- (void)handleReignite {
-    UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
-    [haptic impactOccurred];
-    
-    NowEventActivationViewController *actVC = [[NowEventActivationViewController alloc] init];
-    actVC.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:actVC animated:YES completion:nil];
-}
-
-- (void)handleLogout {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Đăng xuất"
-                                                                   message:@"Bạn có chắc chắn muốn đăng xuất khỏi Now Event?"
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    
-    [alert addAction:[UIAlertAction actionWithTitle:@"Đăng xuất" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        [defaults removeObjectForKey:@"kNowEventLoggedIn"];
-        [defaults removeObjectForKey:@"kNowEventUserName"];
-        [defaults removeObjectForKey:@"kNowEventZaloUID"];
-        [defaults removeObjectForKey:@"kNowEventActivated"];
-        [defaults synchronize];
-        
-        NowEventLoginViewController *loginVC = [[NowEventLoginViewController alloc] init];
-        UIWindow *window = self.view.window ?: [UIApplication sharedApplication].keyWindow;
-        [UIView transitionWithView:window duration:0.4 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
-            window.rootViewController = loginVC;
-        } completion:nil];
-    }]];
-    
-    [alert addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)scrollToTop {

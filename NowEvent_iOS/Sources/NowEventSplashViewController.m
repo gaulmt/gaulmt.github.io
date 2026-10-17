@@ -1,7 +1,5 @@
 #import "NowEventSplashViewController.h"
 #import "NowEventTheme.h"
-#import "NowEventLoginViewController.h"
-#import "NowEventActivationViewController.h"
 #import "NowEventHomeTabBarController.h"
 
 @interface NowEventSplashViewController ()
@@ -97,22 +95,10 @@
 }
 
 - (void)decideNavigation {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL loggedIn = [defaults boolForKey:@"kNowEventLoggedIn"];
-    BOOL activated = [defaults boolForKey:@"kNowEventActivated"];
-    
-    UIViewController *targetVC = nil;
-    if (!loggedIn) {
-        targetVC = [[NowEventLoginViewController alloc] init];
-    } else if (!activated) {
-        targetVC = [[NowEventActivationViewController alloc] init];
-    } else {
-        targetVC = [[NowEventHomeTabBarController alloc] init];
-    }
-    
+    NowEventHomeTabBarController *homeVC = [[NowEventHomeTabBarController alloc] init];
     UIWindow *window = self.view.window ?: [UIApplication sharedApplication].keyWindow;
-    [UIView transitionWithView:window duration:0.4 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
-        window.rootViewController = targetVC;
+    [UIView transitionWithView:window duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+        window.rootViewController = homeVC;
     } completion:nil];
 }
 

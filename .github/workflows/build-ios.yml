@@ -183,8 +183,7 @@ jobs:
               tr -d '\r' < deb_rootless/DEBIAN/postinst > deb_rootless/DEBIAN/postinst.lf
               mv deb_rootless/DEBIAN/postinst.lf deb_rootless/DEBIAN/postinst
               chmod 0755 deb_rootless/DEBIAN/postinst
-              chmod 0755 deb_rootless/DEBIAN
-              dpkg-deb --build --root-owner-group -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+              dpkg-deb -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             fi
             mv control.bak control
 

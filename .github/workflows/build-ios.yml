@@ -244,15 +244,23 @@ jobs:
           git commit -m "Auto-deploy Multi-Product Sileo APT Repository [skip ci]"
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
-      - name: Failure Diagnostics
-        if: failure()
+      - name: Diagnostics & Log Export
+        if: always()
         run: |
-          echo "### ❌ Build Failure Diagnostics" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs
+          echo "=== NOWEVENT BUILD LOG ===" > ci_debug.log
           if [ -f "NowEvent_iOS/build_nen.log" ]; then
-            cat NowEvent_iOS/build_nen.log >> "$GITHUB_STEP_SUMMARY"
+            cat NowEvent_iOS/build_nen.log >> ci_debug.log
+          else
+            echo "build_nen.log not found" >> ci_debug.log
           fi
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "=== BUILD OUT ===" >> ci_debug.log
+          ls -la build_out >> ci_debug.log 2>&1 || true
+          git add -f ci_debug.log
+          git commit -m "ci: build log [skip ci]" || true
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-logs || true
 
       - name: Upload Built Packages (.deb, .tipa, .ipa)
         if: always()

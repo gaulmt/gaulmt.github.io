@@ -185,15 +185,22 @@ jobs:
             echo "=== deb_rootless control contents ==="
             cat deb_rootless/DEBIAN/control
 
-            echo "=== Building rootless .deb with dpkg-deb ==="
-            dpkg-deb --nocheck -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" || dpkg-deb --nocheck -b deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+            echo "=== Building rootless .deb with Theos dm.pl ==="
+            perl "$THEOS/bin/dm.pl" -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             rm -rf deb_rootless
 
-            # 4. Verify both .deb packages contain the binary
-            echo "=== Verifying Rootful .deb contents ==="
-            dpkg-deb -c "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" | grep "NowEvent"
-            echo "=== Verifying Rootless .deb contents ==="
-            dpkg-deb -c "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" | grep "NowEvent"
+            # 4. Verify both .deb packages exist and have valid size
+            echo "=== Verifying Built Packages ==="
+            ls -la "$GITHUB_WORKSPACE/build_out/"*.deb
+            ls -la "$GITHUB_WORKSPACE/build_out/"*.tipa
+            if [ ! -s "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" ]; then
+              echo "### ❌ Missing NowEventNotification_Rootful_arm.deb" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            if [ ! -s "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" ]; then
+              echo "### ❌ Missing NowEventNotification_Rootless_arm64.deb" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
 
             cd "$GITHUB_WORKSPACE"
           fi

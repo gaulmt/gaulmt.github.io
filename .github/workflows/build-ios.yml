@@ -83,27 +83,73 @@ jobs:
             chmod 0755 layout/DEBIAN/postinst
             rm -rf packages .theos
 
-            # 1. Compile NowEvent with Theos
-            make clean all FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
-            NEN_APP=$(find .theos -name "NowEvent.app" -type d | head -n 1)
-            if [ -z "$NEN_APP" ] || [ ! -d "$NEN_APP" ]; then
-              echo "### ❌ NowEvent Compilation Log" >> "$GITHUB_STEP_SUMMARY"
+            # 1. Compile & Stage with Theos
+            set -o pipefail
+            make clean stage FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
+            BUILD_STATUS=$?
+            if [ $BUILD_STATUS -ne 0 ]; then
+              echo "### ❌ NowEvent Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
-              tail -n 60 build_nen.log >> "$GITHUB_STEP_SUMMARY"
+              tail -n 80 build_nen.log >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
 
-            # Copy resources inside app bundle
-            cp -r Resources/* "$NEN_APP/" 2>/dev/null || true
+            # Locate staged app bundle
+            NEN_APP=""
+            if [ -d ".theos/_/Applications/NowEvent.app" ]; then
+              NEN_APP=".theos/_/Applications/NowEvent.app"
+            else
+              NEN_APP=$(find .theos -name "NowEvent.app" -type d | grep -v "/obj/" | head -n 1)
+              if [ -z "$NEN_APP" ]; then
+                NEN_APP=$(find .theos -name "NowEvent.app" -type d | head -n 1)
+              fi
+            fi
 
-            # 2. Build TrollStore .tipa / .ipa
+            echo "Staged app directory: $NEN_APP"
+
+            # Check and ensure executable Mach-O binary exists inside $NEN_APP
+            if [ ! -s "$NEN_APP/NowEvent" ]; then
+              echo "⚠️ Binary not found in $NEN_APP/NowEvent, searching .theos for compiled binary..."
+              BIN_FOUND=$(find .theos -type f -name "NowEvent" ! -name "*.*" ! -path "*/.theos/_*" | head -n 1)
+              if [ -n "$BIN_FOUND" ] && [ -s "$BIN_FOUND" ]; then
+                echo "Found binary at $BIN_FOUND, copying to $NEN_APP/NowEvent"
+                cp -f "$BIN_FOUND" "$NEN_APP/NowEvent"
+              fi
+            fi
+
+            # Copy all resources & assets inside app bundle
+            cp -rf Resources/* "$NEN_APP/" 2>/dev/null || true
+            chmod 0755 "$NEN_APP/NowEvent"
+            ldid -Sentitlements.xml "$NEN_APP/NowEvent"
+
+            # Strict verification of the executable
+            if [ ! -s "$NEN_APP/NowEvent" ]; then
+              echo "### ❌ FATAL: NowEvent executable binary is missing or empty!" >> "$GITHUB_STEP_SUMMARY"
+              ls -laR .theos >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            echo "=== Executable Binary Info ==="
+            ls -la "$NEN_APP/NowEvent"
+            file "$NEN_APP/NowEvent"
+
+            # 2. Build TrollStore .tipa & .ipa
             mkdir -p "$GITHUB_WORKSPACE/build_out/Payload"
             cp -r "$NEN_APP" "$GITHUB_WORKSPACE/build_out/Payload/NowEvent.app"
             cd "$GITHUB_WORKSPACE/build_out"
             zip -r9 NowEventNotification.tipa Payload
             cp NowEventNotification.tipa NowEventNotification.ipa
             rm -rf Payload
+
+            # Verify TrollStore .tipa contains NowEvent binary!
+            echo "=== Verifying TrollStore .tipa contents ==="
+            unzip -l NowEventNotification.tipa | grep "NowEvent"
+            if ! unzip -l NowEventNotification.tipa | grep -q "Payload/NowEvent.app/NowEvent"; then
+              echo "### ❌ FATAL: NowEventNotification.tipa does not contain Payload/NowEvent.app/NowEvent!" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
             cd "$GITHUB_WORKSPACE/NowEvent_iOS"
 
             # 3. Direct dpkg-deb Packaging: Rootful (iphoneos-arm)
@@ -129,6 +175,12 @@ jobs:
             chmod 0755 deb_rootless/DEBIAN/postinst
             dpkg-deb -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
 
+            # Verify both .deb packages contain the binary
+            echo "=== Verifying Rootful .deb contents ==="
+            dpkg-deb -c "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" | grep "NowEvent"
+            echo "=== Verifying Rootless .deb contents ==="
+            dpkg-deb -c "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" | grep "NowEvent"
+
             cd "$GITHUB_WORKSPACE"
           fi
 
@@ -137,7 +189,12 @@ jobs:
           STAGE_DIR="$GITHUB_WORKSPACE/sileo_stage"
           mkdir -p "$STAGE_DIR/debs" "$STAGE_DIR/downloads" "$STAGE_DIR/icons" "$STAGE_DIR/depictions"
 
-          # 1. Copy newly built ZTech packages
+          # 1. First copy static baseline packages from packages/ (if any exist)
+          if [ -d "packages" ]; then
+            cp -v packages/*.deb "$STAGE_DIR/debs/" 2>/dev/null || true
+          fi
+
+          # 2. Copy freshly built ZTech packages (overwriting any static ones)
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_Rootful_arm.deb" "$STAGE_DIR/debs/gaulmt_Tech_Rootful_arm.deb"
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_Rootless_arm64.deb" "$STAGE_DIR/debs/gaulmt_Tech_Rootless_arm64.deb"
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_Rootless_arm64.deb" "$STAGE_DIR/debs/ZTech_Rootless_arm64.deb"
@@ -147,7 +204,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_TrollStore.tipa" "$STAGE_DIR/downloads/gaulmt_Tech_TrollStore.tipa"
           cp "$GITHUB_WORKSPACE/build_out/gaulmt_Tech_App.ipa" "$STAGE_DIR/downloads/gaulmt_Tech_App.ipa" 2>/dev/null || true
 
-          # 2. Copy newly built NowEvent packages
+          # 3. Copy freshly built NowEvent packages (overwriting any static ones)
           if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" ]; then
             cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" "$STAGE_DIR/debs/"
           fi
@@ -163,11 +220,6 @@ jobs:
           fi
           if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa" ]; then
             cp "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa" "$STAGE_DIR/downloads/"
-          fi
-
-          # 2. Copy all other packages from packages/ (including NowEventNotification)
-          if [ -d "packages" ]; then
-            cp -v packages/*.deb "$STAGE_DIR/debs/" 2>/dev/null || true
           fi
 
           # 3. Copy downloads (including NowEventNotification.apk)

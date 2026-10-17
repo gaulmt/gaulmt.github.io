@@ -87,6 +87,10 @@ jobs:
             make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen_rootful.log || true
             if [ -d packages ] && [ -n "$(ls -A packages/*.deb 2>/dev/null)" ]; then
               cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
+              cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb"
+            else
+              echo "::warning ::NowEvent Rootful build had issues. Check build_nen_rootful.log:"
+              tail -n 40 build_nen_rootful.log || true
             fi
 
             # TrollStore .tipa / .ipa
@@ -135,6 +139,9 @@ jobs:
           fi
           if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" ]; then
             cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" "$STAGE_DIR/debs/"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb" ]; then
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb" "$STAGE_DIR/debs/"
           fi
           if [ -f "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" ]; then
             cp "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$STAGE_DIR/downloads/"

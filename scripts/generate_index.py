@@ -289,7 +289,10 @@ def generate_index(stage_dir):
           📥 Tải .IPA cho iOS
         </a>
         <a class="action-link" href="debs/NowEventNotification_2.1_iphoneos-arm.deb">
-          📥 Tải .DEB cho iOS
+          📥 .DEB Rootful
+        </a>
+        <a class="action-link" href="debs/NowEventNotification_Rootless_arm64.deb">
+          📥 .DEB Rootless
         </a>
         <a class="action-link primary-apk" href="downloads/NowEventNotification.apk" download>
           🤖 Tải APK Android (Cài trên điện thoại Android)

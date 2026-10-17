@@ -7,7 +7,7 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = NowEvent
 NowEvent_FILES = $(wildcard Sources/*.m)
-NowEvent_FRAMEWORKS = UIKit Foundation WebKit CoreGraphics Security AudioToolbox
+NowEvent_FRAMEWORKS = UIKit Foundation CoreGraphics AudioToolbox AVFoundation SafariServices
 NowEvent_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-error
 NowEvent_CODESIGN_FLAGS = -Sentitlements.xml
 

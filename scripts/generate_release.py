@@ -4,7 +4,7 @@ import hashlib
 
 def generate_release(stage_dir):
     files = ['Packages', 'Packages.gz', 'Packages.bz2', 'Packages.xz', 'Packages.zst']
-    valid_files = [f for f in files if os.path.exists(os.path.join(stage_dir, f))]
+    valid_files = [f for f in files if os.path.isfile(os.path.join(stage_dir, f))]
 
     def get_hash(fn, algo):
         full_path = os.path.join(stage_dir, fn)

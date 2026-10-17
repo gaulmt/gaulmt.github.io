@@ -83,9 +83,9 @@ jobs:
             chmod 0755 layout/DEBIAN/postinst
             rm -rf packages .theos
 
-            # 1. Compile & Stage with Theos
+            # 1. Compile & Package Rootful with Theos
             set -o pipefail
-            make clean stage FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
+            make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
             BUILD_STATUS=$?
             if [ $BUILD_STATUS -ne 0 ]; then
               echo "### ❌ NowEvent Compilation Failure" >> "$GITHUB_STEP_SUMMARY"

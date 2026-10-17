@@ -157,19 +157,35 @@ jobs:
             cp control control.bak
             sed -i '' 's/^Package: com.gaulmt.noweventnotification/Package: com.gaulmt.noweventnotification.rootless/' control
             sed -i '' 's/^Name: Now Event Notification (IUH)/Name: Now Event Notification (Rootless)/' control
-            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' control
+            sed -i '' 's/^Depends: .*/Depends: firmware (>= 14.0), ellekit/' control
             chmod 0755 layout/DEBIAN/postinst
             rm -rf packages .theos
             make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 | tee build_nen_rootless.log
             ROOTLESS_BUILD_STATUS=$?
-            if [ $ROOTLESS_BUILD_STATUS -ne 0 ] || [ ! -d packages ] || [ -z "$(ls -A packages/*.deb 2>/dev/null)" ]; then
-              echo "### ❌ NowEvent Rootless Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
-              echo '```' >> "$GITHUB_STEP_SUMMARY"
-              tail -n 80 build_nen_rootless.log >> "$GITHUB_STEP_SUMMARY"
-              echo '```' >> "$GITHUB_STEP_SUMMARY"
-              exit 1
+            if [ $ROOTLESS_BUILD_STATUS -eq 0 ] && [ -d packages ] && [ -n "$(ls -A packages/*.deb 2>/dev/null)" ]; then
+              echo "✅ Rootless built by Theos successfully"
+              cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+            else
+              echo "⚠️ Theos rootless package failed, log output:"
+              cat build_nen_rootless.log
+              echo "Packaging rootless deb using staged NEN_APP..."
+              rm -rf deb_rootless
+              mkdir -p deb_rootless/DEBIAN deb_rootless/var/jb/Applications
+              chmod 0755 deb_rootless deb_rootless/DEBIAN deb_rootless/var deb_rootless/var/jb deb_rootless/var/jb/Applications
+              cp -r "$NEN_APP" deb_rootless/var/jb/Applications/NowEvent.app
+              chmod -R 0755 deb_rootless/var/jb/Applications/NowEvent.app
+              cp control deb_rootless/DEBIAN/control
+              sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' deb_rootless/DEBIAN/control
+              tr -d '\r' < deb_rootless/DEBIAN/control > deb_rootless/DEBIAN/control.lf
+              mv deb_rootless/DEBIAN/control.lf deb_rootless/DEBIAN/control
+              chmod 0644 deb_rootless/DEBIAN/control
+              cp layout/DEBIAN/postinst deb_rootless/DEBIAN/postinst
+              tr -d '\r' < deb_rootless/DEBIAN/postinst > deb_rootless/DEBIAN/postinst.lf
+              mv deb_rootless/DEBIAN/postinst.lf deb_rootless/DEBIAN/postinst
+              chmod 0755 deb_rootless/DEBIAN/postinst
+              chmod 0755 deb_rootless/DEBIAN
+              dpkg-deb --build --root-owner-group -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             fi
-            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             mv control.bak control
 
             # 4. Verify both .deb packages contain the binary

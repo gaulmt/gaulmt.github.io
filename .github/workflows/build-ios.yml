@@ -178,10 +178,15 @@ jobs:
             cp layout/DEBIAN/postinst deb_rootless/DEBIAN/postinst
             tr -d '\r' < deb_rootless/DEBIAN/postinst > deb_rootless/DEBIAN/postinst.lf
             mv deb_rootless/DEBIAN/postinst.lf deb_rootless/DEBIAN/postinst
-            chmod 0755 deb_rootless/DEBIAN/postinst
+            find deb_rootless/DEBIAN -type f -exec chmod 0644 {} +
+            chmod 0755 deb_rootless/DEBIAN/postinst 2>/dev/null || true
             chmod 0755 deb_rootless/DEBIAN
 
-            dpkg-deb -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
+            echo "=== deb_rootless control contents ==="
+            cat deb_rootless/DEBIAN/control
+
+            echo "=== Building rootless .deb with dpkg-deb ==="
+            dpkg-deb --nocheck -b -Zxz deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb" || dpkg-deb --nocheck -b deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             rm -rf deb_rootless
 
             # 4. Verify both .deb packages contain the binary

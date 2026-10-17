@@ -25,7 +25,11 @@ def pack_deb(src_dir, out_deb):
                 ti.mode = 0o644
             if os.path.isfile(full):
                 with open(full, 'rb') as f:
-                    tar.addfile(ti, f)
+                    content = f.read()
+                if item in ('control', 'postinst', 'prerm', 'postrm', 'preinst'):
+                    content = content.replace(b'\r\n', b'\n')
+                ti.size = len(content)
+                tar.addfile(ti, io.BytesIO(content))
             else:
                 tar.addfile(ti)
     ctrl_data = ctrl_buf.getvalue()

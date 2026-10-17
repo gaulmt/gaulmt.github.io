@@ -76,25 +76,21 @@ jobs:
 
       - name: Build NowEvent iOS .deb (Rootful, Rootless) & TrollStore .tipa / .ipa
         run: |
+          set -e
           if [ -d "NowEvent_iOS" ]; then
+            echo "=== Building NowEvent iOS ==="
             cd NowEvent_iOS
-            tr -d '\r' < layout/DEBIAN/postinst > layout/DEBIAN/postinst.lf
-            mv layout/DEBIAN/postinst.lf layout/DEBIAN/postinst
-            chmod 0755 layout/DEBIAN/postinst
-            rm -rf packages .theos
+            rm -rf packages .theos build_nen.log
 
-            # 1. Compile & Package Rootful with Theos
-            make clean package FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen_rootful.log
-            BUILD_STATUS=${PIPESTATUS[0]}
-            if [ $BUILD_STATUS -ne 0 ] || [ ! -d packages ] || [ -z "$(ls -A packages/*.deb 2>/dev/null)" ]; then
-              echo "### ❌ NowEvent Rootful Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
+            # 1. Compile Mach-O binary and stage app bundle with Theos
+            make clean all stage FINALPACKAGE=1 messages=yes 2>&1 | tee build_nen.log
+            if [ ! -d ".theos" ]; then
+              echo "### ❌ NowEvent Compilation Failure" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
-              tail -n 80 build_nen_rootful.log >> "$GITHUB_STEP_SUMMARY"
+              tail -n 80 build_nen.log >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
-            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
-            cp packages/*.deb "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb"
 
             # Locate staged app bundle containing compiled binary
             NEN_APP=""
@@ -109,7 +105,7 @@ jobs:
 
             echo "Staged app directory: $NEN_APP"
 
-            # Check and ensure executable Mach-O binary exists inside $NEN_APP
+            # Ensure executable Mach-O binary exists inside $NEN_APP
             if [ ! -s "$NEN_APP/NowEvent" ]; then
               echo "⚠️ Binary not found in $NEN_APP/NowEvent, searching .theos for compiled binary..."
               BIN_FOUND=$(find .theos -type f -name "NowEvent" ! -name "*.*" ! -path "*/.theos/_*" | head -n 1)
@@ -143,39 +139,28 @@ jobs:
             # 2. Build TrollStore .tipa & .ipa using pack_tipa.py
             python3 "$GITHUB_WORKSPACE/scripts/pack_tipa.py" "$STAGED_APP" "$GITHUB_WORKSPACE/build_out/NowEventNotification.tipa" "$GITHUB_WORKSPACE/build_out/NowEventNotification.ipa"
 
-            # 3. Build Rootless .deb (Dopamine / palera1n iphoneos-arm64)
-            cd "$GITHUB_WORKSPACE/NowEvent_iOS"
+            # 3. Build Rootful .deb (Standard iphoneos-arm)
+            echo "Packaging rootful deb using staged app..."
+            rm -rf deb_rootful
+            mkdir -p deb_rootful/DEBIAN deb_rootful/Applications
+            cp -r "$STAGED_APP" deb_rootful/Applications/NowEvent.app
+            cp control deb_rootful/DEBIAN/control
+            cp layout/DEBIAN/postinst deb_rootful/DEBIAN/postinst
+            python3 "$GITHUB_WORKSPACE/scripts/pack_deb.py" deb_rootful "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb"
+            cp "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootful_arm.deb" "$GITHUB_WORKSPACE/build_out/NowEventNotification_2.1_iphoneos-arm.deb"
+            rm -rf deb_rootful
+
+            # 4. Build Rootless .deb (Dopamine / palera1n iphoneos-arm64)
             echo "Packaging rootless deb using staged app..."
             rm -rf deb_rootless
             mkdir -p deb_rootless/DEBIAN deb_rootless/var/jb/Applications
-            chmod 0755 deb_rootless deb_rootless/DEBIAN deb_rootless/var deb_rootless/var/jb deb_rootless/var/jb/Applications
             cp -r "$STAGED_APP" deb_rootless/var/jb/Applications/NowEvent.app
-            chmod -R 0755 deb_rootless/var/jb/Applications/NowEvent.app
-
-            cp control deb_rootless/DEBIAN/control
-            sed -i '' 's/^Package: com.gaulmt.noweventnotification/Package: com.gaulmt.noweventnotification.rootless/' deb_rootless/DEBIAN/control
-            sed -i '' 's/^Name: Now Event Notification (IUH)/Name: Now Event Notification (Rootless)/' deb_rootless/DEBIAN/control
-            sed -i '' 's/^Architecture: .*/Architecture: iphoneos-arm64/' deb_rootless/DEBIAN/control
-            sed -i '' 's/^Depends: .*/Depends: firmware (>= 14.0), ellekit/' deb_rootless/DEBIAN/control
-            tr -d '\r' < deb_rootless/DEBIAN/control > deb_rootless/DEBIAN/control.lf
-            mv deb_rootless/DEBIAN/control.lf deb_rootless/DEBIAN/control
-            chmod 0644 deb_rootless/DEBIAN/control
-
+            python3 "$GITHUB_WORKSPACE/scripts/prep_rootless_control.py" control deb_rootless/DEBIAN/control
             cp layout/DEBIAN/postinst deb_rootless/DEBIAN/postinst
-            tr -d '\r' < deb_rootless/DEBIAN/postinst > deb_rootless/DEBIAN/postinst.lf
-            mv deb_rootless/DEBIAN/postinst.lf deb_rootless/DEBIAN/postinst
-            find deb_rootless/DEBIAN -type f -exec chmod 0644 {} +
-            chmod 0755 deb_rootless/DEBIAN/postinst 2>/dev/null || true
-            chmod 0755 deb_rootless/DEBIAN
-
-            echo "=== deb_rootless control contents ==="
-            cat deb_rootless/DEBIAN/control
-
-            echo "=== Building rootless .deb with pack_deb.py ==="
             python3 "$GITHUB_WORKSPACE/scripts/pack_deb.py" deb_rootless "$GITHUB_WORKSPACE/build_out/NowEventNotification_Rootless_arm64.deb"
             rm -rf deb_rootless
 
-            # 4. Verify all output packages exist and are valid size (>50KB)
+            # 5. Verify all output packages exist and are valid size (>50KB)
             python3 "$GITHUB_WORKSPACE/scripts/verify_packages.py" "$GITHUB_WORKSPACE/build_out"
 
             cd "$GITHUB_WORKSPACE"

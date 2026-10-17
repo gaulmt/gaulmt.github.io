@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/CydiaIcon@3x.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "quang lam marketing v5.6.2"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Công cụ **quang lam marketing v5.6.2**:\n\n- **Bắt Trọn Kết Quả MobileGestalt (`MGCopyAnswerWithError`)**: Tự động chặn và ghi đè model, board-id, OS version thật sang thông số máy ảo.\n- **Hậu Xử Lý Động Sysctl & IOKit**: Xoá sạch mọi dấu vết model máy thật trả về từ `sysctl`, `sysctlbyname` và `IORegistryEntryCreateCFProperty`.\n- **Lọc Gói Tin Mạng HTTP / User-Agent Động**: Tự động chuyển đổi `Scale/2.00` và `Scale/3.00`, User-Agent, model header linh hoạt theo thiết bị mục tiêu.\n- **Tự Động Nạp Cấu Hình Mới Nhất**: Tương thích hoàn toàn Zalo, AIDA64 và các ứng dụng quét phần cứng."
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Nhà phát triển",
+          "text": "quang lam marketing"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "5.6.2"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Tương thích",
+          "text": "iOS 12.0 - 17.0+"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/CydiaIcon@3x.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "quang lam marketing (Rootless)"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Bản phát hành đặc biệt **Rootless** dành cho Dopamine, palera1n (iOS 15 - 16+):\n\n- Tự động symlink TweakInject vào `/var/jb`.\n- Chặn sạch MobileGestalt, sysctl và IOKit registry.\n- Tương thích hoàn toàn Zalo, AIDA64 và các ứng dụng quét phần cứng."
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Nhà phát triển",
+          "text": "quang lam marketing"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "5.6.2"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Môi trường",
+          "text": "Rootless (Dopamine / palera1n)"
+        }
+      ]
+    }
+  ]
+}

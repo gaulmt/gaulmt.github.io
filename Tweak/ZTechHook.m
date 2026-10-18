@@ -26,8 +26,6 @@
 #import <execinfo.h>
 #import <signal.h>
 #import <time.h>
-#import <fcntl.h>
-#import <stdarg.h>
 #if __has_feature(ptrauth_calls)
 #import <ptrauth.h>
 #endif
@@ -1104,10 +1102,6 @@ typedef struct {
 static ZTechAddrRange gAppImageRanges[128];
 static volatile int gAppImageRangeCount = 0;
 
-static int hooked_access(const char *path, int mode);
-static int hooked_stat(const char *path, struct stat *buf);
-static int hooked_lstat(const char *path, struct stat *buf);
-
 static void ZTechRebindImageAndRecordRange(const struct mach_header *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
     Dl_info info;
@@ -1199,12 +1193,6 @@ static void ZTechRebindImageAndRecordRange(const struct mach_header *header, int
                                 bindings[k] = (void *)hooked_SCDynamicStoreCopyLocalHostName;
                             } else if (strcmp(sym_name, "__CFCopySystemVersionDictionary") == 0) {
                                 bindings[k] = (void *)hooked_CFCopySystemVersionDictionary;
-                            } else if (strcmp(sym_name, "_access") == 0) {
-                                bindings[k] = (void *)hooked_access;
-                            } else if (strcmp(sym_name, "_stat") == 0) {
-                                bindings[k] = (void *)hooked_stat;
-                            } else if (strcmp(sym_name, "_lstat") == 0) {
-                                bindings[k] = (void *)hooked_lstat;
                             }
                         }
                     }
@@ -1265,14 +1253,6 @@ static NSString *swizzled_mobileNetworkCode(id self, SEL _cmd) {
     if ([gCarrierNameObj isEqualToString:@"Vinaphone"]) return @"02";
     if ([gCarrierNameObj isEqualToString:@"Vietnamobile"]) return @"05";
     return @"04";
-}
-
-static BOOL swizzled_DCDevice_isSupported(id self, SEL _cmd) {
-    return NO;
-}
-
-static BOOL swizzled_DCAppAttestService_isSupported(id self, SEL _cmd) {
-    return NO;
 }
 
 static NSString *(*orig_systemVersion)(id, SEL) = NULL;
@@ -1597,10 +1577,7 @@ static inline BOOL ZTechIsJailbreakPath(const char *path) {
         strstr(path, "/Applications/Cydia.app") != NULL ||
         strstr(path, "/Applications/Sileo.app") != NULL ||
         strstr(path, "/Applications/Zebra.app") != NULL ||
-        strstr(path, "/Applications/Filza.app") != NULL ||
-        strstr(path, "/usr/lib/TweakInject") != NULL ||
-        strstr(path, "/var/log/dpkg") != NULL ||
-        strstr(path, "/Library/PreferenceLoader") != NULL) {
+        strstr(path, "/Applications/Filza.app") != NULL) {
         return YES;
     }
     return NO;
@@ -2529,25 +2506,6 @@ static void ZTechHookInit(void) {
             void *raw_dyld = dlsym(RTLD_DEFAULT, "_dyld_get_image_name");
             if (raw_dyld) pMSHook(raw_dyld, (void *)hooked_dyld_get_image_name, (void **)&orig_dyld_get_image_name);
         }
-
-        // Apple DeviceCheck & DCAppAttestService Hardware Attestation Neutralization (Pure C IMP - PAC Safe)
-        @try {
-            Class dcDevCls = objc_getClass("DCDevice");
-            if (dcDevCls) {
-                Method mSup = class_getInstanceMethod(dcDevCls, @selector(isSupported));
-                if (mSup) {
-                    method_setImplementation(mSup, (IMP)swizzled_DCDevice_isSupported);
-                }
-            }
-            Class dcAttestCls = objc_getClass("DCAppAttestService");
-            if (dcAttestCls) {
-                Method mSup = class_getInstanceMethod(dcAttestCls, @selector(isSupported));
-                if (mSup) {
-                    method_setImplementation(mSup, (IMP)swizzled_DCAppAttestService_isSupported);
-                }
-            }
-            ZTechHookTrace("[DeviceCheck] DCDevice & DCAppAttestService hardware attestation neutralized (PAC-safe)");
-        } @catch (NSException *e) {}
 
         struct utsname verifyUts;
         memset(&verifyUts, 0, sizeof(verifyUts));

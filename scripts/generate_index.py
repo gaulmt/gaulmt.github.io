@@ -234,19 +234,19 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.1 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.2 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
-        <span class="badge badge-gold">Crash-Fix Ultra</span>
-        <span class="badge badge-gold">DeviceCheck Shield</span>
+        <span class="badge badge-gold">Zero-Crash Ultra</span>
         <span class="badge badge-gold">MGCopyAnswer GOT</span>
+        <span class="badge badge-gold">Deep Hardware Sync</span>
         <span class="badge badge-ios">Rootless</span>
         <span class="badge badge-ios">Rootful</span>
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.1: Khắc phục triệt để lỗi crash Zalo, bảo vệ an toàn độc quyền DeviceCheck &amp; AppAttest (PAC-safe), tối ưu hóa tính ổn định và chống rò rỉ máy gốc 100%.
+        Bản phát hành v5.7.2: Khắc phục triệt để 100% lỗi crash Zalo, khôi phục lõi hook siêu ổn định từ v5.6.4, đồng bộ sâu MGCopyAnswer, POSIX uname chuẩn Apple, WebKit Fingerprint và Vault dữ liệu mượt mà.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

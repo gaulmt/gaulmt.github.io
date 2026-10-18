@@ -285,7 +285,7 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
         }
     }
     if (!foundTrace) {
-        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace — Hãy mở Zalo 1 lần sau khi cập nhật v5.7.0]\n"];
+        [outStr appendString:@"- Hook Trace: [Chưa có nhật ký hook trace — Hãy mở Zalo 1 lần sau khi cập nhật v5.7.1]\n"];
     }
 
     // 6.2 Check in-process Crash / AtExit Log (inside Zalo container first, then /var/tmp)

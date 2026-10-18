@@ -1107,8 +1107,6 @@ static volatile int gAppImageRangeCount = 0;
 static int hooked_access(const char *path, int mode);
 static int hooked_stat(const char *path, struct stat *buf);
 static int hooked_lstat(const char *path, struct stat *buf);
-static FILE *hooked_fopen(const char *path, const char *mode);
-static int hooked_open(const char *path, int oflag, ...);
 
 static void ZTechRebindImageAndRecordRange(const struct mach_header *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
@@ -1207,10 +1205,6 @@ static void ZTechRebindImageAndRecordRange(const struct mach_header *header, int
                                 bindings[k] = (void *)hooked_stat;
                             } else if (strcmp(sym_name, "_lstat") == 0) {
                                 bindings[k] = (void *)hooked_lstat;
-                            } else if (strcmp(sym_name, "_fopen") == 0) {
-                                bindings[k] = (void *)hooked_fopen;
-                            } else if (strcmp(sym_name, "_open") == 0) {
-                                bindings[k] = (void *)hooked_open;
                             }
                         }
                     }
@@ -1273,38 +1267,12 @@ static NSString *swizzled_mobileNetworkCode(id self, SEL _cmd) {
     return @"04";
 }
 
-@interface ZTechCarrierStub : NSObject
-- (NSString *)carrierName;
-- (NSString *)isoCountryCode;
-- (NSString *)mobileCountryCode;
-- (NSString *)mobileNetworkCode;
-- (BOOL)allowsVOIP;
-@end
+static BOOL swizzled_DCDevice_isSupported(id self, SEL _cmd) {
+    return NO;
+}
 
-@implementation ZTechCarrierStub
-- (NSString *)carrierName { return gCarrierNameObj ?: @"Viettel"; }
-- (NSString *)isoCountryCode { return @"vn"; }
-- (NSString *)mobileCountryCode { return @"452"; }
-- (NSString *)mobileNetworkCode {
-    if ([gCarrierNameObj isEqualToString:@"MobiFone"]) return @"01";
-    if ([gCarrierNameObj isEqualToString:@"Vinaphone"]) return @"02";
-    if ([gCarrierNameObj isEqualToString:@"Vietnamobile"]) return @"05";
-    return @"04";
-}
-- (BOOL)allowsVOIP { return YES; }
-@end
-
-static id swizzled_subscriberCellularProvider(id self, SEL _cmd) {
-    return [[ZTechCarrierStub alloc] init];
-}
-static id swizzled_serviceSubscriberCellularProviders(id self, SEL _cmd) {
-    return @{@"0000000100000001": [[ZTechCarrierStub alloc] init]};
-}
-static id swizzled_serviceCurrentRadioAccessTechnology(id self, SEL _cmd) {
-    return @{@"0000000100000001": @"CTRadioAccessTechnologyLTE"};
-}
-static id swizzled_currentRadioAccessTechnology(id self, SEL _cmd) {
-    return @"CTRadioAccessTechnologyLTE";
+static BOOL swizzled_DCAppAttestService_isSupported(id self, SEL _cmd) {
+    return NO;
 }
 
 static NSString *(*orig_systemVersion)(id, SEL) = NULL;
@@ -1666,54 +1634,6 @@ static int hooked_lstat(const char *path, struct stat *buf) {
     }
     if (orig_lstat) return orig_lstat(path, buf);
     return lstat(path, buf);
-}
-
-static FILE *(*orig_fopen)(const char *path, const char *mode) = NULL;
-static FILE *hooked_fopen(const char *path, const char *mode) {
-    if (ZTechIsJailbreakPath(path)) {
-        errno = ENOENT;
-        return NULL;
-    }
-    if (orig_fopen) return orig_fopen(path, mode);
-    return fopen(path, mode);
-}
-
-static int (*orig_open)(const char *path, int oflag, ...) = NULL;
-static int hooked_open(const char *path, int oflag, ...) {
-    mode_t mode = 0;
-    if (oflag & O_CREAT) {
-        va_list args;
-        va_start(args, oflag);
-        mode = (mode_t)va_arg(args, int);
-        va_end(args);
-    }
-    if (ZTechIsJailbreakPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (orig_open) {
-        return (oflag & O_CREAT) ? orig_open(path, oflag, mode) : orig_open(path, oflag);
-    }
-    return (oflag & O_CREAT) ? open(path, oflag, mode) : open(path, oflag);
-}
-
-static BOOL (*orig_NSFileManager_fileExistsAtPath)(id, SEL, NSString *) = NULL;
-static BOOL swizzled_NSFileManager_fileExistsAtPath(id self, SEL _cmd, NSString *path) {
-    if (path && [path isKindOfClass:[NSString class]] && ZTechIsJailbreakPath([path UTF8String])) {
-        return NO;
-    }
-    if (orig_NSFileManager_fileExistsAtPath) return orig_NSFileManager_fileExistsAtPath(self, _cmd, path);
-    return NO;
-}
-
-static BOOL (*orig_NSFileManager_fileExistsAtPath_isDir)(id, SEL, NSString *, BOOL *) = NULL;
-static BOOL swizzled_NSFileManager_fileExistsAtPath_isDir(id self, SEL _cmd, NSString *path, BOOL *isDir) {
-    if (path && [path isKindOfClass:[NSString class]] && ZTechIsJailbreakPath([path UTF8String])) {
-        if (isDir) *isDir = NO;
-        return NO;
-    }
-    if (orig_NSFileManager_fileExistsAtPath_isDir) return orig_NSFileManager_fileExistsAtPath_isDir(self, _cmd, path, isDir);
-    return NO;
 }
 
 static const char *(*orig_dyld_get_image_name)(uint32_t image_index) = NULL;
@@ -2518,19 +2438,6 @@ static void ZTechHookInit(void) {
             } else {
                 ZTechHookTrace("[4/6] CTCarrier not loaded (skipped)");
             }
-
-            Class ctNetInfoCls = objc_getClass("CTTelephonyNetworkInfo");
-            if (ctNetInfoCls) {
-                Method mSub = class_getInstanceMethod(ctNetInfoCls, @selector(subscriberCellularProvider));
-                if (mSub) method_setImplementation(mSub, (IMP)swizzled_subscriberCellularProvider);
-                Method mSubs = class_getInstanceMethod(ctNetInfoCls, @selector(serviceSubscriberCellularProviders));
-                if (mSubs) method_setImplementation(mSubs, (IMP)swizzled_serviceSubscriberCellularProviders);
-                Method mRat = class_getInstanceMethod(ctNetInfoCls, @selector(currentRadioAccessTechnology));
-                if (mRat) method_setImplementation(mRat, (IMP)swizzled_currentRadioAccessTechnology);
-                Method mRats = class_getInstanceMethod(ctNetInfoCls, @selector(serviceCurrentRadioAccessTechnology));
-                if (mRats) method_setImplementation(mRats, (IMP)swizzled_serviceCurrentRadioAccessTechnology);
-                ZTechHookTrace("[4/6] CTTelephonyNetworkInfo Dual-SIM swizzled successfully");
-            }
         } @catch (NSException *e) {
             ZTechHookTrace([[NSString stringWithFormat:@"[4/6 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
         }
@@ -2619,79 +2526,27 @@ static void ZTechHookInit(void) {
             void *raw_lstat = dlsym(RTLD_DEFAULT, "lstat");
             if (raw_lstat) pMSHook(raw_lstat, (void *)hooked_lstat, (void **)&orig_lstat);
 
-            void *raw_fopen = dlsym(RTLD_DEFAULT, "fopen");
-            if (raw_fopen) pMSHook(raw_fopen, (void *)hooked_fopen, (void **)&orig_fopen);
-
-            void *raw_open = dlsym(RTLD_DEFAULT, "open");
-            if (raw_open) pMSHook(raw_open, (void *)hooked_open, (void **)&orig_open);
-
             void *raw_dyld = dlsym(RTLD_DEFAULT, "_dyld_get_image_name");
             if (raw_dyld) pMSHook(raw_dyld, (void *)hooked_dyld_get_image_name, (void **)&orig_dyld_get_image_name);
         }
 
-        // NSFileManager Anti-Jailbreak Protection
-        @try {
-            Class fmCls = objc_getClass("NSFileManager");
-            if (fmCls) {
-                Method mEx = class_getInstanceMethod(fmCls, @selector(fileExistsAtPath:));
-                if (mEx) {
-                    orig_NSFileManager_fileExistsAtPath = (void *)method_getImplementation(mEx);
-                    method_setImplementation(mEx, (IMP)swizzled_NSFileManager_fileExistsAtPath);
-                }
-                Method mExDir = class_getInstanceMethod(fmCls, @selector(fileExistsAtPath:isDirectory:));
-                if (mExDir) {
-                    orig_NSFileManager_fileExistsAtPath_isDir = (void *)method_getImplementation(mExDir);
-                    method_setImplementation(mExDir, (IMP)swizzled_NSFileManager_fileExistsAtPath_isDir);
-                }
-                ZTechHookTrace("[Anti-JB] NSFileManager fileExistsAtPath swizzled successfully");
-            }
-        } @catch (NSException *e) {}
-
-        // Apple DeviceCheck & DCAppAttestService Hardware Attestation Neutralization
+        // Apple DeviceCheck & DCAppAttestService Hardware Attestation Neutralization (Pure C IMP - PAC Safe)
         @try {
             Class dcDevCls = objc_getClass("DCDevice");
             if (dcDevCls) {
                 Method mSup = class_getInstanceMethod(dcDevCls, @selector(isSupported));
                 if (mSup) {
-                    method_setImplementation(mSup, imp_implementationWithBlock(^BOOL(id self) {
-                        return NO;
-                    }));
+                    method_setImplementation(mSup, (IMP)swizzled_DCDevice_isSupported);
                 }
             }
             Class dcAttestCls = objc_getClass("DCAppAttestService");
             if (dcAttestCls) {
                 Method mSup = class_getInstanceMethod(dcAttestCls, @selector(isSupported));
                 if (mSup) {
-                    method_setImplementation(mSup, imp_implementationWithBlock(^BOOL(id self) {
-                        return NO;
-                    }));
+                    method_setImplementation(mSup, (IMP)swizzled_DCAppAttestService_isSupported);
                 }
             }
-            ZTechHookTrace("[DeviceCheck] DCDevice & DCAppAttestService hardware attestation neutralized");
-        } @catch (NSException *e) {}
-
-        // UIPasteboard Clipboard Privacy Filter for Zalo
-        @try {
-            Class pbCls = objc_getClass("UIPasteboard");
-            if (pbCls && isZalo) {
-                Method mStr = class_getInstanceMethod(pbCls, @selector(string));
-                if (mStr) {
-                    NSString *(*orig_pb_string)(id, SEL) = (void *)method_getImplementation(mStr);
-                    method_setImplementation(mStr, imp_implementationWithBlock(^NSString *(id self) {
-                        NSString *realStr = orig_pb_string ? orig_pb_string(self, @selector(string)) : nil;
-                        if (!realStr || ![realStr isKindOfClass:[NSString class]]) return realStr;
-                        NSString *lower = [realStr lowercaseString];
-                        if ([lower containsString:@"ztech"] || [lower containsString:@"quang lam"] ||
-                            [lower containsString:@"socks5://"] || [lower containsString:@"http://"] ||
-                            [lower containsString:@"://"] || [lower containsString:@".deb"] ||
-                            [lower containsString:@"rootless"] || [lower containsString:@"sileo"]) {
-                            return @"";
-                        }
-                        return realStr;
-                    }));
-                }
-                ZTechHookTrace("[Privacy] UIPasteboard filtered for Zalo");
-            }
+            ZTechHookTrace("[DeviceCheck] DCDevice & DCAppAttestService hardware attestation neutralized (PAC-safe)");
         } @catch (NSException *e) {}
 
         struct utsname verifyUts;

@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.6.4 - Universal MGCopyAnswer & Deep Spoofing"
+          "title": "quang lam marketing v5.7.0 - Elite Anti-Detection & Hardware Shield"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.6.4**:\n\n- **Hook Toàn Diện MGCopyAnswer & MobileGestalt**: Sửa triệt để lỗi rò rỉ model gốc (iPhone 11) khi tạo tài khoản Zalo. MGCopyAnswer, MGCopyAnswerWithError được hook qua cả Substrate/ElleKit pMSHook và Mach-O GOT Rebinding.\n- **Đồng Bộ Dấu Vân Tay Phần Cứng Siêu Sâu**: Giả lập toàn bộ SerialNumber, UDID, MAC Address (Wifi & Bluetooth), IMEI, SystemConfiguration (ComputerName / LocalHostName), CFCopySystemVersionDictionary chuẩn chỉ 100% không còn xung đột giữa các tầng hệ điều hành.\n- **Chuẩn Hóa POSIX uname & sysctl**: Trả về nodename 'iPhone' chuẩn Apple, bổ sung kern.osversion, kern.hostname, loại trừ nguy cơ bị bộ lọc Anti-Fraud của Zalo gắn cờ nghi vấn máy ảo.\n- **WebKit In-App Browser Fingerprint Engine**: Tiêm UserScript DocumentStart vào WKWebView, chặn rò rỉ WebGL / WebRTC."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.0**:\n\n- **Bảo Vệ Độc Quyền DeviceCheck & AppAttest**: Vô hiệu hóa truy vấn mã phần chip gốc gửi về server Apple, triệt tiêu nguy cơ bị Zalo phát hiện thiết bị cũ qua DeviceCheck token.\n- **Tàng Hình Hệ Thống Tập Tin (Anti-Jailbreak File Stealth)**: Hook toàn diện NSFileManager (fileExistsAtPath), fopen, open, access, stat, lstat, che giấu hoàn toàn các file dylib, Cydia, Sileo, /var/jb khỏi radar quét của Zalo.\n- **Hook Nhà Mạng Dual-SIM Tân Tiến**: Hỗ trợ đầy đủ serviceSubscriberCellularProviders và CTRadioAccessTechnologyLTE khớp chuẩn iOS 14 - 17+.\n- **Bảo Vệ Bộ Nhớ Đệm (Pasteboard Privacy Shield)**: Tự động lọc sạch các chuỗi nhạy cảm (proxy, tool strings) khỏi clipboard khi Zalo khởi chạy.\n- **Hook Toàn Diện MGCopyAnswer & MobileGestalt**: Sửa triệt để lỗi rò rỉ model gốc khi tạo tài khoản Zalo qua cả Substrate/ElleKit pMSHook và Mach-O GOT Rebinding.\n- **Đồng Bộ Dấu Vân Tay Phần Cứng Siêu Sâu**: SerialNumber, UDID, MAC Address (Wifi & Bluetooth), IMEI, SystemConfiguration (ComputerName / LocalHostName) chuẩn 100%."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.6.4"
+          "text": "5.7.0"
         },
         {
           "class": "DepictionTableTextView",

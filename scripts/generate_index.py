@@ -234,18 +234,19 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.6.4 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.0 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
-        <span class="badge badge-gold">Universal MGCopyAnswer</span>
-        <span class="badge badge-gold">WebKit Fingerprint</span>
+        <span class="badge badge-gold">DeviceCheck Shield</span>
+        <span class="badge badge-gold">Anti-Jailbreak Stealth</span>
+        <span class="badge badge-gold">MGCopyAnswer GOT</span>
         <span class="badge badge-ios">Rootless</span>
         <span class="badge badge-ios">Rootful</span>
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.6.4: Hook toàn diện MGCopyAnswer &amp; MobileGestalt, đồng bộ sâu toàn diện Serial, UDID, MAC Address, SystemConfiguration và WebKit Fingerprint, triệt tiêu 100% rò rỉ máy gốc trong Zalo.
+        Bản phát hành v5.7.0: Bảo vệ độc quyền DeviceCheck &amp; AppAttest, ẩn giấu triệt để file hệ thống (NSFileManager, fopen, open, access, stat), hook nhà mạng Dual-SIM, lọc clipboard riêng tư và MGCopyAnswer chống rò rỉ máy gốc trong Zalo.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

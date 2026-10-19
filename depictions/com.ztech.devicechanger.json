@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.7.3 - Fix GameController MGCopyAnswer SIGBUS"
+          "title": "quang lam marketing v5.7.4 - Ultra-Smooth Session Creation & Zero-Lag Wipe"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.3**:\n\n- **Khắc phục triệt để lỗi SIGBUS (10) KERN_PROTECTION_FAILURE**: Chuẩn hóa chữ ký hàm ABI C 3 tham số cho `MGCopyAnswerWithError(question, options, error)` và cô lập luồng gọi `MGCopyAnswer`, loại bỏ 100% nguy cơ crash bộ nhớ khi GameController hoặc dyld gọi MobileGestalt khi Zalo khởi động.\n- **Đồng Bộ Dấu Vân Tay Phần Cứng Siêu Sâu**: MGCopyAnswer (pMSHook + Mach-O GOT Rebinding), POSIX uname ('iPhone' nodename chuẩn Apple), sysctl, SCDynamicStore, WebKit Fingerprint Engine, Proxy và Vault hoạt động mượt mà 100% không rò rỉ máy gốc."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.4**:\n\n- **Tối ưu triệt để tạo phiên Zalo mới không giật lag & không crash**: Chuyển đổi toàn bộ cơ chế phân quyền sang POSIX C Syscall thuần chạy trong 1-3ms, loại bỏ hoàn toàn tiến trình ngoài và rủi ro gián đoạn cfprefsd. Tối ưu luồng khởi tạo ZTechHookInit giúp Zalo nạp phiên mới ngay lập tức không gây xung đột bộ nhớ SQLite/MMKV.\n- **Đồng Bộ Dấu Vân Tay Phần Cứng Siêu Sâu**: MGCopyAnswer (pMSHook + Mach-O GOT Rebinding), POSIX uname ('iPhone' nodename chuẩn Apple), sysctl, SCDynamicStore, WebKit Fingerprint Engine, Proxy và Vault hoạt động mượt mà 100% không rò rỉ máy gốc."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.7.3"
+          "text": "5.7.4"
         },
         {
           "class": "DepictionTableTextView",

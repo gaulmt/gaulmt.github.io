@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.7.3
+Version: 5.7.4
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.7.3 - Fix MGCopyAnswer GameController SIGBUS & Complete Zero-Crash Stability
+Description: quang lam marketing v5.7.4 - Ultra-Smooth Session Creation, Zero-Lag Native Chown & Zero-Crash Startup
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

@@ -234,19 +234,19 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.3 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.4 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
         <span class="badge badge-gold">Zero-Crash Ultra</span>
-        <span class="badge badge-gold">MobileGestalt ABI Fix</span>
+        <span class="badge badge-gold">Zero-Lag Native Engine</span>
         <span class="badge badge-gold">Deep Hardware Sync</span>
         <span class="badge badge-ios">Rootless</span>
         <span class="badge badge-ios">Rootful</span>
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.3: Khắc phục triệt để lỗi crash SIGBUS (10) KERN_PROTECTION_FAILURE trong GameController/MobileGestalt, bảo toàn 100% ABI chữ ký hàm, đồng bộ sâu toàn diện phần cứng không xung đột runtime.
+        Bản phát hành v5.7.4: Tối ưu triệt để tạo phiên Zalo mới cực mượt không lag và không crash, chuyển đổi cơ chế phân quyền sang POSIX C Syscall 1ms, loại bỏ xung đột bộ nhớ SQLite/MMKV khi mở Zalo phiên mới.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

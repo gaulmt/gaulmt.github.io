@@ -634,9 +634,6 @@ extern char **environ;
     }
 
     for (NSString *containerPath in zaloContainers) {
-        // 0. Normalize ownership and permissions first so no read-only subdirectories block deletion
-        [ZTechVaultManager runFastChownAndChmod:containerPath];
-
         // 1. Clean all interior sub-directories (preserving trace logs and active profile in Documents/Preferences)
         NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support", @"Library/SplashBoard", @"Library/HTTPStorages", @"Library/Saved Application State"];
         for (NSString *sub in subDirs) {
@@ -654,7 +651,7 @@ extern char **environ;
         [ZTechVaultManager runFastChownAndChmod:containerPath];
     }
 
-    // Write _zt_wipe_keychain.flag and remove _zt_bound_uuid.txt so ZTechHookInit purges Zalo's Keychain (e.g. 466042823) on next Zalo launch
+    // Write _zt_wipe_keychain.flag and remove _zt_bound_uuid.txt so ZTechHookInit purges Zalo's Keychain on next Zalo launch
     if (mainZalo.length > 0) {
         NSString *zDocs = [mainZalo stringByAppendingPathComponent:@"Documents"];
         [fm removeItemAtPath:[zDocs stringByAppendingPathComponent:@"_zt_bound_uuid.txt"] error:nil];
@@ -664,18 +661,6 @@ extern char **environ;
         chmod([wipeFlag UTF8String], 0666);
     }
 
-    // Flush cfprefsd so iOS reloads clean NSUserDefaults for Zalo and its AppGroups
-    NSArray<NSString *> *killBins = @[@"/var/jb/usr/bin/killall", @"/usr/bin/killall"];
-    for (NSString *bin in killBins) {
-        if ([fm isExecutableFileAtPath:bin]) {
-            pid_t pid;
-            const char *args[] = { [bin UTF8String], "-9", "cfprefsd", NULL };
-            posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ);
-            break;
-        }
-    }
-    sync();
-
     NSString *dir = [self storageDirectoryPath];
     NSArray *files = [fm contentsOfDirectoryAtPath:dir error:nil];
     for (NSString *file in files) {
@@ -684,17 +669,6 @@ extern char **environ;
             cleanedItems++;
         }
     }
-
-    NSString *resetToken = [[NSUUID UUID] UUIDString];
-    CFPreferencesSetValue(CFSTR("ZTechResetToken"),
-                          (__bridge CFPropertyListRef)resetToken,
-                          kCFPreferencesAnyApplication,
-                          kCFPreferencesCurrentUser,
-                          kCFPreferencesAnyHost);
-    CFPreferencesSynchronize(kCFPreferencesAnyApplication,
-                             kCFPreferencesCurrentUser,
-                             kCFPreferencesAnyHost);
-    cleanedItems++;
 
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"ZTechActiveVaultAccountId"];
     [[NSURLCache sharedURLCache] removeAllCachedResponses];

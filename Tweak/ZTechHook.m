@@ -2025,12 +2025,18 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
             ZTechHookTrace([[NSString stringWithFormat:@"[2.1/6] In-process deep clean triggered (wipeFlag=%d, boundSig=%@ -> newSig=%@)",
                              hasWipeFlag ? 1 : 0, boundSig ?: @"(none)", currentSig] UTF8String]);
 
+            // 1. Immediately bind new signature so subsequent launches are never re-triggered in a loop
+            if (currentSig.length > 1) {
+                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                chmod([boundUuidFile UTF8String], 0666);
+            }
+
             [fm removeItemAtPath:wipeFlag error:nil];
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"] error:nil];
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"] error:nil];
             [[ZTechUbiquitousStoreStub sharedStore] resetStore];
 
-            // 1. Purge all Zalo Keychain items (prevents stale account e.g. 466042823 from auto-restoring & crashing on new UUID)
+            // 2. Purge all Zalo Keychain items (prevents stale account from auto-restoring & crashing on new UUID)
             NSArray *secClasses = @[
                 (__bridge id)kSecClassGenericPassword,
                 (__bridge id)kSecClassInternetPassword,
@@ -2050,50 +2056,6 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
                 }
             }
             ZTechHookTrace([[NSString stringWithFormat:@"[2.2/6] Zalo Keychain purged across 5 classes (matched=%d)", matchedClasses] UTF8String]);
-
-            // 2. Wipe Zalo container subdirectories from inside Zalo's own process (uid 501)
-            // Note: Do NOT call [NSUserDefaults standardUserDefaults] during __attribute__((constructor))
-            // because initializing CFPreferences while dyld holds the loader lock causes SyncedDefaults/CFPrefs EXC_GUARD faults.
-            NSArray<NSString *> *subDirs = @[
-                @"Documents",
-                @"tmp",
-                @"Library/Preferences",
-                @"Library/Caches",
-                @"Library/Cookies",
-                @"Library/WebKit",
-                @"Library/Application Support",
-                @"Library/HTTPStorages",
-                @"Library/Saved Application State"
-            ];
-            for (NSString *sub in subDirs) {
-                NSString *target = [home stringByAppendingPathComponent:sub];
-                if ([fm fileExistsAtPath:target]) {
-                    ZTechWipeDirectoryContentsAtPath(target, fm);
-                }
-            }
-
-            // 3. Wipe all 6 Zalo AppGroup containers (using pre-resolved appGroupPaths from _zt_active_profile.plist)
-            NSArray<NSString *> *groupPaths = [gCachedProfile[@"appGroupPaths"] isKindOfClass:[NSArray class]]
-                ? gCachedProfile[@"appGroupPaths"]
-                : nil;
-            for (NSString *grpPath in groupPaths) {
-                if ([grpPath isKindOfClass:[NSString class]] && grpPath.length > 0 && [fm fileExistsAtPath:grpPath]) {
-                    ZTechWipeDirectoryContentsAtPath(grpPath, fm);
-                    NSArray<NSString *> *grpSubs = @[@"Documents", @"Library/Preferences", @"Library/Caches", @"Library/Application Support"];
-                    for (NSString *gs in grpSubs) {
-                        NSString *gTarget = [grpPath stringByAppendingPathComponent:gs];
-                        if ([fm fileExistsAtPath:gTarget]) {
-                            ZTechWipeDirectoryContentsAtPath(gTarget, fm);
-                        }
-                    }
-                }
-            }
-
-            // 4. Bind the new UUID:machineId so subsequent launches of the same session preserve login data
-            if (currentSig.length > 1) {
-                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                chmod([boundUuidFile UTF8String], 0666);
-            }
             ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6] In-process deep clean completed 100%% for sig=%@", currentSig] UTF8String]);
         }
     } @catch (NSException *e) {
@@ -2201,7 +2163,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.3 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.4 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {

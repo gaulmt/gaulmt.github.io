@@ -144,6 +144,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 @property (nonatomic, assign) ZTechModelTierFilter currentModelTier;
 @property (nonatomic, assign) ZTechMainTab activeTab;
 @property (nonatomic, assign) BOOL isLightMode;
+@property (nonatomic, assign) BOOL isPerformingAction;
 
 // Top Bar & Toast Banner
 @property (nonatomic, strong) UIView *topHeaderBar;
@@ -605,7 +606,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.7.3";
+    appSub.text = @"Identity & Vault · v5.7.4";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1486,6 +1487,10 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 }
 
 - (void)onTapQuickLaunchZalo {
+    if (self.isPerformingAction) return;
+    self.isPerformingAction = YES;
+    self.openZaloButton.enabled = NO;
+
     UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [gen impactOccurred];
     [self showLoadingWithTitle:@"ĐANG MỞ ZALO" subtitle:[NSString stringWithFormat:@"Đang nạp cấu hình %@ & mở Zalo...", self.currentProfile.modelName ?: @"máy ảo"]];
@@ -1494,8 +1499,10 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
             [ZTechDeviceDatabase writeProfileFiles:self.currentProfile error:nil];
         }
         [ZTechVaultManager killZaloProcess];
-        [NSThread sleepForTimeInterval:0.25];
+        [NSThread sleepForTimeInterval:0.15];
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.isPerformingAction = NO;
+            self.openZaloButton.enabled = YES;
             [ZTechVaultManager launchZaloApp];
             [self hideLoadingOverlayAfterDelay:0.45];
         });
@@ -2224,6 +2231,9 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     [self dismissAllKeyboards];
     self.vaultModalOverlay.hidden = YES;
 
+    if (self.isPerformingAction) return;
+    self.isPerformingAction = YES;
+
     NSString *nameText = [self.vaultNameInputField.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     NSString *proxyText = [self.vaultProxyInputField.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 
@@ -2243,11 +2253,9 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                                                                                     error:&err];
             ZTechDeviceProfile *newProf = nil;
             if (saved) {
-                // 1. Automatically wipe Safari cookies & website cache
-                [ZTechVaultManager cleanSafariCookiesAndWebsiteData];
-                // 2. Clean Zalo session & cache
+                // 1. Clean Zalo session & cache (also purges Safari cookies internally)
                 [ZTechDeviceDatabase cleanResetAllProfileDataAndCache];
-                // 3. Immediately prepare a fresh device profile for next Zalo session
+                // 2. Immediately prepare a fresh device profile for next Zalo session
                 newProf = [ZTechDeviceDatabase generateProfileWithLockRealModel:lockOn
                                                                      sameScreen:screenOn
                                                                       matchChip:chipOn
@@ -2256,6 +2264,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
             }
 
             dispatch_async(dispatch_get_main_queue(), ^{
+                self.isPerformingAction = NO;
                 [self hideLoadingOverlayAfterDelay:0.15];
                 if (saved && newProf) {
                     self.currentProfile = newProf;
@@ -2282,6 +2291,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
             // Restart background Zalo process so all sockets immediately route through the new proxy
             [ZTechVaultManager killZaloProcess];
             dispatch_async(dispatch_get_main_queue(), ^{
+                self.isPerformingAction = NO;
                 [self hideLoadingOverlayAfterDelay:0.15];
                 [self refreshUIWithCurrentProfile];
                 [self reloadVaultListUI];
@@ -2299,6 +2309,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                                  proxyString:proxyText];
             ZTechDeviceProfile *reloaded = [ZTechDeviceDatabase loadOrCreateDefaultProfile];
             dispatch_async(dispatch_get_main_queue(), ^{
+                self.isPerformingAction = NO;
                 [self hideLoadingOverlayAfterDelay:0.1];
                 self.currentProfile = reloaded;
                 [self refreshUIWithCurrentProfile];
@@ -2306,6 +2317,8 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                 [self showToast:@"Đã cập nhật Proxy & Tên Acc trong Kho!" isError:NO];
             });
         });
+    } else {
+        self.isPerformingAction = NO;
     }
 }
 
@@ -2716,6 +2729,12 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
         [self updateLicenseUIState];
         return;
     }
+    if (self.isPerformingAction) return;
+    self.isPerformingAction = YES;
+    self.changeDeviceButton.enabled = NO;
+    self.cleanResetButton.enabled = NO;
+    self.openZaloButton.enabled = NO;
+
     [self onAppBecameActive];
 
     UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
@@ -2738,6 +2757,10 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
         [ZTechVaultManager killZaloProcess];
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.isPerformingAction = NO;
+            self.changeDeviceButton.enabled = YES;
+            self.cleanResetButton.enabled = YES;
+            self.openZaloButton.enabled = YES;
             [self hideLoadingOverlayAfterDelay:0.12];
             self.currentProfile = newProf;
             [self refreshUIWithCurrentProfile];
@@ -2756,6 +2779,12 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
         [self updateLicenseUIState];
         return;
     }
+    if (self.isPerformingAction) return;
+    self.isPerformingAction = YES;
+    self.changeDeviceButton.enabled = NO;
+    self.cleanResetButton.enabled = NO;
+    self.openZaloButton.enabled = NO;
+
     [self onAppBecameActive];
 
     UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy];
@@ -2776,6 +2805,10 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                                                                                   modelTier:tier
                                                                                 currentCity:nil];
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.isPerformingAction = NO;
+            self.changeDeviceButton.enabled = YES;
+            self.cleanResetButton.enabled = YES;
+            self.openZaloButton.enabled = YES;
             [self hideLoadingOverlayAfterDelay:0.15];
             self.currentProfile = newProf;
             [self refreshUIWithCurrentProfile];

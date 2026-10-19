@@ -9,6 +9,7 @@
 #import <spawn.h>
 #import <dlfcn.h>
 #import <notify.h>
+#import <dirent.h>
 
 extern char **environ;
 
@@ -113,6 +114,8 @@ extern char **environ;
 }
 
 + (void)killZaloProcess {
+    NSMutableArray<NSNumber *> *killedPids = [NSMutableArray array];
+
     // 1. Direct Darwin kernel sysctl process scan (guaranteed on all jailbreaks & TrollStore)
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
     size_t size = 0;
@@ -127,7 +130,9 @@ extern char **environ;
                      strcasestr(name, "zalo") != NULL ||
                      strcasestr(name, "zingalo") != NULL ||
                      strcasestr(name, "aida64") != NULL)) {
-                    kill(procs[i].kp_proc.p_pid, SIGKILL);
+                    pid_t p = procs[i].kp_proc.p_pid;
+                    kill(p, SIGKILL);
+                    [killedPids addObject:@(p)];
                 }
             }
         }
@@ -149,6 +154,15 @@ extern char **environ;
             const char *args4[] = { [bin UTF8String], "-9", "aida64", NULL };
             posix_spawn(&pid4, [bin UTF8String], NULL, NULL, (char *const *)args4, environ);
             break;
+        }
+    }
+
+    // 3. Confirm target processes have fully exited from kernel tables so SQLite / MMKV locks are released
+    for (NSNumber *pidNum in killedPids) {
+        pid_t p = (pid_t)[pidNum intValue];
+        for (int retries = 0; retries < 15; retries++) {
+            if (kill(p, 0) == -1) break;
+            usleep(10000); // 10ms
         }
     }
 }
@@ -230,20 +244,34 @@ extern char **environ;
     }
 
     // 4. Scan MobileSafari Data Container under /var/mobile/Containers/Data/Application
-    NSString *appDataRoot = @"/var/mobile/Containers/Data/Application";
-    NSArray *guids = [fm contentsOfDirectoryAtPath:appDataRoot error:nil];
-    for (NSString *guid in guids) {
-        NSString *guidPath = [appDataRoot stringByAppendingPathComponent:guid];
-        NSString *metaPath = [guidPath stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
-        NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
-        if (meta && [[meta[@"MCMMetadataIdentifier"] lowercaseString] isEqualToString:@"com.apple.mobilesafari"]) {
-            NSArray *targets = @[@"Library/Cookies", @"Library/Caches", @"Library/WebKit", @"tmp"];
-            for (NSString *t in targets) {
-                NSString *targetPath = [guidPath stringByAppendingPathComponent:t];
-                NSArray *subs = [fm contentsOfDirectoryAtPath:targetPath error:nil];
-                for (NSString *s in subs) {
-                    [fm removeItemAtPath:[targetPath stringByAppendingPathComponent:s] error:nil];
+    static NSString *sCachedSafariContainer = nil;
+    if (sCachedSafariContainer && [fm fileExistsAtPath:sCachedSafariContainer]) {
+        NSArray *targets = @[@"Library/Cookies", @"Library/Caches", @"Library/WebKit", @"tmp"];
+        for (NSString *t in targets) {
+            NSString *targetPath = [sCachedSafariContainer stringByAppendingPathComponent:t];
+            NSArray *subs = [fm contentsOfDirectoryAtPath:targetPath error:nil];
+            for (NSString *s in subs) {
+                [fm removeItemAtPath:[targetPath stringByAppendingPathComponent:s] error:nil];
+            }
+        }
+    } else {
+        NSString *appDataRoot = @"/var/mobile/Containers/Data/Application";
+        NSArray *guids = [fm contentsOfDirectoryAtPath:appDataRoot error:nil];
+        for (NSString *guid in guids) {
+            NSString *guidPath = [appDataRoot stringByAppendingPathComponent:guid];
+            NSString *metaPath = [guidPath stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+            NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
+            if (meta && [[meta[@"MCMMetadataIdentifier"] lowercaseString] isEqualToString:@"com.apple.mobilesafari"]) {
+                sCachedSafariContainer = guidPath;
+                NSArray *targets = @[@"Library/Cookies", @"Library/Caches", @"Library/WebKit", @"tmp"];
+                for (NSString *t in targets) {
+                    NSString *targetPath = [guidPath stringByAppendingPathComponent:t];
+                    NSArray *subs = [fm contentsOfDirectoryAtPath:targetPath error:nil];
+                    for (NSString *s in subs) {
+                        [fm removeItemAtPath:[targetPath stringByAppendingPathComponent:s] error:nil];
+                    }
                 }
+                break;
             }
         }
     }
@@ -472,12 +500,47 @@ extern char **environ;
     return groups;
 }
 
+static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_t gid, mode_t dirMode, mode_t fileMode) {
+    if (!cpath || cpath[0] == '\0') return;
+    DIR *dir = opendir(cpath);
+    if (!dir) return;
+
+    struct dirent *entry;
+    char subBuf[1024];
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        if (strcmp(entry->d_name, ".com.apple.mobile_container_manager.metadata.plist") == 0 ||
+            strcmp(entry->d_name, "SystemData") == 0) {
+            continue;
+        }
+
+        snprintf(subBuf, sizeof(subBuf), "%s/%s", cpath, entry->d_name);
+        struct stat st;
+        if (lstat(subBuf, &st) == 0) {
+            if (S_ISLNK(st.st_mode)) {
+                if (strstr(entry->d_name, ".GlobalPreferences") != NULL) {
+                    unlink(subBuf);
+                }
+                continue;
+            }
+            chflags(subBuf, 0);
+            if (S_ISDIR(st.st_mode)) {
+                chown(subBuf, uid, gid);
+                chmod(subBuf, dirMode);
+                ZTechNativeRecursiveChownAndChmod(subBuf, uid, gid, dirMode, fileMode);
+            } else {
+                chown(subBuf, uid, gid);
+                chmod(subBuf, fileMode);
+            }
+        }
+    }
+    closedir(dir);
+}
+
 + (void)runFastChownAndChmod:(NSString *)path {
     if (!path || path.length == 0) return;
     const char *cpath = [path UTF8String];
     if (!cpath) return;
-
-    NSFileManager *fm = [NSFileManager defaultManager];
 
     // Remove any illegal .GlobalPreferences.plist symlink inside the container's Library/Preferences
     NSString *gpLink = [path stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
@@ -490,53 +553,8 @@ extern char **environ;
         unlink([gpLinkM UTF8String]);
     }
 
-    NSArray<NSString *> *chownBins = @[
-        @"/usr/sbin/chown",
-        @"/usr/bin/chown",
-        @"/bin/chown",
-        @"/var/jb/usr/sbin/chown",
-        @"/var/jb/usr/bin/chown",
-        @"/var/jb/bin/chown"
-    ];
-
-    NSArray<NSString *> *chmodBins = @[@"/bin/chmod", @"/usr/bin/chmod", @"/var/jb/bin/chmod", @"/var/jb/usr/bin/chmod"];
-
-    // Only chown/chmod the interior items (never corrupt .com.apple.mobile_container_manager.metadata.plist)
-    NSArray<NSString *> *items = [fm contentsOfDirectoryAtPath:path error:nil];
-    for (NSString *item in items) {
-        if ([item isEqualToString:@".com.apple.mobile_container_manager.metadata.plist"] ||
-            [item isEqualToString:@"SystemData"]) {
-            continue;
-        }
-        NSString *subPath = [path stringByAppendingPathComponent:item];
-        const char *csub = [subPath UTF8String];
-        if (!csub) continue;
-
-        for (NSString *bin in chownBins) {
-            if ([fm isExecutableFileAtPath:bin]) {
-                pid_t pid;
-                const char *args[] = { [bin UTF8String], "-R", "501:501", csub, NULL };
-                if (posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ) == 0) {
-                    int status = 0;
-                    waitpid(pid, &status, 0);
-                    break;
-                }
-            }
-        }
-        for (NSString *bin in chmodBins) {
-            if ([fm isExecutableFileAtPath:bin]) {
-                pid_t pid;
-                const char *args[] = { [bin UTF8String], "-R", "0755", csub, NULL };
-                if (posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ) == 0) {
-                    int status = 0;
-                    waitpid(pid, &status, 0);
-                    break;
-                }
-            }
-        }
-        chown(csub, 501, 501);
-        chmod(csub, 0755);
-    }
+    // Fast in-process native syscalls (0.001s instead of multi-second posix_spawn forks)
+    ZTechNativeRecursiveChownAndChmod(cpath, 501, 501, 0755, 0666);
 
     // Ensure container root is 0755 and metadata.plist is 0644 (never 0777!)
     chown(cpath, 501, 501);

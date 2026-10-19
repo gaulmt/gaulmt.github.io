@@ -930,77 +930,62 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
     return -1;
 }
 
-typedef CFTypeRef (*zt_MGCopyAnswerWithError_t)(CFStringRef prop, int *error);
+typedef CFTypeRef (*zt_MGCopyAnswerWithError_t)(CFStringRef prop, CFDictionaryRef options, int *error);
 static zt_MGCopyAnswerWithError_t orig_MGCopyAnswerWithError = NULL;
 typedef CFTypeRef (*zt_MGCopyAnswer_t)(CFStringRef prop);
 static zt_MGCopyAnswer_t orig_MGCopyAnswer = NULL;
 
-static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
-    if (prop != NULL && CFGetTypeID(prop) == CFStringGetTypeID()) {
-        if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine")) || CFEqual(prop, CFSTR("device-name"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
-        }
-        if (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
-        }
-        if (CFEqual(prop, CFSTR("MarketingNameString")) || CFEqual(prop, CFSTR("marketing-name")) ||
-            CFEqual(prop, CFSTR("DeviceName")) || CFEqual(prop, CFSTR("UserAssignedDeviceName"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gModelNameObj copy];
-        }
-        if (CFEqual(prop, CFSTR("ProductVersion"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
-        }
-        if (CFEqual(prop, CFSTR("BuildVersion"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[@"22B83" copy];
-        }
-        if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
-            if (error) *error = 0;
-            NSString *udid = [[gUuidObj stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
-            if (CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
-                return (__bridge_retained CFTypeRef)[udid dataUsingEncoding:NSUTF8StringEncoding];
-            }
-            return (__bridge_retained CFTypeRef)[udid copy];
-        }
-        if (CFEqual(prop, CFSTR("SerialNumber"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gSerialNumberObj copy];
-        }
-        if (CFEqual(prop, CFSTR("WifiAddress"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gWifiMacObj copy];
-        }
-        if (CFEqual(prop, CFSTR("BluetoothAddress"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gBtMacObj copy];
-        }
-        if (CFEqual(prop, CFSTR("InternationalMobileEquipmentIdentity")) || CFEqual(prop, CFSTR("IMEI"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[gImeiObj copy];
-        }
-        if (CFEqual(prop, CFSTR("ModelNumber"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[@"MU793VN/A" copy];
-        }
-        if (CFEqual(prop, CFSTR("RegionInfo"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[@"VN/A" copy];
-        }
-        if (CFEqual(prop, CFSTR("RegulatoryModelNumber"))) {
-            if (error) *error = 0;
-            return (__bridge_retained CFTypeRef)[@"A3296" copy];
-        }
+static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
+    if (!prop || CFGetTypeID(prop) != CFStringGetTypeID()) return NULL;
+
+    if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine")) || CFEqual(prop, CFSTR("device-name"))) {
+        return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
     }
-    CFTypeRef res = NULL;
-    if (orig_MGCopyAnswerWithError) {
-        res = orig_MGCopyAnswerWithError(prop, error);
-    } else if (orig_MGCopyAnswer) {
-        res = orig_MGCopyAnswer(prop);
+    if (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel"))) {
+        return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
     }
+    if (CFEqual(prop, CFSTR("MarketingNameString")) || CFEqual(prop, CFSTR("marketing-name")) ||
+        CFEqual(prop, CFSTR("DeviceName")) || CFEqual(prop, CFSTR("UserAssignedDeviceName"))) {
+        return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+    }
+    if (CFEqual(prop, CFSTR("ProductVersion"))) {
+        return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
+    }
+    if (CFEqual(prop, CFSTR("BuildVersion"))) {
+        return (__bridge_retained CFTypeRef)[@"22B83" copy];
+    }
+    if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
+        NSString *udid = [[gUuidObj stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
+        if (CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
+            return (__bridge_retained CFTypeRef)[udid dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        return (__bridge_retained CFTypeRef)[udid copy];
+    }
+    if (CFEqual(prop, CFSTR("SerialNumber"))) {
+        return (__bridge_retained CFTypeRef)[gSerialNumberObj copy];
+    }
+    if (CFEqual(prop, CFSTR("WifiAddress"))) {
+        return (__bridge_retained CFTypeRef)[gWifiMacObj copy];
+    }
+    if (CFEqual(prop, CFSTR("BluetoothAddress"))) {
+        return (__bridge_retained CFTypeRef)[gBtMacObj copy];
+    }
+    if (CFEqual(prop, CFSTR("InternationalMobileEquipmentIdentity")) || CFEqual(prop, CFSTR("IMEI"))) {
+        return (__bridge_retained CFTypeRef)[gImeiObj copy];
+    }
+    if (CFEqual(prop, CFSTR("ModelNumber"))) {
+        return (__bridge_retained CFTypeRef)[@"MU793VN/A" copy];
+    }
+    if (CFEqual(prop, CFSTR("RegionInfo"))) {
+        return (__bridge_retained CFTypeRef)[@"VN/A" copy];
+    }
+    if (CFEqual(prop, CFSTR("RegulatoryModelNumber"))) {
+        return (__bridge_retained CFTypeRef)[@"A3296" copy];
+    }
+    return NULL;
+}
+
+static CFTypeRef ZTechInspectAndFilterMGResult(CFTypeRef res) {
     if (res != NULL && CFGetTypeID(res) == CFStringGetTypeID()) {
         NSString *val = (__bridge NSString *)res;
         if ([val hasPrefix:@"iPhone"] && [val containsString:@","] && ![val isEqualToString:gMachineIdObj]) {
@@ -1025,7 +1010,32 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, int *error) {
 }
 
 static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
-    return hooked_MGCopyAnswerWithError(prop, NULL);
+    CFTypeRef fake = ZTechGetSpoofedMGCopyAnswer(prop);
+    if (fake) {
+        return fake;
+    }
+    CFTypeRef res = NULL;
+    if (orig_MGCopyAnswer) {
+        res = orig_MGCopyAnswer(prop);
+    } else if (orig_MGCopyAnswerWithError) {
+        res = orig_MGCopyAnswerWithError(prop, NULL, NULL);
+    }
+    return ZTechInspectAndFilterMGResult(res);
+}
+
+static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, CFDictionaryRef options, int *error) {
+    CFTypeRef fake = ZTechGetSpoofedMGCopyAnswer(prop);
+    if (fake) {
+        if (error) *error = 0;
+        return fake;
+    }
+    CFTypeRef res = NULL;
+    if (orig_MGCopyAnswerWithError) {
+        res = orig_MGCopyAnswerWithError(prop, options, error);
+    } else if (orig_MGCopyAnswer) {
+        res = orig_MGCopyAnswer(prop);
+    }
+    return ZTechInspectAndFilterMGResult(res);
 }
 
 typedef CFStringRef (*zt_SCDynamicStoreCopyComputerName_t)(CFAllocatorRef allocator, CFStringEncoding *encoding);
@@ -1553,8 +1563,9 @@ static void swizzled_WKWebView_setCustomUserAgent(id self, SEL _cmd, NSString *u
 #pragma mark - Anti-Jailbreak File System & Dyld Cloaking Engine
 
 static inline BOOL ZTechIsJailbreakPath(const char *path) {
-    if (!path || path[0] == '\0') return NO;
-    if (strstr(path, "com.ztech") != NULL || strstr(path, "_zt_") != NULL || strstr(path, "ztech_") != NULL) {
+    if (!path || (uintptr_t)path < 0x1000 || path[0] == '\0') return NO;
+    if (strstr(path, "com.ztech") != NULL || strstr(path, "_zt_") != NULL || strstr(path, "ztech_") != NULL ||
+        strstr(path, "/var/jb/var/mobile/Library/Preferences") != NULL) {
         return NO;
     }
     if (strstr(path, "/var/jb") != NULL ||
@@ -2190,7 +2201,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.6.4 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.3 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2479,10 +2490,6 @@ static void ZTechHookInit(void) {
             void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
             if (raw_CFCopySysVer) {
                 pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
-            }
-            void *raw_CFCopyServVer = dlsym(RTLD_DEFAULT, "_CFCopyServerVersionDictionary");
-            if (raw_CFCopyServVer) {
-                pMSHook(raw_CFCopyServVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
             }
 
             void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");

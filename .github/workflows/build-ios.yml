@@ -250,7 +250,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-logs
-          echo "=== NOWEVENT BUILD LOG ===" > ci_debug.log
+          echo "=== ZTECH BUILD LOG ===" > ci_debug.log
+          if [ -f "build_rootful.log" ]; then
+            cat build_rootful.log >> ci_debug.log
+          elif [ -f "ZTech_iOS/build_rootful.log" ]; then
+            cat ZTech_iOS/build_rootful.log >> ci_debug.log
+          fi
+          echo "=== NOWEVENT BUILD LOG ===" >> ci_debug.log
           if [ -f "NowEvent_iOS/build_nen.log" ]; then
             cat NowEvent_iOS/build_nen.log >> ci_debug.log
           else

@@ -542,6 +542,8 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     const char *cpath = [path UTF8String];
     if (!cpath) return;
 
+    NSFileManager *fm = [NSFileManager defaultManager];
+
     // Remove any illegal .GlobalPreferences.plist symlink inside the container's Library/Preferences
     NSString *gpLink = [path stringByAppendingPathComponent:@"Library/Preferences/.GlobalPreferences.plist"];
     struct stat gpSt;

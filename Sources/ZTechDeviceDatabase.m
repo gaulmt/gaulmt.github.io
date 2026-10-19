@@ -578,11 +578,12 @@ extern char **environ;
 
     BOOL isAppGroup = [containerPath containsString:@"/Shared/AppGroup/"];
     NSArray<NSString *> *subDirs = isAppGroup ? @[
+        @"Documents",
+        @"tmp",
         @"Library",
         @"Library/Caches",
         @"Library/Preferences",
-        @"Library/Application Support",
-        @"Documents"
+        @"Library/Application Support"
     ] : @[
         @"Documents",
         @"tmp",
@@ -590,7 +591,12 @@ extern char **environ;
         @"Library/Caches",
         @"Library/Preferences",
         @"Library/Cookies",
-        @"Library/Application Support"
+        @"Library/Application Support",
+        @"Library/WebKit",
+        @"Library/WebKit/WebsiteData",
+        @"Library/HTTPStorages",
+        @"Library/SplashBoard",
+        @"Library/Saved Application State"
     ];
 
     for (NSString *sub in subDirs) {

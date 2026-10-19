@@ -668,6 +668,21 @@ static inline BOOL ZTechIsMetalCaller(const void *retAddr) {
     return NO;
 }
 
+static inline BOOL ZTechIsSafeASCIIString(const void *buf, size_t len) {
+    if (!buf || len <= 1 || len > 256) return NO;
+    const unsigned char *p = (const unsigned char *)buf;
+    size_t i = 0;
+    while (i < len) {
+        if (p[i] == '\0') {
+            return (i > 0);
+        }
+        if (p[i] < 32 && p[i] != '\t' && p[i] != '\n' && p[i] != '\r') return NO;
+        if (p[i] > 126) return NO;
+        i++;
+    }
+    return NO;
+}
+
 static int (*orig_uname)(struct utsname *buf) = NULL;
 static int hooked_uname(struct utsname *buf) {
     if (buf == NULL) return -1;
@@ -777,7 +792,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
         }
     }
     int ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
-    if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
+    if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
         char *buf = (char *)oldp;
         if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
             size_t len = strlen(gMachineCStr) + 1;
@@ -906,7 +921,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
         int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
         if (err < 0) return err;
         int ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
-        if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0) {
+        if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
             char *buf = (char *)oldp;
             if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
                 size_t len = strlen(gMachineCStr) + 1;
@@ -1081,22 +1096,27 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
         if (CFGetTypeID(res) == CFStringGetTypeID()) {
             NSString *s = (__bridge NSString *)res;
             if ([s hasPrefix:@"iPhone"] && [s containsString:@","] && ![s isEqualToString:gMachineIdObj]) {
+                CFRelease(res);
                 return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
             }
             if ((gRealMarketingObj.length > 0 && [s localizedCaseInsensitiveContainsString:gRealMarketingObj]) ||
                 ([s hasPrefix:@"iPhone "] && ![s isEqualToString:gModelNameObj])) {
+                CFRelease(res);
                 return (__bridge_retained CFTypeRef)[gModelNameObj copy];
             }
             if (gRealBoardIdObj.length > 0 && [s isEqualToString:gRealBoardIdObj]) {
+                CFRelease(res);
                 return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
             }
         } else if (CFGetTypeID(res) == CFDataGetTypeID()) {
             NSData *d = (__bridge NSData *)res;
             NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
             if (s && [s hasPrefix:@"iPhone"] && [s containsString:@","] && ![s hasPrefix:gMachineIdObj]) {
+                CFRelease(res);
                 return (__bridge_retained CFTypeRef)[[gMachineIdObj stringByAppendingString:@"\0"] dataUsingEncoding:NSUTF8StringEncoding];
             }
             if (s && gRealBoardIdObj.length > 0 && [s hasPrefix:gRealBoardIdObj]) {
+                CFRelease(res);
                 return (__bridge_retained CFTypeRef)[[[NSString stringWithUTF8String:gBoardIdCStr] stringByAppendingString:@"\0"] dataUsingEncoding:NSUTF8StringEncoding];
             }
         }
@@ -1522,22 +1542,29 @@ static NSString *ZTechGenerateWebKitFingerprintScript(void) {
         fakeUA, fakeAppVer, (long)gScreenWidth, (long)gScreenHeight, gScreenScale, (long)gCpuCores, (long)gRamGB, fakeGPU];
 }
 
-static id swizzled_WKWebView_initWithFrame_configuration(id self, SEL _cmd, CGRect frame, WKWebViewConfiguration *configuration) {
-    if (!configuration) {
-        configuration = [[WKWebViewConfiguration alloc] init];
-    }
-    if (!configuration.userContentController) {
-        configuration.userContentController = [[WKUserContentController alloc] init];
-    }
+static id (*orig_WKWebView_initWithFrame_configuration)(id, SEL, CGRect, id) = NULL;
+static void (*orig_WKWebView_setCustomUserAgent)(id, SEL, id) = NULL;
 
-    NSString *jsSource = ZTechGenerateWebKitFingerprintScript();
-    WKUserScript *script = [[WKUserScript alloc] initWithSource:jsSource
-                                                  injectionTime:WKUserScriptInjectionTimeAtDocumentStart
-                                               forMainFrameOnly:NO];
-    [configuration.userContentController addUserScript:script];
+static id swizzled_WKWebView_initWithFrame_configuration(id self, SEL _cmd, CGRect frame, WKWebViewConfiguration *configuration) {
+    @try {
+        if (!configuration) {
+            configuration = [[WKWebViewConfiguration alloc] init];
+        }
+        if (!configuration.userContentController) {
+            configuration.userContentController = [[WKUserContentController alloc] init];
+        }
+
+        NSString *jsSource = ZTechGenerateWebKitFingerprintScript();
+        WKUserScript *script = [[WKUserScript alloc] initWithSource:jsSource
+                                                      injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                                   forMainFrameOnly:NO];
+        [configuration.userContentController addUserScript:script];
+    } @catch (NSException *e) {}
 
     id view = nil;
-    if (gZTechOrigWKInitWithFrameSel && [self respondsToSelector:gZTechOrigWKInitWithFrameSel]) {
+    if (orig_WKWebView_initWithFrame_configuration) {
+        view = orig_WKWebView_initWithFrame_configuration(self, _cmd, frame, configuration);
+    } else if (gZTechOrigWKInitWithFrameSel && [self respondsToSelector:gZTechOrigWKInitWithFrameSel]) {
         view = ((id (*)(id, SEL, CGRect, id))objc_msgSend)(self, gZTechOrigWKInitWithFrameSel, frame, configuration);
     }
     if (view && [view isKindOfClass:[WKWebView class]]) {
@@ -1555,82 +1582,11 @@ static void swizzled_WKWebView_setCustomUserAgent(id self, SEL _cmd, NSString *u
     if (!sanitized || sanitized.length == 0 || [sanitized containsString:@"15_5"] || [sanitized containsString:@"15.5"]) {
         sanitized = gWebKitUserAgent ?: [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22B83", gTargetIosUnderscoreObj ?: @"18_2_1"];
     }
-    if (gZTechOrigWKSetUASel && [self respondsToSelector:gZTechOrigWKSetUASel]) {
+    if (orig_WKWebView_setCustomUserAgent) {
+        orig_WKWebView_setCustomUserAgent(self, _cmd, sanitized);
+    } else if (gZTechOrigWKSetUASel && [self respondsToSelector:gZTechOrigWKSetUASel]) {
         ((void (*)(id, SEL, id))objc_msgSend)(self, gZTechOrigWKSetUASel, sanitized);
     }
-}
-
-#pragma mark - Anti-Jailbreak File System & Dyld Cloaking Engine
-
-static inline BOOL ZTechIsJailbreakPath(const char *path) {
-    if (!path || (uintptr_t)path < 0x1000 || path[0] == '\0') return NO;
-    if (strstr(path, "com.ztech") != NULL || strstr(path, "_zt_") != NULL || strstr(path, "ztech_") != NULL ||
-        strstr(path, "/var/jb/var/mobile/Library/Preferences") != NULL) {
-        return NO;
-    }
-    if (strstr(path, "/var/jb") != NULL ||
-        strstr(path, "libellekit") != NULL ||
-        strstr(path, "libsubstrate") != NULL ||
-        strstr(path, "libsubstitute") != NULL ||
-        strstr(path, "TweakInject") != NULL ||
-        strstr(path, "MobileSubstrate") != NULL ||
-        strstr(path, "Sileo") != NULL ||
-        strstr(path, "Cydia") != NULL ||
-        strstr(path, "Zebra") != NULL ||
-        strstr(path, "Filza") != NULL ||
-        strstr(path, "/bin/sh") != NULL ||
-        strstr(path, "/bin/bash") != NULL ||
-        strstr(path, "/private/var/lib/apt") != NULL ||
-        strstr(path, "/var/lib/apt") != NULL ||
-        strstr(path, "/var/lib/dpkg") != NULL ||
-        strstr(path, "/etc/apt") != NULL ||
-        strstr(path, "/Library/MobileSubstrate") != NULL ||
-        strstr(path, "/Applications/Cydia.app") != NULL ||
-        strstr(path, "/Applications/Sileo.app") != NULL ||
-        strstr(path, "/Applications/Zebra.app") != NULL ||
-        strstr(path, "/Applications/Filza.app") != NULL) {
-        return YES;
-    }
-    return NO;
-}
-
-static int (*orig_access)(const char *path, int mode) = NULL;
-static int hooked_access(const char *path, int mode) {
-    if (ZTechIsJailbreakPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (orig_access) return orig_access(path, mode);
-    return access(path, mode);
-}
-
-static int (*orig_stat)(const char *path, struct stat *buf) = NULL;
-static int hooked_stat(const char *path, struct stat *buf) {
-    if (ZTechIsJailbreakPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (orig_stat) return orig_stat(path, buf);
-    return stat(path, buf);
-}
-
-static int (*orig_lstat)(const char *path, struct stat *buf) = NULL;
-static int hooked_lstat(const char *path, struct stat *buf) {
-    if (ZTechIsJailbreakPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (orig_lstat) return orig_lstat(path, buf);
-    return lstat(path, buf);
-}
-
-static const char *(*orig_dyld_get_image_name)(uint32_t image_index) = NULL;
-static const char *hooked_dyld_get_image_name(uint32_t image_index) {
-    const char *name = orig_dyld_get_image_name ? orig_dyld_get_image_name(image_index) : _dyld_get_image_name(image_index);
-    if (name && ZTechIsJailbreakPath(name)) {
-        return "/System/Library/Frameworks/Foundation.framework/Foundation";
-    }
-    return name;
 }
 
 static BOOL (*orig_canOpenURL)(id, SEL, NSURL *) = NULL;
@@ -2036,26 +1992,25 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
             [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_prefs_snapshot.plist"] error:nil];
             [[ZTechUbiquitousStoreStub sharedStore] resetStore];
 
-            // 2. Purge all Zalo Keychain items (prevents stale account from auto-restoring & crashing on new UUID)
+            // 2. Purge all Zalo Keychain password items (prevents stale account from auto-restoring & crashing on new UUID)
             NSArray *secClasses = @[
                 (__bridge id)kSecClassGenericPassword,
-                (__bridge id)kSecClassInternetPassword,
-                (__bridge id)kSecClassCertificate,
-                (__bridge id)kSecClassKey,
-                (__bridge id)kSecClassIdentity
+                (__bridge id)kSecClassInternetPassword
             ];
             int matchedClasses = 0;
             for (id secClass in secClasses) {
-                OSStatus st1 = SecItemDelete((__bridge CFDictionaryRef)@{(__bridge id)kSecClass: secClass});
-                OSStatus st2 = SecItemDelete((__bridge CFDictionaryRef)@{
-                    (__bridge id)kSecClass: secClass,
-                    (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny
-                });
-                if (st1 == errSecSuccess || st2 == errSecSuccess) {
-                    matchedClasses++;
-                }
+                @try {
+                    OSStatus st1 = SecItemDelete((__bridge CFDictionaryRef)@{(__bridge id)kSecClass: secClass});
+                    OSStatus st2 = SecItemDelete((__bridge CFDictionaryRef)@{
+                        (__bridge id)kSecClass: secClass,
+                        (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny
+                    });
+                    if (st1 == errSecSuccess || st2 == errSecSuccess) {
+                        matchedClasses++;
+                    }
+                } @catch (NSException *e) {}
             }
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.2/6] Zalo Keychain purged across 5 classes (matched=%d)", matchedClasses] UTF8String]);
+            ZTechHookTrace([[NSString stringWithFormat:@"[2.2/6] Zalo Keychain purged across password classes (matched=%d)", matchedClasses] UTF8String]);
             ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6] In-process deep clean completed 100%% for sig=%@", currentSig] UTF8String]);
         }
     } @catch (NSException *e) {
@@ -2163,7 +2118,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.4 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.5 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2336,21 +2291,13 @@ static void ZTechHookInit(void) {
             if (wkCls) {
                 Method mInit = class_getInstanceMethod(wkCls, @selector(initWithFrame:configuration:));
                 if (mInit) {
-                    SEL origSel = sel_registerName("_ztech_orig_initWithFrame:configuration:");
-                    if (class_addMethod(wkCls, origSel, (IMP)swizzled_WKWebView_initWithFrame_configuration, method_getTypeEncoding(mInit))) {
-                        Method mSwizInit = class_getInstanceMethod(wkCls, origSel);
-                        if (mSwizInit) method_exchangeImplementations(mInit, mSwizInit);
-                        gZTechOrigWKInitWithFrameSel = origSel;
-                    }
+                    orig_WKWebView_initWithFrame_configuration = (id (*)(id, SEL, CGRect, id))method_getImplementation(mInit);
+                    method_setImplementation(mInit, (IMP)swizzled_WKWebView_initWithFrame_configuration);
                 }
                 Method mSetUA = class_getInstanceMethod(wkCls, @selector(setCustomUserAgent:));
                 if (mSetUA) {
-                    SEL origSel = sel_registerName("_ztech_orig_setCustomUserAgent:");
-                    if (class_addMethod(wkCls, origSel, (IMP)swizzled_WKWebView_setCustomUserAgent, method_getTypeEncoding(mSetUA))) {
-                        Method mSwizSetUA = class_getInstanceMethod(wkCls, origSel);
-                        if (mSwizSetUA) method_exchangeImplementations(mSetUA, mSwizSetUA);
-                        gZTechOrigWKSetUASel = origSel;
-                    }
+                    orig_WKWebView_setCustomUserAgent = (void (*)(id, SEL, id))method_getImplementation(mSetUA);
+                    method_setImplementation(mSetUA, (IMP)swizzled_WKWebView_setCustomUserAgent);
                 }
                 ZTechHookTrace("[WebKit] WKWebView fingerprinted & isolated with DocumentStart UserScript");
             }
@@ -2462,18 +2409,6 @@ static void ZTechHookInit(void) {
             if (raw_IOReg) {
                 pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
             }
-
-            void *raw_access = dlsym(RTLD_DEFAULT, "access");
-            if (raw_access) pMSHook(raw_access, (void *)hooked_access, (void **)&orig_access);
-
-            void *raw_stat = dlsym(RTLD_DEFAULT, "stat");
-            if (raw_stat) pMSHook(raw_stat, (void *)hooked_stat, (void **)&orig_stat);
-
-            void *raw_lstat = dlsym(RTLD_DEFAULT, "lstat");
-            if (raw_lstat) pMSHook(raw_lstat, (void *)hooked_lstat, (void **)&orig_lstat);
-
-            void *raw_dyld = dlsym(RTLD_DEFAULT, "_dyld_get_image_name");
-            if (raw_dyld) pMSHook(raw_dyld, (void *)hooked_dyld_get_image_name, (void **)&orig_dyld_get_image_name);
         }
 
         struct utsname verifyUts;

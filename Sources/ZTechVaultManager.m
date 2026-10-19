@@ -129,7 +129,9 @@ extern char **environ;
                     (strcasecmp(name, "Zalo") == 0 ||
                      strcasestr(name, "zalo") != NULL ||
                      strcasestr(name, "zingalo") != NULL ||
-                     strcasestr(name, "aida64") != NULL)) {
+                     strcasestr(name, "aida64") != NULL ||
+                     strcasestr(name, "NotificationService") != NULL ||
+                     strcasestr(name, "NotificationContent") != NULL)) {
                     pid_t p = procs[i].kp_proc.p_pid;
                     kill(p, SIGKILL);
                     [killedPids addObject:@(p)];
@@ -768,20 +770,6 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     chmod([markerFile UTF8String], 0666);
 
     [self runFastChownAndChmod:zaloContainer];
-
-    // Flush cfprefsd so restored NSUserDefaults plists are reloaded cleanly
-    NSArray<NSString *> *killBins = @[@"/var/jb/usr/bin/killall", @"/usr/bin/killall"];
-    for (NSString *bin in killBins) {
-        if ([fm isExecutableFileAtPath:bin]) {
-            pid_t pid;
-            const char *args[] = { [bin UTF8String], "-9", "cfprefsd", NULL };
-            posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ);
-            break;
-        }
-    }
-
-    // Flush filesystem
-    sync();
 
     // 7. Launch Zalo
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.20 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{

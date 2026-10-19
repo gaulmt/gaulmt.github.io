@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.4 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.5 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.4: Tối ưu triệt để tạo phiên Zalo mới cực mượt không lag và không crash, chuyển đổi cơ chế phân quyền sang POSIX C Syscall 1ms, loại bỏ xung đột bộ nhớ SQLite/MMKV khi mở Zalo phiên mới.
+        Bản phát hành v5.7.5: Khắc phục triệt để lỗi crash & khựng giật khi mở Zalo phiên mới, gỡ bỏ hook stat/lstat/access tầng thấp tránh xung đột dylib, bảo vệ an toàn bộ đệm sysctl và đồng bộ Keychain mượt mà 100%.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.7.4
+Version: 5.7.5
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.7.4 - Ultra-Smooth Session Creation, Zero-Lag Native Chown & Zero-Crash Startup
+Description: quang lam marketing v5.7.5 - Fixed Fresh Session Launch Crash, Pure High-Speed Startup & Universal Sysctl Safety
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

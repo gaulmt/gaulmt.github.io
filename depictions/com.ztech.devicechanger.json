@@ -14,11 +14,7 @@
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành **quang lam marketing v5.7.6**:
-
-- **Triệt tiêu hoàn toàn hiện tượng crash chập chờn khi mở Zalo**: Gỡ bỏ triệt để cơ chế manual Mach-O GOT rebinding (_dyld_register_func_for_add_image) gây xung đột chained fixups trong dyld4 trên iOS 15 (nguyên nhân gây SIGBUS/EXC_BAD_ACCESS khi khởi chạy Zalo).
-- **100% ElleKit Native Function Hooks**: Chuyển đổi toàn diện sang ElleKit function entry trampolines siêu an toàn, mượt mà và không can thiệp bộ nhớ __DATA_CONST.
-- **Nâng cấp đồng bộ I/O Kernel**: Thêm kernel sync() và tối ưu hóa thời gian giải phóng tiến trình khi làm mới phiên Zalo, đảm bảo không khóa database hay giật lag."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.6**:\n\n- **Triệt tiêu hoàn toàn hiện tượng crash chập chờn khi mở Zalo**: Gỡ bỏ triệt để cơ chế manual Mach-O GOT rebinding (_dyld_register_func_for_add_image) gây xung đột chained fixups trong dyld4 trên iOS 15 (nguyên nhân gây SIGBUS/EXC_BAD_ACCESS khi khởi chạy Zalo).\n- **100% ElleKit Native Function Hooks**: Chuyển đổi toàn diện sang ElleKit function entry trampolines siêu an toàn, mượt mà và không can thiệp bộ nhớ __DATA_CONST.\n- **Nâng cấp đồng bộ I/O Kernel**: Thêm kernel sync() và tối ưu hóa thời gian giải phóng tiến trình khi làm mới phiên Zalo, đảm bảo không khóa database hay giật lag."
         },
         {
           "class": "DepictionTableTextView",

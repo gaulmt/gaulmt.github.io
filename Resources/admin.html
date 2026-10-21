@@ -889,7 +889,29 @@
     }
 
     async function cloudCmd(cmdArray) {
-      const resp = await fetch(CLOUD_API_URL, {
+      const isVercel = window.location.hostname.includes("vercel.app");
+      const endpoint = isVercel ? "/api/cmd" : CLOUD_API_URL;
+
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${CLOUD_API_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(cmdArray)
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return data.result;
+        }
+        if (!isVercel) throw new Error("HTTP " + resp.status);
+      } catch (e) {
+        if (!isVercel) throw e;
+      }
+
+      // Fallback to direct Upstash REST API if serverless proxy is unavailable
+      const resp2 = await fetch(CLOUD_API_URL, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${CLOUD_API_TOKEN}`,
@@ -897,9 +919,9 @@
         },
         body: JSON.stringify(cmdArray)
       });
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const data = await resp.json();
-      return data.result;
+      if (!resp2.ok) throw new Error("HTTP " + resp2.status);
+      const data2 = await resp2.json();
+      return data2.result;
     }
 
     function randomKeyString() {

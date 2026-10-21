@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.7.5
+Version: 5.7.6
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.7.5 - Fixed Fresh Session Launch Crash, Pure High-Speed Startup & Universal Sysctl Safety
+Description: quang lam marketing v5.7.6 - Fixed Fresh Session Launch Crash, Pure High-Speed Startup & Universal Sysctl Safety
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

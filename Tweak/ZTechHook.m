@@ -791,7 +791,12 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
             }
         }
     }
-    int ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    int ret = 0;
+    if (orig_sysctl) {
+        ret = orig_sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    } else {
+        ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+    }
     if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
         char *buf = (char *)oldp;
         if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
@@ -915,12 +920,17 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             return 0;
         }
 
-        int name2oid_oid[2] = { 0, 3 };
-        int real_oid[CTL_MAXNAME + 2];
-        size_t oidlen = sizeof(real_oid);
-        int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
-        if (err < 0) return err;
-        int ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
+        int ret = 0;
+        if (orig_sysctlbyname) {
+            ret = orig_sysctlbyname(name, oldp, oldlenp, newp, newlen);
+        } else {
+            int name2oid_oid[2] = { 0, 3 };
+            int real_oid[CTL_MAXNAME + 2];
+            size_t oidlen = sizeof(real_oid);
+            int err = __sysctl(name2oid_oid, 2, real_oid, &oidlen, (void *)name, strlen(name));
+            if (err < 0) return err;
+            ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
+        }
         if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
             char *buf = (char *)oldp;
             if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
@@ -951,7 +961,14 @@ typedef CFTypeRef (*zt_MGCopyAnswer_t)(CFStringRef prop);
 static zt_MGCopyAnswer_t orig_MGCopyAnswer = NULL;
 
 static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
-    if (!prop || CFGetTypeID(prop) != CFStringGetTypeID()) return NULL;
+    if (!prop) return NULL;
+    uintptr_t p = (uintptr_t)prop;
+    if (p < 0x10000ULL || (p & 0x7) != 0) return NULL;
+    @try {
+        if (CFGetTypeID(prop) != CFStringGetTypeID()) return NULL;
+    } @catch (NSException *e) {
+        return NULL;
+    }
 
     if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine")) || CFEqual(prop, CFSTR("device-name"))) {
         return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
@@ -1001,26 +1018,31 @@ static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
 }
 
 static CFTypeRef ZTechInspectAndFilterMGResult(CFTypeRef res) {
-    if (res != NULL && CFGetTypeID(res) == CFStringGetTypeID()) {
-        NSString *val = (__bridge NSString *)res;
-        if ([val hasPrefix:@"iPhone"] && [val containsString:@","] && ![val isEqualToString:gMachineIdObj]) {
-            CFRelease(res);
-            return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+    if (!res) return NULL;
+    uintptr_t p = (uintptr_t)res;
+    if (p < 0x10000ULL || (p & 0x7) != 0) return res;
+    @try {
+        if (CFGetTypeID(res) == CFStringGetTypeID()) {
+            NSString *val = (__bridge NSString *)res;
+            if ([val hasPrefix:@"iPhone"] && [val containsString:@","] && ![val isEqualToString:gMachineIdObj]) {
+                CFRelease(res);
+                return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
+            }
+            if ((gRealMarketingObj.length > 0 && [val localizedCaseInsensitiveContainsString:gRealMarketingObj]) ||
+                ([val hasPrefix:@"iPhone "] && ![val isEqualToString:gModelNameObj])) {
+                CFRelease(res);
+                return (__bridge_retained CFTypeRef)[gModelNameObj copy];
+            }
+            if (gRealBoardIdObj.length > 0 && [val isEqualToString:gRealBoardIdObj]) {
+                CFRelease(res);
+                return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
+            }
+            if (gRealIosVersionObj.length > 0 && ([val isEqualToString:gRealIosVersionObj] || [val hasPrefix:gRealIosVersionObj])) {
+                CFRelease(res);
+                return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
+            }
         }
-        if ((gRealMarketingObj.length > 0 && [val localizedCaseInsensitiveContainsString:gRealMarketingObj]) ||
-            ([val hasPrefix:@"iPhone "] && ![val isEqualToString:gModelNameObj])) {
-            CFRelease(res);
-            return (__bridge_retained CFTypeRef)[gModelNameObj copy];
-        }
-        if (gRealBoardIdObj.length > 0 && [val isEqualToString:gRealBoardIdObj]) {
-            CFRelease(res);
-            return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
-        }
-        if (gRealIosVersionObj.length > 0 && ([val isEqualToString:gRealIosVersionObj] || [val hasPrefix:gRealIosVersionObj])) {
-            CFRelease(res);
-            return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
-        }
-    }
+    } @catch (NSException *e) {}
     return res;
 }
 
@@ -1124,121 +1146,10 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
     return res;
 }
 
-typedef struct {
-    uintptr_t start;
-    uintptr_t end;
-} ZTechAddrRange;
-
-static ZTechAddrRange gAppImageRanges[128];
-static volatile int gAppImageRangeCount = 0;
-
-static void ZTechRebindImageAndRecordRange(const struct mach_header *header, intptr_t slide) {
-    if (!header || header->magic != MH_MAGIC_64) return;
-    Dl_info info;
-    if (dladdr(header, &info) == 0 || !info.dli_fname) return;
-
-    const char *fname = info.dli_fname;
-    BOOL isAppImg = (strstr(fname, ".app/") != NULL);
-    BOOL isSelfTweak = (strstr(fname, "ZTechHook") != NULL);
-    if (!isAppImg && !isSelfTweak) return;
-
-    const struct mach_header_64 *mh64 = (const struct mach_header_64 *)header;
-    const struct segment_command_64 *linkedit_seg = NULL;
-    const struct symtab_command *symtab_cmd = NULL;
-    const struct dysymtab_command *dysymtab_cmd = NULL;
-
-    uintptr_t cur = (uintptr_t)mh64 + sizeof(struct mach_header_64);
-    for (uint32_t i = 0; i < mh64->ncmds; ++i) {
-        const struct load_command *lc = (const struct load_command *)cur;
-        if (lc->cmd == LC_SEGMENT_64) {
-            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
-            if (strcmp(seg->segname, "__TEXT") == 0) {
-                int idx = gAppImageRangeCount;
-                if (idx < 128) {
-                    uintptr_t start = (uintptr_t)slide + seg->vmaddr;
-                    uintptr_t end = start + seg->vmsize;
-                    BOOL exists = NO;
-                    for (int k = 0; k < idx; ++k) {
-                        if (gAppImageRanges[k].start == start) { exists = YES; break; }
-                    }
-                    if (!exists) {
-                        gAppImageRanges[idx].start = start;
-                        gAppImageRanges[idx].end = end;
-                        gAppImageRangeCount = idx + 1;
-                    }
-                }
-            } else if (strcmp(seg->segname, "__LINKEDIT") == 0) {
-                linkedit_seg = seg;
-            }
-        } else if (lc->cmd == LC_SYMTAB) {
-            symtab_cmd = (const struct symtab_command *)lc;
-        } else if (lc->cmd == LC_DYSYMTAB) {
-            dysymtab_cmd = (const struct dysymtab_command *)lc;
-        }
-        cur += lc->cmdsize;
-    }
-
-    // Only rebind GOT / lazy symbol pointers on pure arm64 app images (skip on arm64e PAC pointers)
-#if !__has_feature(ptrauth_calls)
-    if (!isAppImg || !linkedit_seg || !symtab_cmd || !dysymtab_cmd) return;
-    uintptr_t linkedit_base = (uintptr_t)slide + linkedit_seg->vmaddr - linkedit_seg->fileoff;
-    const struct nlist_64 *symtab = (const struct nlist_64 *)(linkedit_base + symtab_cmd->symoff);
-    const char *strtab = (const char *)(linkedit_base + symtab_cmd->stroff);
-    const uint32_t *indirect_symtab = (const uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
-
-    cur = (uintptr_t)mh64 + sizeof(struct mach_header_64);
-    for (uint32_t i = 0; i < mh64->ncmds; ++i) {
-        const struct load_command *lc = (const struct load_command *)cur;
-        if (lc->cmd == LC_SEGMENT_64) {
-            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
-            if (strcmp(seg->segname, "__DATA") == 0 || strcmp(seg->segname, "__DATA_CONST") == 0) {
-                const struct section_64 *sec = (const struct section_64 *)((uintptr_t)seg + sizeof(struct segment_command_64));
-                for (uint32_t j = 0; j < seg->nsects; ++j) {
-                    uint8_t type = sec[j].flags & SECTION_TYPE;
-                    if (type == S_LAZY_SYMBOL_POINTERS || type == S_NON_LAZY_SYMBOL_POINTERS) {
-                        uint32_t *indices = (uint32_t *)(indirect_symtab + sec[j].reserved1);
-                        void **bindings = (void **)((uintptr_t)slide + sec[j].addr);
-                        size_t count = sec[j].size / sizeof(void *);
-                        vm_protect(mach_task_self(), (vm_address_t)bindings, (vm_size_t)sec[j].size, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
-                        for (size_t k = 0; k < count; ++k) {
-                            uint32_t sym_idx = indices[k];
-                            if (sym_idx == INDIRECT_SYMBOL_ABS || sym_idx == INDIRECT_SYMBOL_LOCAL ||
-                                sym_idx == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS) || sym_idx >= symtab_cmd->nsyms) {
-                                continue;
-                            }
-                            const char *sym_name = strtab + symtab[sym_idx].n_un.n_strx;
-                            if (strcmp(sym_name, "_uname") == 0) {
-                                bindings[k] = (void *)hooked_uname;
-                            } else if (strcmp(sym_name, "_sysctlbyname") == 0) {
-                                bindings[k] = (void *)hooked_sysctlbyname;
-                            } else if (strcmp(sym_name, "_sysctl") == 0) {
-                                bindings[k] = (void *)hooked_sysctl;
-                            } else if (strcmp(sym_name, "_MGCopyAnswer") == 0) {
-                                bindings[k] = (void *)hooked_MGCopyAnswer;
-                            } else if (strcmp(sym_name, "_MGCopyAnswerWithError") == 0) {
-                                bindings[k] = (void *)hooked_MGCopyAnswerWithError;
-                            } else if (strcmp(sym_name, "_SCDynamicStoreCopyComputerName") == 0) {
-                                bindings[k] = (void *)hooked_SCDynamicStoreCopyComputerName;
-                            } else if (strcmp(sym_name, "_SCDynamicStoreCopyLocalHostName") == 0) {
-                                bindings[k] = (void *)hooked_SCDynamicStoreCopyLocalHostName;
-                            } else if (strcmp(sym_name, "__CFCopySystemVersionDictionary") == 0) {
-                                bindings[k] = (void *)hooked_CFCopySystemVersionDictionary;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        cur += lc->cmdsize;
-    }
-#endif
-}
-
-
-
-
-
-
+// ElleKit MSHookFunction safely hooks uname, sysctl, sysctlbyname, MGCopyAnswer,
+// MGCopyAnswerWithError, SCDynamicStore and IOKit at function entry points.
+// Manual Mach-O GOT rebinding / _dyld_register_func_for_add_image is intentionally
+// omitted to prevent dyld chained fixups corruption (SIGBUS/EXC_BAD_ACCESS) on iOS 15+.
 
 static NSString *ZTechGPUNameForMachine(NSString *machine) {
     if (!machine || machine.length == 0) return @"Apple A18 Pro GPU";
@@ -2118,7 +2029,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.5 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.6 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2339,8 +2250,7 @@ static void ZTechHookInit(void) {
             ZTechHookTrace([[NSString stringWithFormat:@"[4/6 ERROR] CTCarrier swizzle exception: %@", e] UTF8String]);
         }
 
-        // 3. Hardware Model, MobileGestalt & IOKit Spoofing (ElleKit MSHookFunction + Mach-O GOT Rebinding)
-        _dyld_register_func_for_add_image(&ZTechRebindImageAndRecordRange);
+        // 3. Hardware Model, MobileGestalt & IOKit Spoofing (ElleKit MSHookFunction Global Native Hooks)
 
         typedef void (*zt_MSHookFunction_t)(void *symbol, void *replace, void **result);
         zt_MSHookFunction_t pMSHook = (zt_MSHookFunction_t)dlsym(RTLD_DEFAULT, "MSHookFunction");

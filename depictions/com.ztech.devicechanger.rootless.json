@@ -10,11 +10,15 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing (Rootless) v5.7.5 - Fixed Fresh Session Launch Crash & Safe Sysctl"
+          "title": "quang lam marketing (Rootless) v5.7.6 - Fixed Fresh Session Launch Crash & Safe Sysctl"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **Rootless v5.7.5** dành cho Dopamine, palera1n (iOS 15 - 16+):\n\n- **Khắc phục triệt để lỗi crash & khựng giật khi mở Zalo phiên mới**: Gỡ bỏ hook stat/lstat/access tầng thấp tránh xung đột dylib và stack overflow, bổ sung kiểm tra an toàn chuỗi ASCII trên bộ đệm sysctl ngăn chặn triệt để lỗi đọc tràn bộ nhớ (SIGBUS/SIGSEGV).\n- **Bảo Vệ Đầy Đủ Cấu Trúc Container & Keychain**: Tự động tái tạo toàn bộ 12 thư mục container chuẩn iOS (Documents, WebKit, HTTPStorages, Application Support), đồng bộ Keychain mượt mà và an toàn 100% không làm treo tiến trình."
+          "markdown": "Bản phát hành **quang lam marketing v5.7.6**:
+
+- **Triệt tiêu hoàn toàn hiện tượng crash chập chờn khi mở Zalo**: Gỡ bỏ triệt để cơ chế manual Mach-O GOT rebinding (_dyld_register_func_for_add_image) gây xung đột chained fixups trong dyld4 trên iOS 15 (nguyên nhân gây SIGBUS/EXC_BAD_ACCESS khi khởi chạy Zalo).
+- **100% ElleKit Native Function Hooks**: Chuyển đổi toàn diện sang ElleKit function entry trampolines siêu an toàn, mượt mà và không can thiệp bộ nhớ __DATA_CONST.
+- **Nâng cấp đồng bộ I/O Kernel**: Thêm kernel sync() và tối ưu hóa thời gian giải phóng tiến trình khi làm mới phiên Zalo, đảm bảo không khóa database hay giật lag."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +28,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.7.5"
+          "text": "5.7.6"
         },
         {
           "class": "DepictionTableTextView",

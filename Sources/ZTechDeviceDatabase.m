@@ -623,7 +623,8 @@ extern char **environ;
 
     // Guarantee Zalo, Zalo extensions, AIDA64 and Safari are terminated via kernel sysctl and release SQLite/MMKV locks
     [ZTechVaultManager killZaloProcess];
-    usleep(120000);
+    usleep(250000);
+    sync();
     [ZTechVaultManager cleanSafariCookiesAndWebsiteData];
     cleanedItems += 5;
 

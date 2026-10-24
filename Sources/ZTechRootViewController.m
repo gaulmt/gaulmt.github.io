@@ -137,7 +137,7 @@ disk_fallback:
     return @"";
 }
 
-@interface ZTechSafeTextField : UITextField
+@interface ZTechSafeTextField : UITextField <UIPasteConfigurationSupporting>
 @property (nonatomic, assign) UIEdgeInsets textInsets;
 @end
 
@@ -174,10 +174,15 @@ disk_fallback:
 }
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
-    if (action == @selector(paste:)) return YES;
+    if (action == @selector(paste:) ||
+        action == @selector(pasteAndSearch:) ||
+        action == @selector(pasteAndGo:)) {
+        return YES;
+    }
     if (action == @selector(copy:) || action == @selector(cut:) || action == @selector(selectAll:)) {
         return [super canPerformAction:action withSender:sender];
     }
+    // Block all other system actions (e.g. VisionKit OCR captureTextFromCamera:, share, define) that crash unsandboxed apps
     return NO;
 }
 
@@ -187,6 +192,23 @@ disk_fallback:
         self.text = clip;
         [self sendActionsForControlEvents:UIControlEventEditingChanged];
     }
+}
+
+- (void)pasteAndSearch:(id)sender {
+    [self paste:sender];
+}
+
+- (void)pasteAndGo:(id)sender {
+    [self paste:sender];
+}
+
+// Intercept UIKit iOS 11+ system pasteboard providers (assistant bar, system menus, quick paste gestures)
+- (BOOL)canPasteItemProviders:(NSArray *)itemProviders {
+    return YES;
+}
+
+- (void)pasteItemProviders:(NSArray *)itemProviders {
+    [self paste:nil];
 }
 
 @end
@@ -665,7 +687,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.8.3";
+    appSub.text = @"Identity & Vault · v5.8.4";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -2292,7 +2314,15 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     self.editingVaultAccountId = @"__CURRENT_SESSION__";
     self.vaultNameInputField.hidden = YES;
     self.vaultNameInputField.text = @"Phiên Zalo hiện tại";
-    self.vaultProxyInputField.text = self.currentProfile.activeProxy ?: @"";
+    NSString *curProxy = self.currentProfile.activeProxy ?: @"";
+    self.vaultProxyInputField.text = curProxy;
+    if (curProxy.length == 0) {
+        NSString *clip = ZTechReadClipboardSafely();
+        if (clip.length > 0 && [clip containsString:@":"]) {
+            self.vaultProxyInputField.text = clip;
+            [self showToast:[NSString stringWithFormat:@"Đã tự động nhận diện Proxy: %@", clip] isError:NO];
+        }
+    }
     self.vaultModalTitleLabel.text = @"GẮN PROXY CHO PHIÊN HIỆN TẠI";
     [self styleButton:self.btnVaultSaveConfirm
                 title:@"Xác nhận Proxy"

@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.8.3
+Version: 5.8.4
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.8.3 - POSIX Signal Guard, Zero-Crash Clipboard Paste & Memory Safety
+Description: quang lam marketing v5.8.4 - Anti-Crash Account Restore, System Menu Paste Guard & Zero-Config Proxy
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

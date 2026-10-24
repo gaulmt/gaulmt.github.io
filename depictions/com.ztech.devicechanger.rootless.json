@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.8.3 - POSIX Signal Guard & Khắc phục Triệt để Crash Dán Bộ Nhớ Tạm"
+          "title": "quang lam marketing v5.8.4 - Khắc phục Triệt để Crash Mở Acc Cũ & Dán Menu Hệ Thống"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.3**:\n\n- **Khắc phục Triệt Để Lỗi Crash khi Nhấn Dán Dữ Liệu**: Tích hợp cơ chế bảo vệ tín hiệu hạt nhân POSIX Signal Guard (`sigsetjmp`/`siglongjmp`) bảo vệ ứng dụng trước mọi tín hiệu `SIGSEGV`, `SIGBUS`, `SIGABRT` khi đọc bộ nhớ tạm. Ngăn chặn 100% tình trạng văng app khi dán Proxy hoặc Key bản quyền do xung đột với các tweak hệ thống (Little12, DynamicPen, v.v.).\n- **Xác thực Định dạng An Toàn (Type-Safe Pasteboard)**: Kiểm tra `hasStrings` và `containsPasteboardTypes:` trước khi trích xuất dữ liệu, loại bỏ hoàn toàn lỗi ngoại lệ `dataForPasteboardType` trên iOS 15/16.\n- **Tích hợp Nút Nhập & Cấu hình Proxy ngay tại Tab 1**: Cho phép thiết lập Proxy cô lập IP tuyệt đối 100% trước khi mở Zalo để đăng ký tài khoản mới an toàn, chống bị trảm / vô hiệu hóa acc do trùng IP thật.\n- **Bảo toàn Dữ liệu MMKV & Khôi phục Mở Acc cũ Mượt mà**: Bảo toàn 100% tệp đồng bộ đa tiến trình Tencent MMKV (`bak_sm_`), loại bỏ lỗi tràn bộ nhớ `abort()` khi nạp tài khoản đã lưu."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.4**:\n\n- **Khắc phục Triệt Để Lỗi Crash Khi Mở Acc Cũ**: Loại bỏ hoàn toàn thao tác xóa tệp shared memory SQLite (`-shm`) gây hỏng chỉ mục WAL của WCDB/SQLite; tách rời khôi phục Keychain ra khỏi dyld constructor, kích hoạt theo cơ chế On-Demand (`SecItemCopyMatching` hook) và Main Queue, chấm dứt 100% tình trạng watchdog timeout hoặc chết đột ngột khi mở tài khoản đã lưu.\n- **Bảo Vệ Toàn Diện Cử Chỉ Dán Hệ Thống (System Paste Interception)**: Tiếp nhận an toàn các lệnh dán từ Menu ngữ cảnh iOS (`UIMenuController`/`UIEditMenuInteraction`), thanh tiện ích bàn phím (`inputAssistantItem`) và cử chỉ chụm 3 ngón thông qua `canPasteItemProviders:` / `pasteItemProviders:`, ngăn chặn tuyệt đối tình trạng crash XPC của `_UITextPasteController`.\n- **Tự Động Nhận Diện Proxy Từ Bộ Nhớ Tạm**: Tự động điền chuỗi Proxy khi mở khung cấu hình nếu đã sao chép Proxy dạng `IP:Port:User:Pass`, loại bỏ hoàn toàn thao tác cấu hình thủ công."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.8.3"
+          "text": "5.8.4"
         },
         {
           "class": "DepictionTableTextView",

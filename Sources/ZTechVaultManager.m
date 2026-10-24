@@ -608,9 +608,13 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     NSString *sub = nil;
     while ((sub = [enumerator nextObject])) {
         NSString *last = [sub lastPathComponent];
-        if ([last hasSuffix:@"-shm"] || [last hasSuffix:@".sqlite-shm"] || [last hasSuffix:@".db-shm"] ||
-            [last hasSuffix:@".lock"] || [last isEqualToString:@"zalo.lock"] ||
-            [last isEqualToString:@".lock"]) {
+        // CRITICAL FIX v5.8.4: DO NOT delete SQLite -shm or -wal files!
+        // The -shm file is the shared memory index required by SQLite / WCDB to replay -wal logs.
+        // Deleting -shm while -wal exists corrupts database index headers and crashes Zalo (WCDB::AssertionFailure).
+        // Only remove actual lock markers like zalo.lock, .lock or stale sockets.
+        if ([last isEqualToString:@"zalo.lock"] ||
+            [last isEqualToString:@".lock"] ||
+            [last hasSuffix:@".flock"]) {
             NSString *full = [rootPath stringByAppendingPathComponent:sub];
             [fm removeItemAtPath:full error:nil];
         }
@@ -824,8 +828,13 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     NSString *docsDir = [zaloContainer stringByAppendingPathComponent:@"Documents"];
     [fm createDirectoryAtPath:docsDir withIntermediateDirectories:YES attributes:nil error:nil];
 
-    // Explicitly guarantee no wipe flag exists
+    // Explicitly guarantee no wipe flag exists in main container or any AppGroups
     [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
+    for (NSString *groupId in appGroups) {
+        NSString *liveGroupPath = appGroups[groupId];
+        [fm removeItemAtPath:[liveGroupPath stringByAppendingPathComponent:@"Documents/_zt_wipe_keychain.flag"] error:nil];
+        [fm removeItemAtPath:[liveGroupPath stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
+    }
 
     // Write restore trigger
     NSString *restoreTrigger = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];

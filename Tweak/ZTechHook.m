@@ -1867,7 +1867,7 @@ static void ZTechSnapshotZaloKeychainAndPrefs(NSString *bundleId) {
     } @catch (NSException *e) {}
 }
 
-static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
+static void ZTechRestoreZaloPreferencesIfTriggered(NSString *bundleId) {
     @try {
         const char *homeC = getenv("HOME");
         if (!homeC || homeC[0] == '\0') return;
@@ -1883,9 +1883,8 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
 
         NSString *restoreTrigger = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
         NSString *wipeFlag = [docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"];
-        NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
 
-        // Case 1: Vault Restore Triggered (Write plist directly to disk without initializing CFPreferences during dyld constructor)
+        // Restore Preferences plist directly to disk synchronously in constructor (pure disk I/O, fast & safe)
         if ([fm fileExistsAtPath:restoreTrigger]) {
             [fm removeItemAtPath:wipeFlag error:nil];
 
@@ -1899,127 +1898,163 @@ static void ZTechSyncZaloSessionAndKeychain(NSString *bundleId) {
                 [savedPrefs writeToFile:destPlist atomically:YES];
                 chmod([destPlist UTF8String], 0644);
             }
-
-            NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
-            NSArray *savedKc = [NSArray arrayWithContentsOfFile:kcSnapPath];
-            int restoredCount = 0;
-            if (savedKc && [savedKc isKindOfClass:[NSArray class]] && savedKc.count > 0) {
-                for (NSDictionary *entry in savedKc) {
-                    if (![entry isKindOfClass:[NSDictionary class]] || !entry[@"v_Data"]) continue;
-                    @try {
-                        NSMutableDictionary *addItem = [NSMutableDictionary dictionary];
-                        NSString *clsType = entry[@"secClass"];
-                        if ([clsType isEqualToString:@"inet"]) {
-                            addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassInternetPassword;
-                        } else if ([clsType isEqualToString:@"keys"]) {
-                            addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassKey;
-                        } else {
-                            addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassGenericPassword;
-                        }
-
-                        addItem[(__bridge id)kSecValueData] = entry[@"v_Data"];
-
-                        id pdmn = entry[@"pdmn"];
-                        if (pdmn) {
-                            addItem[(__bridge id)kSecAttrAccessible] = pdmn;
-                        } else {
-                            addItem[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlock;
-                        }
-
-                        if (entry[@"agrp"] && [entry[@"agrp"] length] > 0) {
-                            addItem[(__bridge id)kSecAttrAccessGroup] = entry[@"agrp"];
-                        }
-                        if (entry[@"acct"]) addItem[(__bridge id)kSecAttrAccount] = entry[@"acct"];
-                        if (entry[@"svce"]) addItem[(__bridge id)kSecAttrService] = entry[@"svce"];
-                        if (entry[@"gena"]) addItem[(__bridge id)kSecAttrGeneric] = entry[@"gena"];
-                        if (entry[@"labl"]) addItem[(__bridge id)kSecAttrLabel] = entry[@"labl"];
-                        if (entry[@"klbl"]) addItem[(__bridge id)kSecAttrApplicationLabel] = entry[@"klbl"];
-                        if (entry[@"ktyp"]) addItem[(__bridge id)kSecAttrKeyType] = entry[@"ktyp"];
-
-                        // Delete existing item matching exact attributes first so SecItemAdd succeeds cleanly
-                        NSMutableDictionary *delQuery = [NSMutableDictionary dictionary];
-                        delQuery[(__bridge id)kSecClass] = addItem[(__bridge id)kSecClass];
-                        if (addItem[(__bridge id)kSecAttrAccessGroup]) delQuery[(__bridge id)kSecAttrAccessGroup] = addItem[(__bridge id)kSecAttrAccessGroup];
-                        if (addItem[(__bridge id)kSecAttrAccount]) delQuery[(__bridge id)kSecAttrAccount] = addItem[(__bridge id)kSecAttrAccount];
-                        if (addItem[(__bridge id)kSecAttrService]) delQuery[(__bridge id)kSecAttrService] = addItem[(__bridge id)kSecAttrService];
-                        if (addItem[(__bridge id)kSecAttrApplicationLabel]) delQuery[(__bridge id)kSecAttrApplicationLabel] = addItem[(__bridge id)kSecAttrApplicationLabel];
-                        SecItemDelete((__bridge CFDictionaryRef)delQuery);
-
-                        OSStatus addSt = SecItemAdd((__bridge CFDictionaryRef)addItem, NULL);
-                        if (addSt == errSecSuccess) {
-                            restoredCount++;
-                        }
-                    } @catch (NSException *e) {}
-                }
-            }
-
-            NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
-            if (currentSig.length > 1) {
-                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                chmod([boundUuidFile UTF8String], 0666);
-            }
-            [fm removeItemAtPath:restoreTrigger error:nil];
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.5/6] Vault session restored (%d keychain items) for sig=%@", restoredCount, currentSig] UTF8String]);
-            return;
-        }
-
-        // Case 2: Check if Clean Reset requires purging stale Keychain
-        NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
-        NSString *boundSig = [[NSString stringWithContentsOfFile:boundUuidFile encoding:NSUTF8StringEncoding error:nil]
-                              stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        BOOL hasWipeFlag = [fm fileExistsAtPath:wipeFlag];
-        BOOL sigMatches = (boundSig && currentSig && ([boundSig isEqualToString:currentSig] || (gUuidObj.length > 10 && [boundSig hasPrefix:gUuidObj])));
-
-        if (hasWipeFlag && !sigMatches) {
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.1/6] In-process deep clean triggered (wipeFlag=%d, boundSig=%@ -> newSig=%@)",
-                             hasWipeFlag ? 1 : 0, boundSig ?: @"(none)", currentSig] UTF8String]);
-
-            if (currentSig.length > 1) {
-                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                chmod([boundUuidFile UTF8String], 0666);
-            }
-
-            [fm removeItemAtPath:wipeFlag error:nil];
-            [[ZTechUbiquitousStoreStub sharedStore] resetStore];
-
-            // Purge all Zalo Keychain password items across all access groups
-            NSArray *secClasses = @[
-                (__bridge id)kSecClassGenericPassword,
-                (__bridge id)kSecClassInternetPassword
-            ];
-            NSArray *accessGroups = @[
-                @"",
-                @"group.vn.com.vng.zingalo",
-                @"group.zgroups.vn.com.vng.zingalo",
-                @"group.zcontacts.vn.com.vng.zingalo",
-                @"group.zfriends.vn.com.vng.zingalo",
-                @"group.noti.vn.com.vng.zingalo",
-                @"group.zsettings.vn.com.vng.zingalo"
-            ];
-            int matchedClasses = 0;
-            for (NSString *agrp in accessGroups) {
-                for (id secClass in secClasses) {
-                    @try {
-                        NSMutableDictionary *q = [NSMutableDictionary dictionary];
-                        q[(__bridge id)kSecClass] = secClass;
-                        if (agrp.length > 0) {
-                            q[(__bridge id)kSecAttrAccessGroup] = agrp;
-                        }
-                        OSStatus st1 = SecItemDelete((__bridge CFDictionaryRef)q);
-                        if (st1 == errSecSuccess) matchedClasses++;
-                    } @catch (NSException *e) {}
-                }
-            }
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.2/6] Zalo Keychain purged across password classes (matched=%d)", matchedClasses] UTF8String]);
-            ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6] In-process deep clean completed 100%% for sig=%@", currentSig] UTF8String]);
-        } else if (!sigMatches && currentSig.length > 1) {
-            // Re-bind signature without wiping Keychain
-            [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            chmod([boundUuidFile UTF8String], 0666);
         }
     } @catch (NSException *e) {
-        ZTechHookTrace([[NSString stringWithFormat:@"[2.3/6 ERROR] Sync exception: %@", e] UTF8String]);
+        ZTechHookTrace([[NSString stringWithFormat:@"[Preferences ERROR] %@", e] UTF8String]);
     }
+}
+
+static dispatch_once_t sKeychainSyncOnceToken = 0;
+static void ZTechPerformKeychainRestoreOrPurgeIfNeeded(void) {
+    dispatch_once(&sKeychainSyncOnceToken, ^{
+        @try {
+            const char *homeC = getenv("HOME");
+            if (!homeC || homeC[0] == '\0') return;
+            NSString *home = [NSString stringWithUTF8String:homeC];
+            if (home.length == 0) return;
+
+            NSFileManager *fm = [NSFileManager defaultManager];
+            NSString *docsDir = [home stringByAppendingPathComponent:@"Documents"];
+            NSString *restoreTrigger = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
+            NSString *wipeFlag = [docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"];
+            NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
+
+            // Case 1: Vault Restore Triggered (Run on main queue or on-demand to prevent dyld constructor XPC deadlock)
+            if ([fm fileExistsAtPath:restoreTrigger]) {
+                [fm removeItemAtPath:wipeFlag error:nil];
+
+                NSString *kcSnapPath = [docsDir stringByAppendingPathComponent:@"_zt_keychain_snapshot.plist"];
+                NSArray *savedKc = [NSArray arrayWithContentsOfFile:kcSnapPath];
+                int restoredCount = 0;
+                if (savedKc && [savedKc isKindOfClass:[NSArray class]] && savedKc.count > 0) {
+                    for (NSDictionary *entry in savedKc) {
+                        if (![entry isKindOfClass:[NSDictionary class]] || !entry[@"v_Data"]) continue;
+                        @try {
+                            NSMutableDictionary *addItem = [NSMutableDictionary dictionary];
+                            NSString *clsType = entry[@"secClass"];
+                            if ([clsType isEqualToString:@"inet"]) {
+                                addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassInternetPassword;
+                            } else if ([clsType isEqualToString:@"keys"]) {
+                                addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassKey;
+                            } else {
+                                addItem[(__bridge id)kSecClass] = (__bridge id)kSecClassGenericPassword;
+                            }
+
+                            addItem[(__bridge id)kSecValueData] = entry[@"v_Data"];
+
+                            id pdmn = entry[@"pdmn"];
+                            if (pdmn) {
+                                addItem[(__bridge id)kSecAttrAccessible] = pdmn;
+                            } else {
+                                addItem[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlock;
+                            }
+
+                            if (entry[@"agrp"] && [entry[@"agrp"] length] > 0) {
+                                addItem[(__bridge id)kSecAttrAccessGroup] = entry[@"agrp"];
+                            }
+                            if (entry[@"acct"]) addItem[(__bridge id)kSecAttrAccount] = entry[@"acct"];
+                            if (entry[@"svce"]) addItem[(__bridge id)kSecAttrService] = entry[@"svce"];
+                            if (entry[@"gena"] && [entry[@"gena"] isKindOfClass:[NSData class]]) {
+                                addItem[(__bridge id)kSecAttrGeneric] = entry[@"gena"];
+                            }
+                            if (entry[@"labl"]) addItem[(__bridge id)kSecAttrLabel] = entry[@"labl"];
+                            if (entry[@"klbl"] && [entry[@"klbl"] isKindOfClass:[NSData class]]) {
+                                addItem[(__bridge id)kSecAttrApplicationLabel] = entry[@"klbl"];
+                            }
+                            if (entry[@"ktyp"] && [entry[@"ktyp"] isKindOfClass:[NSNumber class]]) {
+                                addItem[(__bridge id)kSecAttrKeyType] = entry[@"ktyp"];
+                            }
+
+                            // Delete existing item matching exact attributes first so SecItemAdd succeeds cleanly
+                            NSMutableDictionary *delQuery = [NSMutableDictionary dictionary];
+                            delQuery[(__bridge id)kSecClass] = addItem[(__bridge id)kSecClass];
+                            if (addItem[(__bridge id)kSecAttrAccessGroup]) delQuery[(__bridge id)kSecAttrAccessGroup] = addItem[(__bridge id)kSecAttrAccessGroup];
+                            if (addItem[(__bridge id)kSecAttrAccount]) delQuery[(__bridge id)kSecAttrAccount] = addItem[(__bridge id)kSecAttrAccount];
+                            if (addItem[(__bridge id)kSecAttrService]) delQuery[(__bridge id)kSecAttrService] = addItem[(__bridge id)kSecAttrService];
+                            if (addItem[(__bridge id)kSecAttrApplicationLabel]) delQuery[(__bridge id)kSecAttrApplicationLabel] = addItem[(__bridge id)kSecAttrApplicationLabel];
+                            SecItemDelete((__bridge CFDictionaryRef)delQuery);
+
+                            OSStatus addSt = SecItemAdd((__bridge CFDictionaryRef)addItem, NULL);
+                            if (addSt == errSecSuccess) {
+                                restoredCount++;
+                            }
+                        } @catch (NSException *e) {}
+                    }
+                }
+
+                NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
+                if (currentSig.length > 1) {
+                    [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                    chmod([boundUuidFile UTF8String], 0666);
+                }
+                [fm removeItemAtPath:restoreTrigger error:nil];
+                ZTechHookTrace([[NSString stringWithFormat:@"[Keychain] Restored %d items on-demand safely (sig=%@)", restoredCount, currentSig] UTF8String]);
+                return;
+            }
+
+            // Case 2: Check if Clean Reset requires purging stale Keychain
+            NSString *currentSig = [NSString stringWithFormat:@"%@:%@", gUuidObj ?: @"", gMachineIdObj ?: @""];
+            NSString *boundSig = [[NSString stringWithContentsOfFile:boundUuidFile encoding:NSUTF8StringEncoding error:nil]
+                                  stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            BOOL hasWipeFlag = [fm fileExistsAtPath:wipeFlag];
+            BOOL sigMatches = (boundSig && currentSig && ([boundSig isEqualToString:currentSig] || (gUuidObj.length > 10 && [boundSig hasPrefix:gUuidObj])));
+
+            if (hasWipeFlag && !sigMatches) {
+                ZTechHookTrace([[NSString stringWithFormat:@"[Keychain] In-process deep clean triggered (wipeFlag=%d, boundSig=%@ -> newSig=%@)",
+                                 hasWipeFlag ? 1 : 0, boundSig ?: @"(none)", currentSig] UTF8String]);
+
+                if (currentSig.length > 1) {
+                    [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                    chmod([boundUuidFile UTF8String], 0666);
+                }
+
+                [fm removeItemAtPath:wipeFlag error:nil];
+                [[ZTechUbiquitousStoreStub sharedStore] resetStore];
+
+                // Purge all Zalo Keychain password items across all access groups
+                NSArray *secClasses = @[
+                    (__bridge id)kSecClassGenericPassword,
+                    (__bridge id)kSecClassInternetPassword
+                ];
+                NSArray *accessGroups = @[
+                    @"",
+                    @"group.vn.com.vng.zingalo",
+                    @"group.zgroups.vn.com.vng.zingalo",
+                    @"group.zcontacts.vn.com.vng.zingalo",
+                    @"group.zfriends.vn.com.vng.zingalo",
+                    @"group.noti.vn.com.vng.zingalo",
+                    @"group.zsettings.vn.com.vng.zingalo"
+                ];
+                int matchedClasses = 0;
+                for (NSString *agrp in accessGroups) {
+                    for (id secClass in secClasses) {
+                        @try {
+                            NSMutableDictionary *q = [NSMutableDictionary dictionary];
+                            q[(__bridge id)kSecClass] = secClass;
+                            if (agrp.length > 0) {
+                                q[(__bridge id)kSecAttrAccessGroup] = agrp;
+                            }
+                            OSStatus st1 = SecItemDelete((__bridge CFDictionaryRef)q);
+                            if (st1 == errSecSuccess) matchedClasses++;
+                        } @catch (NSException *e) {}
+                    }
+                }
+                ZTechHookTrace([[NSString stringWithFormat:@"[Keychain] Purged %d items safely", matchedClasses] UTF8String]);
+            } else if (!sigMatches && currentSig.length > 1) {
+                // Re-bind signature without wiping Keychain
+                [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                chmod([boundUuidFile UTF8String], 0666);
+            }
+        } @catch (NSException *e) {
+            ZTechHookTrace([[NSString stringWithFormat:@"[Keychain ERROR] Sync exception: %@", e] UTF8String]);
+        }
+    });
+}
+
+static OSStatus (*orig_SecItemCopyMatching)(CFDictionaryRef query, CFTypeRef *result) = NULL;
+static OSStatus hook_SecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
+    ZTechPerformKeychainRestoreOrPurgeIfNeeded();
+    return orig_SecItemCopyMatching ? orig_SecItemCopyMatching(query, result) : errSecParam;
 }
 
 #pragma mark - Constructor
@@ -2122,7 +2157,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.2 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.4 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2164,9 +2199,15 @@ static void ZTechHookInit(void) {
         ZTechHookTrace([[NSString stringWithFormat:@"[2/6] Profile loaded: model=%@, id=%@, ios=%@, uuid=%@",
                          gModelNameObj, gMachineIdObj, gIosVersionObj, gUuidObj] UTF8String]);
 
-        // Synchronize Zalo Keychain, Container & AppGroup state before Zalo's main() runs
+        // Synchronize Zalo Preferences & Keychain state
         if (isZalo) {
-            ZTechSyncZaloSessionAndKeychain(bundleId);
+            // Restore Preferences plist directly during constructor (fast & local disk I/O)
+            ZTechRestoreZaloPreferencesIfTriggered(bundleId);
+
+            // Defer Keychain restore/purge to main queue to prevent dyld constructor XPC deadlock
+            dispatch_async(dispatch_get_main_queue(), ^{
+                ZTechPerformKeychainRestoreOrPurgeIfNeeded();
+            });
 
             // Swizzle +[NSUbiquitousKeyValueStore defaultStore] to return in-memory stub
             // Eliminates SyncedDefaults (SYDRemotePreferencesSource) EXC_GUARD fault & blocks iCloud KVS tracking
@@ -2429,6 +2470,17 @@ static void ZTechHookInit(void) {
                     pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
                 }
             }
+
+            if (isZalo) {
+                void *raw_SecItemCopyMatching = dlsym(RTLD_DEFAULT, "SecItemCopyMatching");
+                if (!raw_SecItemCopyMatching) {
+                    void *hSec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_GLOBAL | RTLD_LAZY);
+                    if (hSec) raw_SecItemCopyMatching = dlsym(hSec, "SecItemCopyMatching");
+                }
+                if (raw_SecItemCopyMatching) {
+                    pMSHook(raw_SecItemCopyMatching, (void *)hook_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
+                }
+            }
         }
 
         struct utsname verifyUts;
@@ -2485,6 +2537,9 @@ static void ZTechHookInit(void) {
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification * _Nonnull note) {
+            if (isZalo) {
+                ZTechPerformKeychainRestoreOrPurgeIfNeeded();
+            }
             ZTechInstallSignalHandlers();
             ZTechHookTrace("[6/6] UIApplicationDidFinishLaunchingNotification reached OK!");
         }];

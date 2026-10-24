@@ -1240,6 +1240,16 @@ static NSString *swizzled_osVersionString(id self, SEL _cmd) {
 
 static unsigned long long (*orig_physicalMemory)(id, SEL) = NULL;
 static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
+    if (gIsAidaProcess) {
+        return (unsigned long long)gRamBytes;
+    }
+    // For Zalo: never exceed real physical memory to prevent Kernel Jetsam OOM kill on 2GB devices like iPhone 7
+    if (orig_physicalMemory) {
+        unsigned long long realMem = orig_physicalMemory(self, _cmd);
+        if (realMem > 0 && realMem < gRamBytes) {
+            return realMem;
+        }
+    }
     return (unsigned long long)gRamBytes;
 }
 
@@ -2126,7 +2136,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.7 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.8 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {

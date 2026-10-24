@@ -575,7 +575,10 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:rootPath];
     NSString *sub = nil;
     while ((sub = [enumerator nextObject])) {
-        if ([sub hasSuffix:@"-shm"] || [sub hasSuffix:@".sqlite-shm"] || [sub hasSuffix:@".db-shm"]) {
+        NSString *last = [sub lastPathComponent];
+        if ([last hasSuffix:@"-shm"] || [last hasSuffix:@".sqlite-shm"] || [last hasSuffix:@".db-shm"] ||
+            [last hasPrefix:@"bak_sm_"] || [last hasSuffix:@".lock"] || [last isEqualToString:@"zalo.lock"] ||
+            [last isEqualToString:@".lock"]) {
             NSString *full = [rootPath stringByAppendingPathComponent:sub];
             [fm removeItemAtPath:full error:nil];
         }
@@ -806,11 +809,12 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     [@"vn.com.vng.zalo" writeToFile:markerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
     chmod([markerFile UTF8String], 0666);
 
-    [self runFastChownAndChmod:zaloContainer];
+        [self runFastChownAndChmod:zaloContainer];
     for (NSString *groupId in appGroups) {
         NSString *liveGroupPath = appGroups[groupId];
         [self runFastChownAndChmod:liveGroupPath];
     }
+    system("killall -9 cfprefsd 2>/dev/null");
     sync();
 
     // 9. Launch Zalo with slight delay so buffers are flushed to flash storage
@@ -939,5 +943,80 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     } @catch (NSException *e) {}
     return NO;
 }
+
++ (BOOL)rescueAccountWithId:(NSString *)accountId
+             resetCorruptDb:(BOOL)resetDb
+                 outProfile:(ZTechDeviceProfile * _Nullable * _Nullable)outProfile
+                      error:(NSError **)error {
+    if (!accountId || accountId.length == 0) return NO;
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *slotDir = [[self vaultRootDirectory] stringByAppendingPathComponent:accountId];
+    NSString *dataBackupDir = [slotDir stringByAppendingPathComponent:@"DataContainer"];
+    if (![fm fileExistsAtPath:dataBackupDir]) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"ZTechVault"
+                                         code:404
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Không tìm thấy dữ liệu sao lưu của Acc này."}];
+        }
+        return NO;
+    }
+
+    // 1. If resetCorruptDb is requested, find user folders inside Documents/ and quarantine corrupted message.sqlite*
+    if (resetDb) {
+        NSString *docs = [dataBackupDir stringByAppendingPathComponent:@"Documents"];
+        NSArray *items = [fm contentsOfDirectoryAtPath:docs error:nil];
+        for (NSString *item in items) {
+            NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+            if ([item rangeOfCharacterFromSet:nonDigits].location == NSNotFound && item.length >= 5) {
+                NSString *uDir = [docs stringByAppendingPathComponent:item];
+                NSString *quarantine = [uDir stringByAppendingPathComponent:@"Corrupt_DB_Backup"];
+                [fm createDirectoryAtPath:quarantine withIntermediateDirectories:YES attributes:nil error:nil];
+                NSArray *uFiles = [fm contentsOfDirectoryAtPath:uDir error:nil];
+                for (NSString *uf in uFiles) {
+                    if ([uf containsString:@"message"] || [uf hasSuffix:@".sqlite"] || [uf hasSuffix:@".sqlite-wal"] || [uf hasSuffix:@".sqlite-shm"]) {
+                        NSString *src = [uDir stringByAppendingPathComponent:uf];
+                        NSString *dst = [quarantine stringByAppendingPathComponent:uf];
+                        [fm removeItemAtPath:dst error:nil];
+                        [fm moveItemAtPath:src toPath:dst error:nil];
+                    }
+                }
+            }
+        }
+        NSString *platSqlite = [docs stringByAppendingPathComponent:@"platform.sqlite"];
+        if ([fm fileExistsAtPath:platSqlite]) {
+            [fm removeItemAtPath:[platSqlite stringByAppendingString:@"-wal"] error:nil];
+            [fm removeItemAtPath:[platSqlite stringByAppendingString:@"-shm"] error:nil];
+        }
+    }
+
+    // 2. Clean all lock files and memory-mapped files from backup
+    [self removeStaleSqliteShmFilesAtPath:dataBackupDir fileManager:fm];
+    NSString *groupBackupDir = [slotDir stringByAppendingPathComponent:@"AppGroups"];
+    if ([fm fileExistsAtPath:groupBackupDir]) {
+        [self removeStaleSqliteShmFilesAtPath:groupBackupDir fileManager:fm];
+    }
+
+    // 3. Find target account model
+    NSMutableArray<ZTechVaultAccount *> *accounts = [[self listSavedAccounts] mutableCopy];
+    ZTechVaultAccount *targetAcc = nil;
+    for (ZTechVaultAccount *a in accounts) {
+        if ([a.accountId isEqualToString:accountId]) {
+            targetAcc = a;
+            break;
+        }
+    }
+    if (!targetAcc) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"ZTechVault"
+                                         code:404
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Không tìm thấy thông tin Acc."}];
+        }
+        return NO;
+    }
+
+    return [self restoreAndLaunchAccount:targetAcc outProfile:outProfile error:error];
+}
+
 
 @end

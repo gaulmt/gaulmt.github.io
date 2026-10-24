@@ -10,7 +10,7 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing (Rootless) v5.7.7 - Khắc phục triệt để lỗi Crash khi Nạp lại Acc từ Kho (Vault)"
+          "title": "quang lam marketing (Rootless) v5.7.8 - Tính năng Cứu Hộ Acc Cũ, Chống tràn RAM Jetsam & Đồng bộ cfprefsd"
         },
         {
           "class": "DepictionMarkdownView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.7.7"
+          "text": "5.7.8"
         },
         {
           "class": "DepictionTableTextView",

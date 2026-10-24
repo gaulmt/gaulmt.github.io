@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.7 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.8 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">

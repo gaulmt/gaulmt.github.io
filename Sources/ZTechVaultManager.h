@@ -32,6 +32,11 @@ NS_ASSUME_NONNULL_BEGIN
                      outProfile:(ZTechDeviceProfile * _Nullable * _Nullable)outProfile
                           error:(NSError **)error;
 
++ (BOOL)rescueAccountWithId:(NSString *)accountId
+             resetCorruptDb:(BOOL)resetDb
+                 outProfile:(ZTechDeviceProfile * _Nullable * _Nullable)outProfile
+                      error:(NSError **)error;
+
 + (BOOL)updateAccount:(NSString *)accountId
                 title:(nullable NSString *)title
           proxyString:(nullable NSString *)proxyString;

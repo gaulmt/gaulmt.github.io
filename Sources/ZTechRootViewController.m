@@ -606,7 +606,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.7.7";
+    appSub.text = @"Identity & Vault · v5.7.8";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1799,21 +1799,35 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                     title:@"Mở Zalo"
                  iconType:ZTechIconRocketLaunch
                 tintColor:[self darkInkColor]
-                     font:[UIFont systemFontOfSize:13.5 weight:UIFontWeightHeavy]];
+                     font:[UIFont systemFontOfSize:13.0 weight:UIFontWeightHeavy]];
         [btnOpen addTarget:self action:@selector(onTapRestoreAndOpenVaultAccount:) forControlEvents:UIControlEventTouchUpInside];
+
+        UIButton *btnRescue = [UIButton buttonWithType:UIButtonTypeSystem];
+        btnRescue.tag = (NSInteger)i;
+        btnRescue.backgroundColor = [self surfaceInsetColor];
+        btnRescue.layer.cornerRadius = 10.0;
+        btnRescue.layer.borderWidth = 1.0;
+        btnRescue.layer.borderColor = [self goldAccentColor].CGColor;
+        [self styleButton:btnRescue
+                    title:@"Cứu Hộ"
+                 iconType:ZTechIconShieldCheck
+                tintColor:[self goldAccentColor]
+                     font:[UIFont systemFontOfSize:12.0 weight:UIFontWeightBold]];
+        [btnRescue.widthAnchor constraintEqualToConstant:78.0].active = YES;
+        [btnRescue addTarget:self action:@selector(onTapRescueVaultAccount:) forControlEvents:UIControlEventTouchUpInside];
 
         UIButton *btnEdit = [UIButton buttonWithType:UIButtonTypeSystem];
         btnEdit.tag = (NSInteger)i;
         btnEdit.backgroundColor = [self secondaryTintButtonBgColor];
         btnEdit.layer.cornerRadius = 10.0;
         btnEdit.layer.borderWidth = 1.0;
-        btnEdit.layer.borderColor = [self goldAccentColor].CGColor;
+        btnEdit.layer.borderColor = [self borderSubtleColor].CGColor;
         [self styleButton:btnEdit
-                    title:@"Proxy / Tên"
+                    title:@"Sửa"
                  iconType:ZTechIconSlidersTune
-                tintColor:[self goldAccentColor]
+                tintColor:[self primaryTextColor]
                      font:[UIFont systemFontOfSize:12.0 weight:UIFontWeightBold]];
-        [btnEdit.widthAnchor constraintEqualToConstant:108.0].active = YES;
+        [btnEdit.widthAnchor constraintEqualToConstant:62.0].active = YES;
         [btnEdit addTarget:self action:@selector(onTapEditVaultAccount:) forControlEvents:UIControlEventTouchUpInside];
 
         UIButton *btnDel = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -1832,6 +1846,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
         [btnDel addTarget:self action:@selector(onTapDeleteVaultAccount:) forControlEvents:UIControlEventTouchUpInside];
 
         [actRow addArrangedSubview:btnOpen];
+        [actRow addArrangedSubview:btnRescue];
         [actRow addArrangedSubview:btnEdit];
         [actRow addArrangedSubview:btnDel];
         [cStack addArrangedSubview:actRow];

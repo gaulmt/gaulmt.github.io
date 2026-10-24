@@ -1,0 +1,26 @@
+Origin: gaulmt Official Sileo Repo
+Label: gaulmt Repo
+Suite: stable
+Version: 1.0
+Codename: ios
+Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e
+Components: main
+Description: Kho ung dung, tweak & san pham gaulmt tren Sileo & Zebra
+MD5Sum:
+ ee391058ca00773efb5f777806aaf49f 5959 Packages
+ 4f6d36012acf7ddf9c7e0e3a0ac64d6d 1093 Packages.gz
+ f51867632f09ca4d382c0993f9f94011 1523 Packages.bz2
+ d7e18a3b376027d027b6f01caf84c42e 1148 Packages.xz
+ 438533f9dffbc7a95df74192c09bd0d1 1073 Packages.zst
+SHA1:
+ d6eb27ae547fca23c20eb6224a4d1ca88c8c4c3d 5959 Packages
+ 04d336e4bb6a3c383437fd2d33be848dba2976bc 1093 Packages.gz
+ 67f04138619d8479d00192cc7853942028ae9992 1523 Packages.bz2
+ 370303284bff9a154c348f52abcbcbddb8306706 1148 Packages.xz
+ 7fff6b1a5ecd8571d3a1d046bda2914bf4c62998 1073 Packages.zst
+SHA256:
+ 9b10af165430434d978f960a0a5d10f3e5547b2a118bcc3489177d6c35ad303d 5959 Packages
+ eb13bf627b93f8113c5415186202ec957a5befb34114e43b6a718069f72023a4 1093 Packages.gz
+ f6a0660693aee781a2913dfad9476358234f1e0f7b454636d990302d069b305c 1523 Packages.bz2
+ 67dbb2ea0bb228a937ed634762d7dbc3377de2006d782e2324f854716b90cf9f 1148 Packages.xz
+ 2f197c6ca6fb9e8271484aa8ccd8bc2850907efb5a22fde11efb8cd8ce2e5daf 1073 Packages.zst

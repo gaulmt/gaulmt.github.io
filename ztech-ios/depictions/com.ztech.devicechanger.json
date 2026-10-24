@@ -1,0 +1,37 @@
+{
+  "minVersion": "0.1",
+  "class": "DepictionTabView",
+  "headerImage": "https://gaulmt.github.io/CydiaIcon@3x.png",
+  "tabs": [
+    {
+      "tabname": "Chi tiết",
+      "class": "DepictionStackView",
+      "views": [
+        {
+          "class": "DepictionSubheaderView",
+          "useBoldText": true,
+          "title": "quang lam marketing v5.8.6 - Tự Động Xác Thực Proxy, Xoá Sạch Tàn Dư Keychain & Darwin 24"
+        },
+        {
+          "class": "DepictionMarkdownView",
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.6**:\n\n- **Tự Động Nạp Thông Tin Xác Thực Proxy (Zero-Prompt Auto Auth)**: Tự động ghi thông tin chứng thực (User/Pass) vào `NSURLCredentialStorage` cho Protection Space của Proxy, chấm dứt hoàn toàn bảng thông báo phiền phức 'Xác minh proxy' của hệ thống iOS và chặn đứng 100% việc kết nối mạng bị rớt về IP gốc.\n- **Làm Sạch Tuyệt Đối Tàn Dư Keychain Của Tài Khoản Cũ**: Khi tạo phiên mới, xoá sạch toàn bộ 5 lớp khoá Keychain (`genp`, `inet`, `cert`, `keys`, `idnt`) trên tất cả Access Groups của Zalo, không để lại bất kỳ User Token hay Device Token nào của tài khoản bị khoá trước đó.\n- **Đồng Bộ Hoàn Toàn Nhân Darwin 24 & Xoá Dấu Vết Chip A10 T8010**: Giả lập `uname.release = 24.2.0`, `uname.version = Darwin Kernel Version 24.2.0 (RELEASE_ARM64_D94AP)`, `kern.osrelease` và `kern.version`, xoá sạch dấu vết bo mạch cũ của iPhone 7 trong kernel."
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Nhà phát triển",
+          "text": "quang lam marketing"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Phiên bản",
+          "text": "5.8.6"
+        },
+        {
+          "class": "DepictionTableTextView",
+          "title": "Tương thích",
+          "text": "iOS 12.0 - 17.0+"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+Package: com.gaulmt.noweventnotification
+Version: 2.1.0
+Architecture: iphoneos-arm
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0)
+Filename: debs/NowEventNotification_2.1_iphoneos-arm.deb
+Size: 410046
+MD5sum: 35bf6b7538a035a0faf2f12ca9030602
+SHA1: 0e743a09534b30a2c5b64a5b631c192e0ff15c16
+SHA256: af40fee48fcb8c41da2c5b7f72481f29b221a5c0387e908a87b7411bec5de9a8
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (IUH)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.json
+
+Package: com.gaulmt.noweventnotification
+Version: 2.1.0
+Architecture: iphoneos-arm
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0)
+Filename: debs/NowEventNotification_Rootful_arm.deb
+Size: 410046
+MD5sum: 35bf6b7538a035a0faf2f12ca9030602
+SHA1: 0e743a09534b30a2c5b64a5b631c192e0ff15c16
+SHA256: af40fee48fcb8c41da2c5b7f72481f29b221a5c0387e908a87b7411bec5de9a8
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (IUH)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.json
+
+Package: com.gaulmt.noweventnotification.rootless
+Version: 2.1.0
+Architecture: iphoneos-arm64
+Maintainer: gaulmt <lmtgau@gmail.com>
+Depends: firmware (>= 14.0), ellekit
+Filename: debs/NowEventNotification_Rootless_arm64.deb
+Size: 410128
+MD5sum: 294008d82f11200d33a6c8f96ed44f8d
+SHA1: b307946f7a79c13b0c23c75811795baf22dbc01f
+SHA256: 632dd0f986bfbd0efcf522a0600f4206a1a0a97a635372b3699e4f6bd4e77210
+Section: Utilities
+Description: Ung dung theo doi su kien & thong bao Doan Thanh nien IUH tuc thi cho sinh vien.
+Author: Nguyen Dang Duong & Le Phuoc Tai
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/icons/now_event.png
+Name: Now Event Notification (Rootless)
+Sileodepiction: https://gaulmt.github.io/depictions/com.gaulmt.noweventnotification.rootless.json
+
+Package: com.ztech.devicechanger
+Version: 5.8.6
+Architecture: iphoneos-arm
+Maintainer: quang lam marketing
+Installed-Size: 1216
+Depends: firmware (>= 12.0), mobilesubstrate
+Filename: debs/gaulmt_Tech_Rootful_arm.deb
+Size: 208434
+MD5sum: ee77a7c9109dbbbe73742e78de4ed05a
+SHA1: 6e5ffb471cba32441bc6f203d5762b6743e6db11
+SHA256: 4e70519b08c62153a440e5ed4a643696a8d30f1568dbd442928632362d8399a6
+Section: Utilities
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger
+Version: 5.8.6
+Architecture: iphoneos-arm
+Maintainer: quang lam marketing
+Installed-Size: 1216
+Depends: firmware (>= 12.0), mobilesubstrate
+Filename: debs/ZTech_Rootful_arm.deb
+Size: 208434
+MD5sum: ee77a7c9109dbbbe73742e78de4ed05a
+SHA1: 6e5ffb471cba32441bc6f203d5762b6743e6db11
+SHA256: 4e70519b08c62153a440e5ed4a643696a8d30f1568dbd442928632362d8399a6
+Section: Utilities
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.8.6
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1216
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/gaulmt_Tech_Rootless_arm64.deb
+Size: 208070
+MD5sum: c8ee4e73ac4d377ebe22b06b42261998
+SHA1: db0f2d5e69217cb280b46c8363fb6f8918275578
+SHA256: e5858032653a16389c0aad8af62e1918bc025c8926a857243ac73a7e4d9b67d5
+Section: Utilities
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.8.6
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1216
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/ZTech_Rootless_arm64.deb
+Size: 208070
+MD5sum: c8ee4e73ac4d377ebe22b06b42261998
+SHA1: db0f2d5e69217cb280b46c8363fb6f8918275578
+SHA256: e5858032653a16389c0aad8af62e1918bc025c8926a857243ac73a7e4d9b67d5
+Section: Utilities
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+
+Package: com.ztech.devicechanger.rootless
+Version: 5.8.6
+Architecture: iphoneos-arm64
+Maintainer: quang lam marketing
+Installed-Size: 1216
+Depends: firmware (>= 12.0), ellekit
+Filename: debs/com.ztech.devicechanger.rootless_5.8.6_iphoneos-arm64.deb
+Size: 208070
+MD5sum: c8ee4e73ac4d377ebe22b06b42261998
+SHA1: db0f2d5e69217cb280b46c8363fb6f8918275578
+SHA256: e5858032653a16389c0aad8af62e1918bc025c8926a857243ac73a7e4d9b67d5
+Section: Utilities
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
+Author: quang lam marketing
+Depiction: https://gaulmt.github.io/
+Icon: https://gaulmt.github.io/CydiaIcon@3x.png
+Name: quang lam marketing (Rootless)
+Sileodepiction: https://gaulmt.github.io/depiction.json
+

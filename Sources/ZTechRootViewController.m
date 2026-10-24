@@ -2337,6 +2337,63 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     }
 }
 
+- (void)onTapRescueVaultAccount:(UIButton *)sender {
+    if (![ZTechLicenseManager isLicenseCurrentlyValid]) {
+        [self updateLicenseUIState];
+        return;
+    }
+    NSInteger idx = sender.tag;
+    if (idx < 0 || idx >= (NSInteger)self.vaultAccounts.count) return;
+    ZTechVaultAccount *acc = self.vaultAccounts[idx];
+
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🚑 CỨU HỘ ACC ZALO"
+                                                                   message:[NSString stringWithFormat:@"Khắc phục lỗi crash / văng khi mở [%@] do tệp lock cũ hoặc lỗi khoá database từ bản trước:", acc.title]
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"⚡ 1. Cứu Hộ An Toàn (Xoá Lock, Hạ RAM & Khởi động lại cfprefsd)"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        [self executeRescueAccount:acc resetDb:NO];
+    }]];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"🔄 2. Cứu Hộ Sâu (Làm mới DB tin nhắn — Giữ nguyên phiên đăng nhập)"
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        [self executeRescueAccount:acc resetDb:YES];
+    }]];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"Huỷ bỏ" style:UIAlertActionStyleCancel handler:nil]];
+
+    if (alert.popoverPresentationController) {
+        alert.popoverPresentationController.sourceView = sender;
+        alert.popoverPresentationController.sourceRect = sender.bounds;
+    }
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)executeRescueAccount:(ZTechVaultAccount *)acc resetDb:(BOOL)resetDb {
+    [self showLoadingWithTitle:@"ĐANG CỨU HỘ ACC..." subtitle:[NSString stringWithFormat:@"Đang sửa lỗi & phục hồi [%@]...", acc.title]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        NSError *err = nil;
+        ZTechDeviceProfile *restoredProf = nil;
+        BOOL ok = [ZTechVaultManager rescueAccountWithId:acc.accountId resetCorruptDb:resetDb outProfile:&restoredProf error:&err];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self hideLoadingOverlayAfterDelay:0.3];
+            if (ok && restoredProf) {
+                self.currentProfile = restoredProf;
+                [self refreshUIWithCurrentProfile];
+                [self reloadVaultListUI];
+                [self showToast:[NSString stringWithFormat:@"Đã cứu hộ thành công [%@] — Đang mở Zalo!", acc.title] isError:NO];
+            } else {
+                [self reloadVaultListUI];
+                [self showToast:(err.localizedDescription ?: @"Lỗi khi cứu hộ Acc.") isError:YES];
+            }
+        });
+    });
+}
+
 - (void)onTapRestoreAndOpenVaultAccount:(UIButton *)sender {
     if (![ZTechLicenseManager isLicenseCurrentlyValid]) {
         [self updateLicenseUIState];

@@ -925,22 +925,6 @@ static zt_MGCopyAnswerWithError_t orig_MGCopyAnswerWithError = NULL;
 typedef CFTypeRef (*zt_MGCopyAnswer_t)(CFStringRef prop);
 static zt_MGCopyAnswer_t orig_MGCopyAnswer = NULL;
 
-static NSData *ZTechHexToBinaryData(NSString *hex) {
-    if (!hex) return [NSData data];
-    NSString *clean = [[hex stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
-    if (clean.length < 40) {
-        clean = [clean stringByPaddingToLength:40 withString:@"0" startingAtIndex:0];
-    }
-    NSMutableData *data = [NSMutableData dataWithCapacity:20];
-    char byteChars[3] = {'\0', '\0', '\0'};
-    for (int i = 0; i < 40; i += 2) {
-        byteChars[0] = (char)[clean characterAtIndex:i];
-        byteChars[1] = (char)[clean characterAtIndex:i+1];
-        unsigned char wholeByte = (unsigned char)strtol(byteChars, NULL, 16);
-        [data appendBytes:&wholeByte length:1];
-    }
-    return [data copy];
-}
 
 static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
     if (!prop) return NULL;
@@ -974,7 +958,7 @@ static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
             udid = [udid stringByPaddingToLength:40 withString:@"0" startingAtIndex:0];
         }
         if (CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
-            return (__bridge_retained CFTypeRef)ZTechHexToBinaryData(udid);
+            return (__bridge_retained CFTypeRef)[udid dataUsingEncoding:NSUTF8StringEncoding];
         }
         return (__bridge_retained CFTypeRef)[udid copy];
     }
@@ -2138,7 +2122,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.1 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.2 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {

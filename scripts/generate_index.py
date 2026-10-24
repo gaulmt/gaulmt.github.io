@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.8.1 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.8.2 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.8.1: Cơ chế Xác thực Toàn vẹn (Verification Engine) 4 bước trước khi hoàn tất, cách ly IOKit Metal GPU và sửa lỗi tràn bộ đệm UniqueDeviceIDData giúp mở Zalo và nạp Acc từ Kho mượt mà 100%.
+        Bản phát hành v5.8.2: Tích hợp cấu hình Proxy ngay tại Tab 1 cô lập IP chống trảm Reg, bảo toàn đồng bộ MMKV và tương thích khóa giải mã giúp mở Acc cũ đã lưu trong Kho mượt mà 100%.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

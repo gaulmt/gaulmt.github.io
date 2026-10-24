@@ -609,7 +609,7 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     while ((sub = [enumerator nextObject])) {
         NSString *last = [sub lastPathComponent];
         if ([last hasSuffix:@"-shm"] || [last hasSuffix:@".sqlite-shm"] || [last hasSuffix:@".db-shm"] ||
-            [last hasPrefix:@"bak_sm_"] || [last hasSuffix:@".lock"] || [last isEqualToString:@"zalo.lock"] ||
+            [last hasSuffix:@".lock"] || [last isEqualToString:@"zalo.lock"] ||
             [last isEqualToString:@".lock"]) {
             NSString *full = [rootPath stringByAppendingPathComponent:sub];
             [fm removeItemAtPath:full error:nil];
@@ -853,10 +853,7 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     // Verify restored profile and container integrity before launching
     [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:restoredProfile isNewSession:NO error:nil];
 
-    // 9. Launch Zalo with verified integrity once flash buffers are settled
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self launchZaloApp];
-    });
+
 
     return YES;
 }

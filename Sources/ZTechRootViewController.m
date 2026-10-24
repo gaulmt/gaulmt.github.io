@@ -186,7 +186,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 @property (nonatomic, strong) UILabel *specBatValueLabel;
 @property (nonatomic, strong) NSArray<UIButton *> *tierSegmentButtons;
 
-@property (nonatomic, strong) UIButton *changeDeviceButton;
+@property (nonatomic, strong) UIButton *configProxyButton;
 @property (nonatomic, strong) UIButton *cleanResetButton;
 @property (nonatomic, strong) UIButton *syncIPButton;
 @property (nonatomic, strong) UIButton *openZaloButton;
@@ -606,7 +606,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.8.1";
+    appSub.text = @"Identity & Vault · v5.8.2";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1235,29 +1235,29 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                                                 rightView:nil];
     [actStack addArrangedSubview:actHeader];
 
-    self.changeDeviceButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.changeDeviceButton.backgroundColor = [self creamPrimaryColor];
-    self.changeDeviceButton.layer.cornerRadius = 14.0;
-    [self styleButton:self.changeDeviceButton
-                title:@"Đổi cấu hình máy ảo mới (Change Device)"
-             iconType:ZTechIconRefreshMorph
+    self.cleanResetButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.cleanResetButton.backgroundColor = [self creamPrimaryColor];
+    self.cleanResetButton.layer.cornerRadius = 14.0;
+    [self styleButton:self.cleanResetButton
+                title:@"Làm mới dữ liệu & Tạo phiên Zalo mới"
+             iconType:ZTechIconCleanWipe
             tintColor:[self darkInkColor]
                  font:[UIFont systemFontOfSize:15.5 weight:UIFontWeightHeavy]];
-    [self.changeDeviceButton.heightAnchor constraintEqualToConstant:50.0].active = YES;
-    [self.changeDeviceButton addTarget:self action:@selector(onTapChangeDevice) forControlEvents:UIControlEventTouchUpInside];
-
-    self.cleanResetButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.cleanResetButton.backgroundColor = [self secondaryTintButtonBgColor];
-    self.cleanResetButton.layer.cornerRadius = 14.0;
-    self.cleanResetButton.layer.borderWidth = 1.2;
-    self.cleanResetButton.layer.borderColor = [self goldAccentColor].CGColor;
-    [self styleButton:self.cleanResetButton
-                title:@"Làm mới dữ liệu Zalo & Tạo phiên mới"
-             iconType:ZTechIconCleanWipe
-            tintColor:[self goldAccentColor]
-                 font:[UIFont systemFontOfSize:15.0 weight:UIFontWeightBold]];
-    [self.cleanResetButton.heightAnchor constraintEqualToConstant:48.0].active = YES;
+    [self.cleanResetButton.heightAnchor constraintEqualToConstant:50.0].active = YES;
     [self.cleanResetButton addTarget:self action:@selector(onTapCleanReset) forControlEvents:UIControlEventTouchUpInside];
+
+    self.configProxyButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.configProxyButton.backgroundColor = [self secondaryTintButtonBgColor];
+    self.configProxyButton.layer.cornerRadius = 14.0;
+    self.configProxyButton.layer.borderWidth = 1.2;
+    self.configProxyButton.layer.borderColor = [self goldAccentColor].CGColor;
+    [self styleButton:self.configProxyButton
+                title:@"🛡️ Cấu hình & Nhập Proxy (HTTP/SOCKS5)"
+             iconType:ZTechIconProxyNodes
+            tintColor:[self goldAccentColor]
+                 font:[UIFont systemFontOfSize:14.5 weight:UIFontWeightBold]];
+    [self.configProxyButton.heightAnchor constraintEqualToConstant:48.0].active = YES;
+    [self.configProxyButton addTarget:self action:@selector(onTapEditCurrentSessionProxy) forControlEvents:UIControlEventTouchUpInside];
 
     UIStackView *subActRow = [[UIStackView alloc] init];
     subActRow.axis = UILayoutConstraintAxisHorizontal;
@@ -1292,8 +1292,8 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     [subActRow addArrangedSubview:self.syncIPButton];
     [subActRow addArrangedSubview:self.openZaloButton];
 
-    [actStack addArrangedSubview:self.changeDeviceButton];
     [actStack addArrangedSubview:self.cleanResetButton];
+    [actStack addArrangedSubview:self.configProxyButton];
     [actStack addArrangedSubview:subActRow];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -2408,6 +2408,9 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                 [self refreshUIWithCurrentProfile];
                 [self reloadVaultListUI];
                 [self showToast:[NSString stringWithFormat:@"Đã cứu hộ thành công [%@] — Đang mở Zalo!", acc.title] isError:NO];
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [ZTechVaultManager launchZaloApp];
+                });
             } else {
                 [self reloadVaultListUI];
                 [self showToast:(err.localizedDescription ?: @"Lỗi khi cứu hộ Acc.") isError:YES];
@@ -2446,10 +2449,9 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
         BOOL ok = [ZTechVaultManager restoreAndLaunchAccount:acc outProfile:&restoredProf error:&err];
 
         if (ok && restoredProf) {
-            [self updateLoadingSubtitle:@"Bước 3/4: Kiểm tra toàn vẹn tệp tin & Khóa bảo mật..."];
-            [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:restoredProf isNewSession:NO error:nil];
+            [self updateLoadingSubtitle:@"Bước 3/4: Xác nhận tính toàn vẹn hồ sơ & AppGroups..."];
             [self updateLoadingSubtitle:@"✅ Đã nạp thành công 100%! Đang chuyển sang Zalo..."];
-            [NSThread sleepForTimeInterval:0.35];
+            [NSThread sleepForTimeInterval:0.25];
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -2457,8 +2459,11 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                 self.currentProfile = restoredProf;
                 [self refreshUIWithCurrentProfile];
                 [self reloadVaultListUI];
-                [self hideLoadingOverlayAfterDelay:0.45];
+                [self hideLoadingOverlayAfterDelay:0.25];
                 [self showToast:[NSString stringWithFormat:@"Đã nạp [%@] — Đang mở Zalo!", acc.title] isError:NO];
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [ZTechVaultManager launchZaloApp];
+                });
             } else {
                 [self hideLoadingOverlayAfterDelay:0.05];
                 [self reloadVaultListUI];
@@ -2807,6 +2812,26 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     self.specNetValueLabel.text = [NSString stringWithFormat:@"%@ · %@", self.currentProfile.carrier ?: @"Viettel", self.currentProfile.city ?: @"Hà Nội"];
     self.specBatValueLabel.text = [NSString stringWithFormat:@"%ld%% · %ld danh bạ", (long)self.currentProfile.batteryPercent, (long)self.currentProfile.contactsCount];
 
+    if (self.configProxyButton) {
+        if (self.currentProfile.activeProxy.length > 0) {
+            self.configProxyButton.backgroundColor = [self emeraldBadgeBgColor];
+            self.configProxyButton.layer.borderColor = [self emeraldColor].CGColor;
+            [self styleButton:self.configProxyButton
+                        title:[NSString stringWithFormat:@"🛡️ Đang dùng Proxy: %@", self.currentProfile.activeProxy]
+                     iconType:ZTechIconShieldCheck
+                    tintColor:[self emeraldColor]
+                         font:[UIFont systemFontOfSize:14.0 weight:UIFontWeightBold]];
+        } else {
+            self.configProxyButton.backgroundColor = [self secondaryTintButtonBgColor];
+            self.configProxyButton.layer.borderColor = [self goldAccentColor].CGColor;
+            [self styleButton:self.configProxyButton
+                        title:@"🛡️ Cấu hình & Nhập Proxy (HTTP/SOCKS5)"
+                     iconType:ZTechIconProxyNodes
+                    tintColor:[self goldAccentColor]
+                         font:[UIFont systemFontOfSize:14.5 weight:UIFontWeightBold]];
+        }
+    }
+
     [self refreshCheckFooterText];
 }
 
@@ -2830,7 +2855,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     }
     if (self.isPerformingAction) return;
     self.isPerformingAction = YES;
-    self.changeDeviceButton.enabled = NO;
+    self.configProxyButton.enabled = NO;
     self.cleanResetButton.enabled = NO;
     self.openZaloButton.enabled = NO;
 
@@ -2874,7 +2899,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
-            self.changeDeviceButton.enabled = YES;
+            self.configProxyButton.enabled = YES;
             self.cleanResetButton.enabled = YES;
             self.openZaloButton.enabled = YES;
             [self hideLoadingOverlayAfterDelay:0.25];
@@ -2898,7 +2923,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     }
     if (self.isPerformingAction) return;
     self.isPerformingAction = YES;
-    self.changeDeviceButton.enabled = NO;
+    self.configProxyButton.enabled = NO;
     self.cleanResetButton.enabled = NO;
     self.openZaloButton.enabled = NO;
 
@@ -2924,6 +2949,11 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                                                                                   matchChip:chipOn
                                                                                   modelTier:tier
                                                                                 currentCity:nil];
+        NSString *currProxy = self.currentProfile.activeProxy;
+        if (currProxy.length > 0) {
+            newProf.activeProxy = currProxy;
+            [ZTechDeviceDatabase writeProfileFiles:newProf error:nil];
+        }
 
         [self updateLoadingSubtitle:@"Bước 3/4: Đồng bộ bộ đệm APFS & Tải lại cfprefsd..."];
         sync();
@@ -2941,7 +2971,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
-            self.changeDeviceButton.enabled = YES;
+            self.configProxyButton.enabled = YES;
             self.cleanResetButton.enabled = YES;
             self.openZaloButton.enabled = YES;
             [self hideLoadingOverlayAfterDelay:0.25];

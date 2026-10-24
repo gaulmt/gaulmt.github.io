@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.8.1 - Cơ chế Xác thực Toàn vẹn (Verification Engine) & Khắc phục Crash Mở Zalo Triệt Để"
+          "title": "quang lam marketing v5.8.2 - Tích hợp Proxy Trực quan Tab 1 & Khắc phục Triệt để Crash Mở Acc Cũ"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.1**:\n\n- **Đảm bảo 100% Tạo phiên mới & Mở Zalo mượt mà**: Tích hợp công cụ kiểm tra toàn vẹn trên đĩa (Verification Engine). Khi bấm Tạo phiên mới hoặc Đổi cấu hình, hệ thống sẽ thực hiện quy trình 4 bước tuần tự, chỉ khi nào toàn bộ tệp tin hồ sơ, phân quyền 501:501, cờ Keychain và cfprefsd được xác thực 100% trên đĩa thì màn hình chờ mới hoàn tất, ngăn ngừa hoàn toàn tình trạng vội mở Zalo khi tệp chưa đồng bộ xong.\n- **Cách ly IOKit khỏi Zalo**: Khóa toàn bộ hook IOKit chỉ cho AIDA64, giữ nguyên vẹn 100% tầng Metal GPU và CoreAnimation cho Zalo, ngăn chặn triệt để lỗi không khớp board driver GPU trên chip A10/A11.\n- **Sửa lỗi tràn bộ đệm SHA-1 MobileGestalt**: Sửa `UniqueDeviceIDData` trả về đúng 20 byte nhị phân thay vì chuỗi 40 byte, loại bỏ lỗi tràn bộ đệm stack frame ngầm khi Zalo khởi động.\n- **Mở Acc đã lưu trong Kho nhanh chóng, gọn gàng**: Tự động dọn sạch các tệp lock SQLite (-shm, -wal) và kiểm tra tính toàn vẹn trước khi khởi chạy Zalo."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.2**:\n\n- **Tích hợp Nút Nhập & Cấu hình Proxy ngay tại Tab 1**: Thay thế nút đổi cấu hình thừa thãi bằng nút Cấu hình Proxy (HTTP/SOCKS5) kèm trạng thái bảo vệ trực quan (hiển thị màu xanh lá khi Proxy đang hoạt động). Cho phép thiết lập Proxy cô lập IP tuyệt đối 100% trước khi mở Zalo để đăng ký tài khoản mới an toàn, chống bị trảm / vô hiệu hóa acc do trùng IP thật.\n- **Khắc phục triệt để lỗi Crash khi Mở lại Acc cũ**: Bảo toàn 100% tệp đồng bộ đa tiến trình Tencent MMKV (`bak_sm_`), loại bỏ lỗi tràn bộ nhớ `abort()` khi nạp tài khoản đã lưu.\n- **Khôi phục tương thích mã hóa Database cũ**: Đồng bộ khóa giải mã dữ liệu `UniqueDeviceIDData` theo chuẩn UTF-8, giúp tất cả các tài khoản cũ trong Kho giải mã cơ sở dữ liệu `platform.sqlite` mượt mà.\n- **Loại bỏ Race Condition khi Nạp Acc**: Quy trình nạp acc và xác thực tính toàn vẹn trên đĩa được thực hiện đồng bộ 100%, chỉ khởi chạy Zalo sau khi hệ điều hành đã đồng bộ bộ đệm hoàn tất."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.8.1"
+          "text": "5.8.2"
         },
         {
           "class": "DepictionTableTextView",

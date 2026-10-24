@@ -925,6 +925,23 @@ static zt_MGCopyAnswerWithError_t orig_MGCopyAnswerWithError = NULL;
 typedef CFTypeRef (*zt_MGCopyAnswer_t)(CFStringRef prop);
 static zt_MGCopyAnswer_t orig_MGCopyAnswer = NULL;
 
+static NSData *ZTechHexToBinaryData(NSString *hex) {
+    if (!hex) return [NSData data];
+    NSString *clean = [[hex stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
+    if (clean.length < 40) {
+        clean = [clean stringByPaddingToLength:40 withString:@"0" startingAtIndex:0];
+    }
+    NSMutableData *data = [NSMutableData dataWithCapacity:20];
+    char byteChars[3] = {'\0', '\0', '\0'};
+    for (int i = 0; i < 40; i += 2) {
+        byteChars[0] = (char)[clean characterAtIndex:i];
+        byteChars[1] = (char)[clean characterAtIndex:i+1];
+        unsigned char wholeByte = (unsigned char)strtol(byteChars, NULL, 16);
+        [data appendBytes:&wholeByte length:1];
+    }
+    return [data copy];
+}
+
 static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
     if (!prop) return NULL;
     uintptr_t p = (uintptr_t)prop;
@@ -953,8 +970,11 @@ static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
     }
     if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
         NSString *udid = [[gUuidObj stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
+        if (udid.length < 40) {
+            udid = [udid stringByPaddingToLength:40 withString:@"0" startingAtIndex:0];
+        }
         if (CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
-            return (__bridge_retained CFTypeRef)[udid dataUsingEncoding:NSUTF8StringEncoding];
+            return (__bridge_retained CFTypeRef)ZTechHexToBinaryData(udid);
         }
         return (__bridge_retained CFTypeRef)[udid copy];
     }
@@ -1068,6 +1088,9 @@ typedef CFTypeRef (*zt_IORegistryEntryCreateCFProperty_t)(uint32_t entry, CFStri
 static zt_IORegistryEntryCreateCFProperty_t orig_IORegistryEntryCreateCFProperty = NULL;
 
 static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
+    if (!gIsAidaProcess) {
+        return orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
+    }
     if (key != NULL && CFGetTypeID(key) == CFStringGetTypeID()) {
         if (CFEqual(key, CFSTR("product-name")) || CFEqual(key, CFSTR("model"))) {
             return (__bridge_retained CFTypeRef)[gMachineIdObj dataUsingEncoding:NSUTF8StringEncoding];
@@ -1314,8 +1337,11 @@ static void ZTechSanitizeHeadersDict(NSMutableDictionary *headers) {
 }
 
 static void swizzled_setValueForHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
-    if (value && [value isKindOfClass:[NSString class]]) {
-        value = ZTechSanitizeHeaderString(value);
+    if (value && [value isKindOfClass:[NSString class]] && field && [field isKindOfClass:[NSString class]]) {
+        NSString *lowerField = [field lowercaseString];
+        if ([lowerField containsString:@"user-agent"] || [lowerField containsString:@"device"]) {
+            value = ZTechSanitizeHeaderString(value);
+        }
     }
     if (gZTechOrigSetHdrSel && [self respondsToSelector:gZTechOrigSetHdrSel]) {
         ((void (*)(id, SEL, id, id))objc_msgSend)(self, gZTechOrigSetHdrSel, value, field);
@@ -1662,6 +1688,12 @@ static BOOL swizzled_canOpenURL(id self, SEL _cmd, NSURL *url) {
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
     NSMethodSignature *sig = [super methodSignatureForSelector:aSelector];
+    if (!sig) {
+        Class kvsCls = objc_getClass("NSUbiquitousKeyValueStore");
+        if (kvsCls) {
+            sig = [kvsCls instanceMethodSignatureForSelector:aSelector];
+        }
+    }
     if (!sig) {
         sig = [NSMethodSignature signatureWithObjCTypes:"@@:"];
     }
@@ -2106,7 +2138,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.0 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.1 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2403,13 +2435,15 @@ static void ZTechHookInit(void) {
                 }
             }
 
-            void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
-            if (!raw_IOReg) {
-                void *hIO = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_GLOBAL | RTLD_LAZY);
-                if (hIO) raw_IOReg = dlsym(hIO, "IORegistryEntryCreateCFProperty");
-            }
-            if (raw_IOReg) {
-                pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
+            if (isAida) {
+                void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
+                if (!raw_IOReg) {
+                    void *hIO = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_GLOBAL | RTLD_LAZY);
+                    if (hIO) raw_IOReg = dlsym(hIO, "IORegistryEntryCreateCFProperty");
+                }
+                if (raw_IOReg) {
+                    pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
+                }
             }
         }
 

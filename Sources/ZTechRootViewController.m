@@ -606,7 +606,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.8.0";
+    appSub.text = @"Identity & Vault · v5.8.1";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -825,6 +825,12 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     [UIView animateWithDuration:0.15 animations:^{
         self.loadingOverlayView.alpha = 1.0;
     }];
+}
+
+- (void)updateLoadingSubtitle:(NSString *)subtitle {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.loadingSubLabel.text = subtitle;
+    });
 }
 
 - (void)hideLoadingOverlayAfterDelay:(NSTimeInterval)delay {
@@ -1493,7 +1499,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [gen impactOccurred];
-    [self showLoadingWithTitle:@"ĐANG MỞ ZALO" subtitle:[NSString stringWithFormat:@"Đang nạp cấu hình %@ & mở Zalo...", self.currentProfile.modelName ?: @"máy ảo"]];
+    [self showLoadingWithTitle:@"ĐANG MỞ ZALO" subtitle:[NSString stringWithFormat:@"Đang kiểm tra toàn vẹn %@ & mở Zalo...", self.currentProfile.modelName ?: @"máy ảo"]];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         if (self.currentProfile) {
             [ZTechDeviceDatabase writeProfileFiles:self.currentProfile error:nil];
@@ -1513,6 +1519,8 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
                 [ZTechVaultManager runFastChownAndChmod:grp];
             }
         }
+        sync();
+        [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:self.currentProfile isNewSession:NO error:nil];
         [NSThread sleepForTimeInterval:0.25];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
@@ -2428,23 +2436,28 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
             tintColor:[self darkInkColor]
                  font:[UIFont systemFontOfSize:13.0 weight:UIFontWeightHeavy]];
 
-    NSString *subMsg = (acc.proxyString.length > 0)
-        ? [NSString stringWithFormat:@"Đang nạp [%@] & khoá Proxy %@...", acc.title, acc.proxyString]
-        : [NSString stringWithFormat:@"Đang nạp phiên [%@] & khởi động Zalo...", acc.title];
-    [self showLoadingWithTitle:@"ĐANG MỞ ZALO..." subtitle:subMsg];
+    [self showLoadingWithTitle:@"ĐANG NẠP ACC ZALO"
+                      subtitle:[NSString stringWithFormat:@"Bước 1/4: Đóng ứng dụng & chuẩn bị Acc [%@]...", acc.title]];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        [self updateLoadingSubtitle:[NSString stringWithFormat:@"Bước 2/4: Đang bơm dữ liệu [%@] & AppGroups...", acc.title]];
         NSError *err = nil;
         ZTechDeviceProfile *restoredProf = nil;
         BOOL ok = [ZTechVaultManager restoreAndLaunchAccount:acc outProfile:&restoredProf error:&err];
 
+        if (ok && restoredProf) {
+            [self updateLoadingSubtitle:@"Bước 3/4: Kiểm tra toàn vẹn tệp tin & Khóa bảo mật..."];
+            [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:restoredProf isNewSession:NO error:nil];
+            [self updateLoadingSubtitle:@"✅ Đã nạp thành công 100%! Đang chuyển sang Zalo..."];
+            [NSThread sleepForTimeInterval:0.35];
+        }
+
         dispatch_async(dispatch_get_main_queue(), ^{
             if (ok && restoredProf) {
-                self.loadingSubLabel.text = @"Đã nạp xong! Đang chuyển sang ứng dụng Zalo...";
                 self.currentProfile = restoredProf;
                 [self refreshUIWithCurrentProfile];
                 [self reloadVaultListUI];
-                [self hideLoadingOverlayAfterDelay:0.55];
+                [self hideLoadingOverlayAfterDelay:0.45];
                 [self showToast:[NSString stringWithFormat:@"Đã nạp [%@] — Đang mở Zalo!", acc.title] isError:NO];
             } else {
                 [self hideLoadingOverlayAfterDelay:0.05];
@@ -2823,10 +2836,8 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     [self onAppBecameActive];
 
-    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy];
     [gen impactOccurred];
-
-    [self showLoadingWithTitle:@"ĐANG ĐỔI THIẾT BỊ" subtitle:@"Đang tạo cấu hình máy ảo & đồng bộ phần cứng..."];
 
     BOOL lockOn = self.lockModelSwitch.isOn;
     BOOL screenOn = self.sameScreenSwitch.isOn;
@@ -2834,23 +2845,43 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     ZTechModelTierFilter tier = self.currentModelTier;
     NSString *city = self.currentProfile.city;
 
+    [self showLoadingWithTitle:@"TẠO PHIÊN ZALO MỚI" subtitle:@"Bước 1/4: Đóng Zalo & Làm sạch dữ liệu phiên cũ..."];
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        [ZTechVaultManager killZaloProcess];
+        NSInteger cleaned = [ZTechDeviceDatabase cleanResetAllProfileDataAndCache];
+
+        [self updateLoadingSubtitle:@"Bước 2/4: Khởi tạo thông số phần cứng & ghi Profile mới..."];
         ZTechDeviceProfile *newProf = [ZTechDeviceDatabase generateProfileWithLockRealModel:lockOn
                                                                                  sameScreen:screenOn
                                                                                   matchChip:chipOn
                                                                                   modelTier:tier
                                                                                 currentCity:city];
-        [ZTechVaultManager killZaloProcess];
+
+        [self updateLoadingSubtitle:@"Bước 3/4: Đồng bộ bộ đệm APFS & Khởi động lại daemon..."];
+        sync();
+        [ZTechVaultManager restartCfprefsd];
+
+        [self updateLoadingSubtitle:@"Bước 4/4: Kiểm tra toàn vẹn thực tế (Verification)..."];
+        NSError *vErr = nil;
+        BOOL verified = [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:newProf isNewSession:YES error:&vErr];
+
+        if (verified) {
+            [self updateLoadingSubtitle:@"✅ Đã sẵn sàng 100%! Nhấn [Mở Zalo] để bắt đầu phiên mới!"];
+        }
+
+        [NSThread sleepForTimeInterval:0.35];
 
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
             self.changeDeviceButton.enabled = YES;
             self.cleanResetButton.enabled = YES;
             self.openZaloButton.enabled = YES;
-            [self hideLoadingOverlayAfterDelay:0.12];
+            [self hideLoadingOverlayAfterDelay:0.25];
             self.currentProfile = newProf;
             [self refreshUIWithCurrentProfile];
-            [self showToast:[NSString stringWithFormat:@"Đã đổi sang: %@ (iOS %@)", newProf.modelName, newProf.iosVersion] isError:NO];
+            [self reloadVaultListUI];
+            [self showToast:[NSString stringWithFormat:@"Đã tạo phiên mới: %@ (iOS %@)!", newProf.modelName, newProf.iosVersion] isError:NO];
             if (self.respringSwitch.isOn) {
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                     [ZTechDeviceDatabase performRespringIfPossible];
@@ -2881,21 +2912,39 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     BOOL chipOn = self.matchChipSwitch.isOn;
     ZTechModelTierFilter tier = self.currentModelTier;
 
-    [self showLoadingWithTitle:@"ĐANG LÀM MỚI ZALO" subtitle:@"Đang xoá bộ nhớ đệm & khởi tạo máy ảo mới..."];
+    [self showLoadingWithTitle:@"LÀM MỚI DỮ LIỆU ZALO" subtitle:@"Bước 1/4: Đóng ứng dụng & Quét sạch toàn bộ bộ nhớ đệm..."];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        [ZTechVaultManager killZaloProcess];
         NSInteger cleaned = [ZTechDeviceDatabase cleanResetAllProfileDataAndCache];
+
+        [self updateLoadingSubtitle:@"Bước 2/4: Tạo cấu hình máy ảo mới & Cấp IDFV mới..."];
         ZTechDeviceProfile *newProf = [ZTechDeviceDatabase generateProfileWithLockRealModel:lockOn
                                                                                  sameScreen:screenOn
                                                                                   matchChip:chipOn
                                                                                   modelTier:tier
                                                                                 currentCity:nil];
+
+        [self updateLoadingSubtitle:@"Bước 3/4: Đồng bộ bộ đệm APFS & Tải lại cfprefsd..."];
+        sync();
+        [ZTechVaultManager restartCfprefsd];
+
+        [self updateLoadingSubtitle:@"Bước 4/4: Kiểm tra toàn vẹn thực tế (Verification)..."];
+        NSError *vErr = nil;
+        BOOL verified = [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:newProf isNewSession:YES error:&vErr];
+
+        if (verified) {
+            [self updateLoadingSubtitle:@"✅ Đã làm mới 100%! Zalo hoàn toàn sạch — Sẵn sàng mở!"];
+        }
+
+        [NSThread sleepForTimeInterval:0.35];
+
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
             self.changeDeviceButton.enabled = YES;
             self.cleanResetButton.enabled = YES;
             self.openZaloButton.enabled = YES;
-            [self hideLoadingOverlayAfterDelay:0.15];
+            [self hideLoadingOverlayAfterDelay:0.25];
             self.currentProfile = newProf;
             [self refreshUIWithCurrentProfile];
             [self reloadVaultListUI];

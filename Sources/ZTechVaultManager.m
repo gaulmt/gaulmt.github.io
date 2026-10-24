@@ -850,7 +850,10 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     [self restartCfprefsd];
     sync();
 
-    // 9. Launch Zalo with slight delay so buffers are flushed to flash storage
+    // Verify restored profile and container integrity before launching
+    [ZTechDeviceDatabase verifyCurrentProfileAppliedSuccessfully:restoredProfile isNewSession:NO error:nil];
+
+    // 9. Launch Zalo with verified integrity once flash buffers are settled
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self launchZaloApp];
     });

@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing (Rootless) v5.8.0 - Tính năng Cứu Hộ Acc Cũ, Chống tràn RAM Jetsam & Đồng bộ cfprefsd"
+          "title": "quang lam marketing v5.8.1 - Cơ chế Xác thực Toàn vẹn (Verification Engine) & Khắc phục Crash Mở Zalo Triệt Để"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.0**:\n\n- **Loại bỏ triệt để lỗi Crash 'Hên xui mới vào được'**: Đã phát hiện và gỡ bỏ hoàn toàn bộ quét mù `strstr` ghi đè bộ nhớ trong `sysctl` và `sysctlbyname`. Trước đây khi hệ thống gọi `sysctl` ngầm, việc ghi đè mù vào bộ đệm của GCD/Pthread gây tràn bộ đệm ngẫu nhiên khiến Zalo lúc mở được lúc văng. Bản 5.8.0 đã chuyển sang kiểm tra tường minh 100%, tuyệt đối không làm biến dạng bộ nhớ của app.\n- **Bảo vệ toàn vẹn con trỏ CoreFoundation (MobileGestalt)**: Gỡ bỏ việc giải phóng con trỏ tĩnh `CFRelease`, loại bỏ tận gốc lỗi `EXC_BAD_ACCESS` khi Zalo truy vấn thông tin máy.\n- **Tự động quét dọn Lock & SHM trước khi mở Zalo**: Mỗi khi nhấn nút [Mở Zalo], tool tự động quét sạch các tệp lock SQLite (`-shm`, `-wal`) và khởi động lại daemon `cfprefsd`, đảm bảo Zalo luôn khởi động ở trạng thái sạch sẽ nhất."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.1**:\n\n- **Đảm bảo 100% Tạo phiên mới & Mở Zalo mượt mà**: Tích hợp công cụ kiểm tra toàn vẹn trên đĩa (Verification Engine). Khi bấm Tạo phiên mới hoặc Đổi cấu hình, hệ thống sẽ thực hiện quy trình 4 bước tuần tự, chỉ khi nào toàn bộ tệp tin hồ sơ, phân quyền 501:501, cờ Keychain và cfprefsd được xác thực 100% trên đĩa thì màn hình chờ mới hoàn tất, ngăn ngừa hoàn toàn tình trạng vội mở Zalo khi tệp chưa đồng bộ xong.\n- **Cách ly IOKit khỏi Zalo**: Khóa toàn bộ hook IOKit chỉ cho AIDA64, giữ nguyên vẹn 100% tầng Metal GPU và CoreAnimation cho Zalo, ngăn chặn triệt để lỗi không khớp board driver GPU trên chip A10/A11.\n- **Sửa lỗi tràn bộ đệm SHA-1 MobileGestalt**: Sửa `UniqueDeviceIDData` trả về đúng 20 byte nhị phân thay vì chuỗi 40 byte, loại bỏ lỗi tràn bộ đệm stack frame ngầm khi Zalo khởi động.\n- **Mở Acc đã lưu trong Kho nhanh chóng, gọn gàng**: Tự động dọn sạch các tệp lock SQLite (-shm, -wal) và kiểm tra tính toàn vẹn trước khi khởi chạy Zalo."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.8.0"
+          "text": "5.8.1"
         },
         {
           "class": "DepictionTableTextView",

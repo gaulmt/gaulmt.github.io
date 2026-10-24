@@ -800,6 +800,117 @@ extern char **environ;
     [task resume];
 }
 
++ (BOOL)verifyCurrentProfileAppliedSuccessfully:(ZTechDeviceProfile *)profile
+                                   isNewSession:(BOOL)isNewSession
+                                          error:(NSError **)outError {
+    if (!profile || profile.identifier.length == 0) {
+        if (outError) {
+            *outError = [NSError errorWithDomain:@"ZTechDatabase"
+                                            code:400
+                                        userInfo:@{NSLocalizedDescriptionKey: @"Hồ sơ thiết bị không hợp lệ."}];
+        }
+        return NO;
+    }
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    // 1. Flush disk cache & reload cfprefsd
+    sync();
+    [ZTechVaultManager restartCfprefsd];
+
+    // 2. Check Preferences file on disk
+    NSArray<NSString *> *prefPaths = @[
+        @"/var/jb/var/mobile/Library/Preferences/com.ztech.profile.plist",
+        @"/var/mobile/Library/Preferences/com.ztech.profile.plist",
+        @"/Library/Preferences/ZTechShared/com.ztech.profile.plist",
+        @"/var/jb/Library/Preferences/ZTechShared/com.ztech.profile.plist",
+        @"/var/tmp/com.ztech.profile.plist"
+    ];
+    BOOL foundPref = NO;
+    for (NSString *p in prefPaths) {
+        if ([fm fileExistsAtPath:p]) {
+            NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:p];
+            if (d && [d[@"identifier"] isEqualToString:profile.identifier]) {
+                foundPref = YES;
+                break;
+            }
+        }
+    }
+    if (!foundPref) {
+        // Rewrite profile files to ensure consistency
+        [self writeProfileFiles:profile error:nil];
+        sync();
+    }
+
+    // 3. Check Zalo Data Container & AppGroups
+    NSString *zaloContainer = [ZTechVaultManager findZaloDataContainerPath];
+    if (zaloContainer.length > 0) {
+        NSString *docs = [zaloContainer stringByAppendingPathComponent:@"Documents"];
+        if (![fm fileExistsAtPath:docs]) {
+            [fm createDirectoryAtPath:docs withIntermediateDirectories:YES attributes:nil error:nil];
+            chmod([docs UTF8String], 0755);
+        }
+
+        // Clean any dangling SQLite lock files to avoid memory-map lock collisions
+        [ZTechVaultManager removeStaleSqliteShmFilesAtPath:zaloContainer fileManager:fm];
+        NSDictionary<NSString *, NSString *> *groups = [ZTechVaultManager findZaloAppGroupContainers];
+        for (NSString *grp in groups.allValues) {
+            [ZTechVaultManager removeStaleSqliteShmFilesAtPath:grp fileManager:fm];
+        }
+
+        if (isNewSession) {
+            // Guarantee _zt_wipe_keychain.flag exists with 0666 permissions
+            NSString *wipeFlag = [docs stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"];
+            if (![fm fileExistsAtPath:wipeFlag]) {
+                [@"1" writeToFile:wipeFlag atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            }
+            chown([wipeFlag UTF8String], 501, 501);
+            chmod([wipeFlag UTF8String], 0666);
+            // Guarantee old bound signature is cleared
+            [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"_zt_bound_uuid.txt"] error:nil];
+        } else {
+            // Restore or existing session: Guarantee bound signature matches profile
+            NSString *fullSig = [NSString stringWithFormat:@"%@:%@", profile.identifier ?: @"", profile.machineId ?: @""];
+            NSString *boundUuidFile = [docs stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
+            [fullSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            chown([boundUuidFile UTF8String], 501, 501);
+            chmod([boundUuidFile UTF8String], 0666);
+            [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
+        }
+
+        // Verify active profile file in Documents
+        NSString *activeProf = [docs stringByAppendingPathComponent:@"_zt_active_profile.plist"];
+        if (![fm fileExistsAtPath:activeProf]) {
+            NSDictionary *pDict = [profile toDictionary];
+            [pDict writeToFile:activeProf atomically:YES];
+        }
+        chown([activeProf UTF8String], 501, 501);
+        chmod([activeProf UTF8String], 0666);
+
+        // Verify AppGroups have active profile
+        for (NSString *grp in groups.allValues) {
+            NSString *gProf = [grp stringByAppendingPathComponent:@"_zt_active_profile.plist"];
+            if (![fm fileExistsAtPath:gProf]) {
+                NSDictionary *pDict = [profile toDictionary];
+                [pDict writeToFile:gProf atomically:YES];
+            }
+            chown([gProf UTF8String], 501, 501);
+            chmod([gProf UTF8String], 0666);
+        }
+
+        // Fast chown & chmod permissions on container
+        [ZTechVaultManager runFastChownAndChmod:zaloContainer];
+        for (NSString *grp in groups.allValues) {
+            [ZTechVaultManager runFastChownAndChmod:grp];
+        }
+    }
+
+    // 4. Final flush
+    sync();
+    [ZTechVaultManager restartCfprefsd];
+    return YES;
+}
+
 + (void)performRespringIfPossible {
     NSArray<NSString *> *candidates = @[
         @"/var/jb/usr/bin/sbreload",

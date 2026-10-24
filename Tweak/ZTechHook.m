@@ -32,6 +32,12 @@
 
 #pragma mark - Lock-Free Pre-Cached Profile, Pure C Buffers & Pre-Parsed Proxy State
 
+#ifndef KERN_OSRELEASE
+#define KERN_OSRELEASE 2
+#endif
+#ifndef KERN_VERSION
+#define KERN_VERSION 4
+#endif
 extern int __sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen);
 
 static NSDictionary *gCachedProfile = nil;
@@ -391,8 +397,11 @@ static void ZTechRebuildCachedProxyState(NSString *rawProxy) {
     // Eliminates iOS "Xác minh proxy" system prompt and ensures 100% silent background authentication
     if (user.length > 0 && pass != nil && host.length > 0 && port > 0) {
         @try {
-            NSURLProtectionSpace *httpSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:NSURLProtectionSpaceHTTPProxy realm:nil authenticationMethod:NSURLAuthenticationMethodHTTPProxy];
-            NSURLProtectionSpace *httpsSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:NSURLProtectionSpaceHTTPSProxy realm:nil authenticationMethod:NSURLAuthenticationMethodHTTPProxy];
+            NSString *kProtoHTTPProxy = @"NSURLProtectionSpaceHTTPProxy";
+            NSString *kProtoHTTPSProxy = @"NSURLProtectionSpaceHTTPSProxy";
+            NSString *kAuthMethodProxy = @"NSURLAuthenticationMethodHTTPProxy";
+            NSURLProtectionSpace *httpSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:kProtoHTTPProxy realm:nil authenticationMethod:kAuthMethodProxy];
+            NSURLProtectionSpace *httpsSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:kProtoHTTPSProxy realm:nil authenticationMethod:kAuthMethodProxy];
             NSURLCredential *cred = [NSURLCredential credentialWithUser:user password:pass persistence:NSURLCredentialPersistenceForSession];
             [[NSURLCredentialStorage sharedCredentialStorage] setDefaultCredential:cred forProtectionSpace:httpSpace];
             [[NSURLCredentialStorage sharedCredentialStorage] setCredential:cred forProtectionSpace:httpSpace];

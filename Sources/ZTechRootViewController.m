@@ -5,36 +5,92 @@
 #import "ZTechVectorIcons.h"
 #import "ZTechDiagnostics.h"
 
-#pragma mark - Crash-Proof Native TextField & Multi-Fallback Clipboard Reader
+#import <setjmp.h>
+#import <signal.h>
+
+#pragma mark - POSIX Signal Guarded Crash-Proof Clipboard Reader
+
+static sigjmp_buf gZTechClipJmpBuf;
+static volatile sig_atomic_t gZTechInClipboardRead = 0;
+
+static void ZTechClipSignalCatcher(int sig, siginfo_t *info, void *context) {
+    if (gZTechInClipboardRead) {
+        gZTechInClipboardRead = 0;
+        siglongjmp(gZTechClipJmpBuf, sig);
+    }
+}
 
 static NSString *ZTechReadClipboardSafely(void) {
-    // 1. Primary: UIPasteboard (with writable TMPDIR=/tmp and kTCCServicePasteboard entitlement)
+    __block NSString *result = @"";
+
+    // 1. Guard against SIGSEGV, SIGBUS, SIGABRT, SIGILL from rogue tweak hooks or UIKit pasteboard aborts
+    struct sigaction sa, old_segv, old_bus, old_abrt, old_ill;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = ZTechClipSignalCatcher;
+    sa.sa_flags = SA_SIGINFO;
+
+    sigaction(SIGSEGV, &sa, &old_segv);
+    sigaction(SIGBUS, &sa, &old_bus);
+    sigaction(SIGABRT, &sa, &old_abrt);
+    sigaction(SIGILL, &sa, &old_ill);
+
+    gZTechInClipboardRead = 1;
+    if (sigsetjmp(gZTechClipJmpBuf, 1) != 0) {
+        // A crash signal was intercepted! Restore handlers and fall back to disk cache
+        gZTechInClipboardRead = 0;
+        sigaction(SIGSEGV, &old_segv, NULL);
+        sigaction(SIGBUS, &old_bus, NULL);
+        sigaction(SIGABRT, &old_abrt, NULL);
+        sigaction(SIGILL, &old_ill, NULL);
+        goto disk_fallback;
+    }
+
+    // 2. Primary: Safe UIKit UIPasteboard access with strictly verified types
     @try {
         UIPasteboard *pb = [UIPasteboard generalPasteboard];
         if (pb) {
-            NSString *s = pb.string;
-            if ([s isKindOfClass:[NSString class]] && s.length > 0) {
-                return [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            BOOL hasStr = NO;
+            if (@available(iOS 10.0, *)) {
+                hasStr = pb.hasStrings;
+            } else {
+                hasStr = YES;
             }
-            NSArray<NSString *> *arr = pb.strings;
-            if ([arr isKindOfClass:[NSArray class]] && arr.count > 0 && [arr.firstObject isKindOfClass:[NSString class]]) {
-                NSString *first = [arr.firstObject stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                if (first.length > 0) return first;
+            if (hasStr) {
+                NSString *s = pb.string;
+                if ([s isKindOfClass:[NSString class]] && s.length > 0) {
+                    result = [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                }
             }
-            NSArray<NSString *> *types = @[@"public.utf8-plain-text", @"public.plain-text", @"public.text", @"NSStringPboardType"];
-            for (NSString *t in types) {
-                NSData *d = [pb dataForPasteboardType:t];
-                if ([d isKindOfClass:[NSData class]] && d.length > 0) {
-                    NSString *decoded = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
-                    if (decoded.length > 0) {
-                        return [decoded stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (result.length == 0) {
+                NSArray<NSString *> *safeTypes = @[@"public.utf8-plain-text", @"public.plain-text", @"public.text"];
+                for (NSString *t in safeTypes) {
+                    if ([pb containsPasteboardTypes:@[t]]) {
+                        NSData *d = [pb dataForPasteboardType:t];
+                        if ([d isKindOfClass:[NSData class]] && d.length > 0) {
+                            NSString *decoded = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
+                            if (decoded.length > 0) {
+                                result = [decoded stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
-    } @catch (NSException *e) {}
+    } @catch (id ex) {}
 
-    // 2. Fallback: Direct scan of iOS pboardd cache (/var/mobile/Library/Caches/com.apple.Pasteboard)
+    gZTechInClipboardRead = 0;
+    sigaction(SIGSEGV, &old_segv, NULL);
+    sigaction(SIGBUS, &old_bus, NULL);
+    sigaction(SIGABRT, &old_abrt, NULL);
+    sigaction(SIGILL, &old_ill, NULL);
+
+    if (result.length > 0) {
+        return result;
+    }
+
+disk_fallback:
+    // 3. Fallback: Direct scan of iOS pboardd cache (/var/mobile/Library/Caches/com.apple.Pasteboard)
     @try {
         NSFileManager *fm = [NSFileManager defaultManager];
         NSArray<NSString *> *pbRoots = @[
@@ -46,9 +102,12 @@ static NSString *ZTechReadClipboardSafely(void) {
         NSDate *newestDate = nil;
 
         for (NSString *root in pbRoots) {
+            BOOL isDir = NO;
+            if (![fm fileExistsAtPath:root isDirectory:&isDir] || !isDir) continue;
             NSDirectoryEnumerator *en = [fm enumeratorAtPath:root];
             NSString *rel = nil;
-            while ((rel = [en nextObject])) {
+            int scanned = 0;
+            while ((rel = [en nextObject]) && scanned++ < 120) {
                 NSString *full = [root stringByAppendingPathComponent:rel];
                 NSDictionary *attrs = [fm attributesOfItemAtPath:full error:nil];
                 if ([attrs[NSFileType] isEqualToString:NSFileTypeRegular]) {
@@ -73,7 +132,7 @@ static NSString *ZTechReadClipboardSafely(void) {
                 }
             }
         }
-    } @catch (NSException *e) {}
+    } @catch (id ex) {}
 
     return @"";
 }
@@ -606,7 +665,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.8.2";
+    appSub.text = @"Identity & Vault · v5.8.3";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -2192,11 +2251,15 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 }
 
 - (void)onTapPasteProxyFromClipboard {
+    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    [gen impactOccurred];
     NSString *clip = ZTechReadClipboardSafely();
     if (clip.length > 0) {
         self.vaultProxyInputField.text = clip;
+        [self showToast:[NSString stringWithFormat:@"Đã dán: %@", clip] isError:NO];
     } else {
-        [self showToast:@"Bộ nhớ tạm đang trống!" isError:YES];
+        [self.vaultProxyInputField becomeFirstResponder];
+        [self showToast:@"Bộ nhớ tạm trống! Hãy chạm vào ô để dán." isError:YES];
     }
 }
 
@@ -2672,9 +2735,12 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
     if (clip.length > 0) {
         self.keyInputField.text = [clip uppercaseString];
         self.lockStatusMsgLabel.text = nil;
+        [self showToast:@"Đã dán Key kích hoạt!" isError:NO];
     } else {
-        self.lockStatusMsgLabel.text = @"Bộ nhớ tạm đang trống, hãy sao chép Key trước!";
+        [self.keyInputField becomeFirstResponder];
+        self.lockStatusMsgLabel.text = @"Bộ nhớ tạm trống! Hãy chạm vào ô để dán.";
         self.lockStatusMsgLabel.textColor = [self dangerCoralColor];
+        self.lockStatusMsgLabel.hidden = NO;
     }
 }
 

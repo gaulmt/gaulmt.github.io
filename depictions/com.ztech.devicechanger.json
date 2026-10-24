@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.8.5 - Đồng Bộ Phần Cứng Toàn Diện, Ép Proxy CFNetwork & Vô Hiệu Hoá DeviceCheck"
+          "title": "quang lam marketing v5.8.6 - Tự Động Xác Thực Proxy, Xoá Sạch Tàn Dư Keychain & Darwin 24"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.5**:\n\n- **Đồng Bộ Hoàn Hảo Danh Tính Phần Cứng & OS (Khắc phục triệt để lỗi khoá nick Zalo khi reg)**: Loại bỏ các rào cản cô lập khiến Zalo đọc lệch giữa uname (iPhone 16) và MGCopyAnswer/sysctl (iPhone 7, chip A10 2 core, 2GB RAM, build 19H390). Giờ đây toàn bộ tham số phần cứng, CPU 6 cores, RAM 8GB, Board ID, ProductVersion và BuildVersion được giả lập đồng nhất 100% trong Zalo như các bản v5.7 ổn định.\n- **Ép Buộc Proxy Tầng Thấp CFNetwork & Chống Rò Rỉ IP Gốc**: Bổ sung hook trực tiếp `CFNetworkCopySystemProxySettings` và `CFNetworkCopyProxiesForURL`, đảm bảo Mars/C++ socket và toàn bộ kết nối mạng của Zalo đều đi qua Proxy, không còn tình trạng lộ IP thật Wi-Fi/4G.\n- **Vô Hiệu Hoá Phần Cứng DeviceCheck (DCDevice / DCAppAttest)**: Chặn đứng hành vi định danh phần cứng vật lý qua chip Secure Enclave của Apple.\n- **Bảo Vệ Bộ Nhớ Tạm UIPasteboard**: Chặn Zalo đọc trộm chuỗi Proxy hoặc thông tin công cụ từ clipboard khi khởi động."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.6**:\n\n- **Tự Động Nạp Thông Tin Xác Thực Proxy (Zero-Prompt Auto Auth)**: Tự động ghi thông tin chứng thực (User/Pass) vào `NSURLCredentialStorage` cho Protection Space của Proxy, chấm dứt hoàn toàn bảng thông báo phiền phức 'Xác minh proxy' của hệ thống iOS và chặn đứng 100% việc kết nối mạng bị rớt về IP gốc.\n- **Làm Sạch Tuyệt Đối Tàn Dư Keychain Của Tài Khoản Cũ**: Khi tạo phiên mới, xoá sạch toàn bộ 5 lớp khoá Keychain (`genp`, `inet`, `cert`, `keys`, `idnt`) trên tất cả Access Groups của Zalo, không để lại bất kỳ User Token hay Device Token nào của tài khoản bị khoá trước đó.\n- **Đồng Bộ Hoàn Toàn Nhân Darwin 24 & Xoá Dấu Vết Chip A10 T8010**: Giả lập `uname.release = 24.2.0`, `uname.version = Darwin Kernel Version 24.2.0 (RELEASE_ARM64_D94AP)`, `kern.osrelease` và `kern.version`, xoá sạch dấu vết bo mạch cũ của iPhone 7 trong kernel."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.8.5"
+          "text": "5.8.6"
         },
         {
           "class": "DepictionTableTextView",

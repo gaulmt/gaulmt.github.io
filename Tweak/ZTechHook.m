@@ -386,6 +386,20 @@ static void ZTechRebuildCachedProxyState(NSString *rawProxy) {
     gCachedProxyAuthHeader = [authHeader copy];
     gProxyIsSocks = isSocks ? 1 : 0;
     gProxyEnabled = 1;
+
+    // Pre-seed NSURLCredentialStorage for HTTP/HTTPS Proxy Protection Spaces
+    // Eliminates iOS "Xác minh proxy" system prompt and ensures 100% silent background authentication
+    if (user.length > 0 && pass != nil && host.length > 0 && port > 0) {
+        @try {
+            NSURLProtectionSpace *httpSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:NSURLProtectionSpaceHTTPProxy realm:nil authenticationMethod:NSURLAuthenticationMethodHTTPProxy];
+            NSURLProtectionSpace *httpsSpace = [[NSURLProtectionSpace alloc] initWithHost:host port:port protocol:NSURLProtectionSpaceHTTPSProxy realm:nil authenticationMethod:NSURLAuthenticationMethodHTTPProxy];
+            NSURLCredential *cred = [NSURLCredential credentialWithUser:user password:pass persistence:NSURLCredentialPersistenceForSession];
+            [[NSURLCredentialStorage sharedCredentialStorage] setDefaultCredential:cred forProtectionSpace:httpSpace];
+            [[NSURLCredentialStorage sharedCredentialStorage] setCredential:cred forProtectionSpace:httpSpace];
+            [[NSURLCredentialStorage sharedCredentialStorage] setDefaultCredential:cred forProtectionSpace:httpsSpace];
+            [[NSURLCredentialStorage sharedCredentialStorage] setCredential:cred forProtectionSpace:httpsSpace];
+        } @catch (NSException *e) {}
+    }
 }
 
 static NSDictionary *ZTechNormalizeProfile(NSDictionary *raw) {
@@ -703,6 +717,11 @@ static int hooked_uname(struct utsname *buf) {
     // Clean standard iOS nodename (POSIX host)
     strncpy(buf->nodename, "iPhone", sizeof(buf->nodename) - 1);
     buf->nodename[sizeof(buf->nodename) - 1] = '\0';
+    // Spoof Darwin release and kernel version to match iOS 18 (Darwin 24) and erase iPhone 7 T8010 traces
+    strncpy(buf->release, "24.2.0", sizeof(buf->release) - 1);
+    buf->release[sizeof(buf->release) - 1] = '\0';
+    snprintf(buf->version, sizeof(buf->version), "Darwin Kernel Version 24.2.0: Fri Nov 15 00:00:00 PST 2024; root:xnu-11215.61.5~2/RELEASE_ARM64_%s", gBoardIdCStr);
+    buf->version[sizeof(buf->version) - 1] = '\0';
     return 0;
 }
 
@@ -788,6 +807,25 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                 }
                 if (oldlenp != NULL) *oldlenp = len;
                 return 0;
+            } else if (name[1] == KERN_OSRELEASE) {
+                const char *rel = "24.2.0";
+                size_t len = strlen(rel) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, rel, copyLen);
+                }
+                if (oldlenp != NULL) *oldlenp = len;
+                return 0;
+            } else if (name[1] == KERN_VERSION) {
+                char kver[256] = {0};
+                snprintf(kver, sizeof(kver), "Darwin Kernel Version 24.2.0: Fri Nov 15 00:00:00 PST 2024; root:xnu-11215.61.5~2/RELEASE_ARM64_%s", gBoardIdCStr);
+                size_t len = strlen(kver) + 1;
+                if (oldp != NULL && oldlenp != NULL) {
+                    size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                    memcpy(oldp, kver, copyLen);
+                }
+                if (oldlenp != NULL) *oldlenp = len;
+                return 0;
             }
         }
     }
@@ -842,6 +880,27 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, ver, copyLen);
+            }
+            if (oldlenp != NULL) *oldlenp = len;
+            return 0;
+        } else if (strcmp(name, "kern.osrelease") == 0) {
+            const char *rel = "24.2.0";
+            size_t len = strlen(rel) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, rel, copyLen);
+                if (copyLen > 0) ((char *)oldp)[copyLen - 1] = '\0';
+            }
+            if (oldlenp != NULL) *oldlenp = len;
+            return 0;
+        } else if (strcmp(name, "kern.version") == 0) {
+            char kver[256] = {0};
+            snprintf(kver, sizeof(kver), "Darwin Kernel Version 24.2.0: Fri Nov 15 00:00:00 PST 2024; root:xnu-11215.61.5~2/RELEASE_ARM64_%s", gBoardIdCStr);
+            size_t len = strlen(kver) + 1;
+            if (oldp != NULL && oldlenp != NULL) {
+                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
+                memcpy(oldp, kver, copyLen);
+                if (copyLen > 0) ((char *)oldp)[copyLen - 1] = '\0';
             }
             if (oldlenp != NULL) *oldlenp = len;
             return 0;
@@ -2076,9 +2135,9 @@ static void ZTechPerformKeychainRestoreOrPurgeIfNeeded(void) {
             BOOL hasWipeFlag = [fm fileExistsAtPath:wipeFlag];
             BOOL sigMatches = (boundSig && currentSig && ([boundSig isEqualToString:currentSig] || (gUuidObj.length > 10 && [boundSig hasPrefix:gUuidObj])));
 
-            if (hasWipeFlag && !sigMatches) {
-                ZTechHookTrace([[NSString stringWithFormat:@"[Keychain] In-process deep clean triggered (wipeFlag=%d, boundSig=%@ -> newSig=%@)",
-                                 hasWipeFlag ? 1 : 0, boundSig ?: @"(none)", currentSig] UTF8String]);
+            if (hasWipeFlag) {
+                ZTechHookTrace([[NSString stringWithFormat:@"[Keychain] In-process absolute clean triggered (wipeFlag=1, boundSig=%@ -> newSig=%@)",
+                                 boundSig ?: @"(none)", currentSig] UTF8String]);
 
                 if (currentSig.length > 1) {
                     [currentSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
@@ -2088,10 +2147,13 @@ static void ZTechPerformKeychainRestoreOrPurgeIfNeeded(void) {
                 [fm removeItemAtPath:wipeFlag error:nil];
                 [[ZTechUbiquitousStoreStub sharedStore] resetStore];
 
-                // Purge all Zalo Keychain password items across all access groups
+                // Purge all Zalo Keychain items across all access groups & all classes (genp, inet, cert, keys, idnt)
                 NSArray *secClasses = @[
                     (__bridge id)kSecClassGenericPassword,
-                    (__bridge id)kSecClassInternetPassword
+                    (__bridge id)kSecClassInternetPassword,
+                    (__bridge id)kSecClassCertificate,
+                    (__bridge id)kSecClassKey,
+                    (__bridge id)kSecClassIdentity
                 ];
                 NSArray *accessGroups = @[
                     @"",
@@ -2234,7 +2296,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.5 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.6 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {

@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.8.5
+Version: 5.8.6
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.8.5 - Coherent Hardware & OS Profile, CFNetwork Proxy Enforcement, Anti-Ban & DeviceCheck Neutralization
+Description: quang lam marketing v5.8.6 - Auto Proxy Credentials Pre-seed, Absolute Keychain Wipe & Darwin 24 Coherence
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

@@ -606,7 +606,7 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
 
     UILabel *appSub = [[UILabel alloc] init];
     appSub.translatesAutoresizingMaskIntoConstraints = NO;
-    appSub.text = @"Identity & Vault · v5.7.9";
+    appSub.text = @"Identity & Vault · v5.8.0";
     appSub.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightMedium];
     appSub.textColor = [self mutedTextColor];
     appSub.adjustsFontSizeToFitWidth = YES;
@@ -1499,7 +1499,21 @@ typedef NS_ENUM(NSInteger, ZTechMainTab) {
             [ZTechDeviceDatabase writeProfileFiles:self.currentProfile error:nil];
         }
         [ZTechVaultManager killZaloProcess];
-        [NSThread sleepForTimeInterval:0.15];
+        [ZTechVaultManager restartCfprefsd];
+        NSString *zaloContainer = [ZTechVaultManager findZaloDataContainerPath];
+        if (zaloContainer.length > 0) {
+            NSFileManager *fm = [NSFileManager defaultManager];
+            [ZTechVaultManager removeStaleSqliteShmFilesAtPath:zaloContainer fileManager:fm];
+            NSDictionary<NSString *, NSString *> *groups = [ZTechVaultManager findZaloAppGroupContainers];
+            for (NSString *grp in groups.allValues) {
+                [ZTechVaultManager removeStaleSqliteShmFilesAtPath:grp fileManager:fm];
+            }
+            [ZTechVaultManager runFastChownAndChmod:zaloContainer];
+            for (NSString *grp in groups.allValues) {
+                [ZTechVaultManager runFastChownAndChmod:grp];
+            }
+        }
+        [NSThread sleepForTimeInterval:0.25];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isPerformingAction = NO;
             self.openZaloButton.enabled = YES;

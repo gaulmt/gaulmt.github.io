@@ -797,25 +797,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
     } else {
         ret = __sysctl(name, namelen, oldp, oldlenp, newp, newlen);
     }
-    if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
-        char *buf = (char *)oldp;
-        if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
-            size_t len = strlen(gMachineCStr) + 1;
-            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-            memcpy(oldp, gMachineCStr, copyLen);
-            *oldlenp = len;
-        } else if (gRealMarketingObj && gRealMarketingObj.length > 0 && strstr(buf, [gRealMarketingObj UTF8String]) != NULL) {
-            size_t len = strlen(gModelNameCStr) + 1;
-            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-            memcpy(oldp, gModelNameCStr, copyLen);
-            *oldlenp = len;
-        } else if (gRealBoardIdObj && gRealBoardIdObj.length > 0 && strstr(buf, [gRealBoardIdObj UTF8String]) != NULL) {
-            size_t len = strlen(gBoardIdCStr) + 1;
-            size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-            memcpy(oldp, gBoardIdCStr, copyLen);
-            *oldlenp = len;
-        }
-    }
+    // Safe: No blind strstr overwrites of kernel memory
     return ret;
 }
 
@@ -844,16 +826,17 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 }
                 return 0;
             }
-        } else if (strcmp(name, "kern.osversion") == 0) {
+        } else if (gIsAidaProcess && strcmp(name, "kern.osversion") == 0) {
             const char *build = "22B83";
             size_t len = strlen(build) + 1;
             if (oldp != NULL && oldlenp != NULL) {
                 size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
                 memcpy(oldp, build, copyLen);
+                if (copyLen > 0) ((char *)oldp)[copyLen - 1] = '\0';
             }
             if (oldlenp != NULL) *oldlenp = len;
             return 0;
-        } else if (strcmp(name, "kern.osproductversion") == 0) {
+        } else if (gIsAidaProcess && strcmp(name, "kern.osproductversion") == 0) {
             const char *ver = [gIosVersionObj UTF8String] ?: "18.2.1";
             size_t len = strlen(ver) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -931,25 +914,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             if (err < 0) return err;
             ret = __sysctl(real_oid, (u_int)(oidlen / sizeof(int)), oldp, oldlenp, newp, newlen);
         }
-        if (ret == 0 && oldp != NULL && oldlenp != NULL && *oldlenp > 0 && ZTechIsSafeASCIIString(oldp, *oldlenp)) {
-            char *buf = (char *)oldp;
-            if (gRealMachineCStr[0] != '\0' && strstr(buf, gRealMachineCStr) != NULL) {
-                size_t len = strlen(gMachineCStr) + 1;
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gMachineCStr, copyLen);
-                *oldlenp = len;
-            } else if (gRealMarketingObj && gRealMarketingObj.length > 0 && strstr(buf, [gRealMarketingObj UTF8String]) != NULL) {
-                size_t len = strlen(gModelNameCStr) + 1;
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gModelNameCStr, copyLen);
-                *oldlenp = len;
-            } else if (gRealBoardIdObj && gRealBoardIdObj.length > 0 && strstr(buf, [gRealBoardIdObj UTF8String]) != NULL) {
-                size_t len = strlen(gBoardIdCStr) + 1;
-                size_t copyLen = (*oldlenp < len) ? *oldlenp : len;
-                memcpy(oldp, gBoardIdCStr, copyLen);
-                *oldlenp = len;
-            }
-        }
+        // Safe: No blind strstr overwrites of kernel memory
         return ret;
     }
     return -1;
@@ -973,17 +938,17 @@ static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
     if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine")) || CFEqual(prop, CFSTR("device-name"))) {
         return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
     }
-    if (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel"))) {
+    if (gIsAidaProcess && (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel")))) {
         return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
     }
     if (CFEqual(prop, CFSTR("MarketingNameString")) || CFEqual(prop, CFSTR("marketing-name")) ||
         CFEqual(prop, CFSTR("DeviceName")) || CFEqual(prop, CFSTR("UserAssignedDeviceName"))) {
         return (__bridge_retained CFTypeRef)[gModelNameObj copy];
     }
-    if (CFEqual(prop, CFSTR("ProductVersion"))) {
+    if (gIsAidaProcess && CFEqual(prop, CFSTR("ProductVersion"))) {
         return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
     }
-    if (CFEqual(prop, CFSTR("BuildVersion"))) {
+    if (gIsAidaProcess && CFEqual(prop, CFSTR("BuildVersion"))) {
         return (__bridge_retained CFTypeRef)[@"22B83" copy];
     }
     if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
@@ -1051,13 +1016,12 @@ static CFTypeRef hooked_MGCopyAnswer(CFStringRef prop) {
     if (fake) {
         return fake;
     }
-    CFTypeRef res = NULL;
     if (orig_MGCopyAnswer) {
-        res = orig_MGCopyAnswer(prop);
+        return orig_MGCopyAnswer(prop);
     } else if (orig_MGCopyAnswerWithError) {
-        res = orig_MGCopyAnswerWithError(prop, NULL, NULL);
+        return orig_MGCopyAnswerWithError(prop, NULL, NULL);
     }
-    return ZTechInspectAndFilterMGResult(res);
+    return NULL;
 }
 
 static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, CFDictionaryRef options, int *error) {
@@ -1066,13 +1030,12 @@ static CFTypeRef hooked_MGCopyAnswerWithError(CFStringRef prop, CFDictionaryRef 
         if (error) *error = 0;
         return fake;
     }
-    CFTypeRef res = NULL;
     if (orig_MGCopyAnswerWithError) {
-        res = orig_MGCopyAnswerWithError(prop, options, error);
+        return orig_MGCopyAnswerWithError(prop, options, error);
     } else if (orig_MGCopyAnswer) {
-        res = orig_MGCopyAnswer(prop);
+        return orig_MGCopyAnswer(prop);
     }
-    return ZTechInspectAndFilterMGResult(res);
+    return NULL;
 }
 
 typedef CFStringRef (*zt_SCDynamicStoreCopyComputerName_t)(CFAllocatorRef allocator, CFStringEncoding *encoding);
@@ -1266,17 +1229,17 @@ static id swizzled_deviceInfoForKey(id self, SEL _cmd, NSString *key) {
         if ([key isEqualToString:@"ProductType"] || [key isEqualToString:@"hw-machine"] || [key isEqualToString:@"device-name"]) {
             return gMachineIdObj ?: @"iPhone17,2";
         }
-        if ([key isEqualToString:@"HWModelStr"] || [key isEqualToString:@"HardwareModel"]) {
+        if (gIsAidaProcess && ([key isEqualToString:@"HWModelStr"] || [key isEqualToString:@"HardwareModel"])) {
             return [NSString stringWithUTF8String:gBoardIdCStr];
         }
         if ([key isEqualToString:@"DeviceName"] || [key isEqualToString:@"UserAssignedDeviceName"] ||
             [key isEqualToString:@"MarketingNameString"] || [key isEqualToString:@"marketing-name"]) {
             return gModelNameObj ?: @"iPhone 16 Pro Max";
         }
-        if ([key isEqualToString:@"ProductVersion"]) {
+        if (gIsAidaProcess && [key isEqualToString:@"ProductVersion"]) {
             return gIosVersionObj ?: @"18.1.1";
         }
-        if ([key isEqualToString:@"BuildVersion"]) {
+        if (gIsAidaProcess && [key isEqualToString:@"BuildVersion"]) {
             return @"22B83";
         }
     }
@@ -2143,7 +2106,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.9 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.0 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {

@@ -1,8 +1,8 @@
 Package: com.ztech.devicechanger
 Name: quang lam marketing
-Version: 5.7.9
+Version: 5.8.0
 Architecture: iphoneos-arm
-Description: quang lam marketing v5.7.9 - Absolute Fix for Zalo Engine Crash, OS Runtime Isolation & GPU Board Stability
+Description: quang lam marketing v5.8.0 - Bulletproof Launch Engine, Zero-Blind-Memory-Scan & Instant Lock Cleaner
 Maintainer: quang lam marketing
 Author: quang lam marketing
 Section: Utilities

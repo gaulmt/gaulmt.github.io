@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.7: Khắc phục triệt để lỗi crash lặp đi lặp lại khi Nạp lại Acc từ Kho (Vault), tái thiết toàn diện cơ chế sao lưu/khôi phục Keychain đa AppGroup (group.vn.com.vng.zingalo), tự động dọn sạch SQLite SHM memory locks và khôi phục cấu trúc container iOS chuẩn.
+        Bản phát hành v5.7.8: Bổ sung công cụ Cứu Hộ Acc Cũ 1-chạm (Vault Rescue), khắc phục lỗi văng do tràn RAM Jetsam OOM trên iPhone 7 / máy 2GB, tự động đồng bộ hoá daemon cfprefsd và dọn dẹp triệt để lock bộ nhớ.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

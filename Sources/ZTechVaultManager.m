@@ -169,6 +169,38 @@ extern char **environ;
     }
 }
 
+
++ (void)restartCfprefsd {
+    // 1. Direct Darwin kernel sysctl scan for cfprefsd
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    size_t size = 0;
+    if (sysctl(mib, 4, NULL, &size, NULL, 0) == 0 && size > 0) {
+        struct kinfo_proc *procs = malloc(size);
+        if (procs && sysctl(mib, 4, procs, &size, NULL, 0) == 0) {
+            int count = (int)(size / sizeof(struct kinfo_proc));
+            for (int i = 0; i < count; i++) {
+                const char *name = procs[i].kp_proc.p_comm;
+                if (name && strcasecmp(name, "cfprefsd") == 0) {
+                    kill(procs[i].kp_proc.p_pid, SIGKILL);
+                }
+            }
+        }
+        if (procs) free(procs);
+    }
+
+    // 2. Fallback via posix_spawn killall
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *killBins = @[@"/var/jb/usr/bin/killall", @"/usr/bin/killall"];
+    for (NSString *bin in killBins) {
+        if ([fm isExecutableFileAtPath:bin]) {
+            pid_t pid;
+            const char *args[] = { [bin UTF8String], "-9", "cfprefsd", NULL };
+            posix_spawn(&pid, [bin UTF8String], NULL, NULL, (char *const *)args, environ);
+            break;
+        }
+    }
+}
+
 + (void)cleanSafariCookiesAndWebsiteData {
     // 1. Terminate MobileSafari & SafariViewService processes via direct kernel kill
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
@@ -737,6 +769,7 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
 
     // 1. Kill Zalo first so SQLite databases are flushed and unlocked
     [self killZaloProcess];
+    [self restartCfprefsd];
     usleep(200000); // 200ms
     sync();
 
@@ -814,7 +847,7 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
         NSString *liveGroupPath = appGroups[groupId];
         [self runFastChownAndChmod:liveGroupPath];
     }
-    system("killall -9 cfprefsd 2>/dev/null");
+    [self restartCfprefsd];
     sync();
 
     // 9. Launch Zalo with slight delay so buffers are flushed to flash storage

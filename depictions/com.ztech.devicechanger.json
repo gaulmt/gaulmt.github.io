@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.8.4 - Khắc phục Triệt để Crash Mở Acc Cũ & Dán Menu Hệ Thống"
+          "title": "quang lam marketing v5.8.5 - Đồng Bộ Phần Cứng Toàn Diện, Ép Proxy CFNetwork & Vô Hiệu Hoá DeviceCheck"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.4**:\n\n- **Khắc phục Triệt Để Lỗi Crash Khi Mở Acc Cũ**: Loại bỏ hoàn toàn thao tác xóa tệp shared memory SQLite (`-shm`) gây hỏng chỉ mục WAL của WCDB/SQLite; tách rời khôi phục Keychain ra khỏi dyld constructor, kích hoạt theo cơ chế On-Demand (`SecItemCopyMatching` hook) và Main Queue, chấm dứt 100% tình trạng watchdog timeout hoặc chết đột ngột khi mở tài khoản đã lưu.\n- **Bảo Vệ Toàn Diện Cử Chỉ Dán Hệ Thống (System Paste Interception)**: Tiếp nhận an toàn các lệnh dán từ Menu ngữ cảnh iOS (`UIMenuController`/`UIEditMenuInteraction`), thanh tiện ích bàn phím (`inputAssistantItem`) và cử chỉ chụm 3 ngón thông qua `canPasteItemProviders:` / `pasteItemProviders:`, ngăn chặn tuyệt đối tình trạng crash XPC của `_UITextPasteController`.\n- **Tự Động Nhận Diện Proxy Từ Bộ Nhớ Tạm**: Tự động điền chuỗi Proxy khi mở khung cấu hình nếu đã sao chép Proxy dạng `IP:Port:User:Pass`, loại bỏ hoàn toàn thao tác cấu hình thủ công."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.8.5**:\n\n- **Đồng Bộ Hoàn Hảo Danh Tính Phần Cứng & OS (Khắc phục triệt để lỗi khoá nick Zalo khi reg)**: Loại bỏ các rào cản cô lập khiến Zalo đọc lệch giữa uname (iPhone 16) và MGCopyAnswer/sysctl (iPhone 7, chip A10 2 core, 2GB RAM, build 19H390). Giờ đây toàn bộ tham số phần cứng, CPU 6 cores, RAM 8GB, Board ID, ProductVersion và BuildVersion được giả lập đồng nhất 100% trong Zalo như các bản v5.7 ổn định.\n- **Ép Buộc Proxy Tầng Thấp CFNetwork & Chống Rò Rỉ IP Gốc**: Bổ sung hook trực tiếp `CFNetworkCopySystemProxySettings` và `CFNetworkCopyProxiesForURL`, đảm bảo Mars/C++ socket và toàn bộ kết nối mạng của Zalo đều đi qua Proxy, không còn tình trạng lộ IP thật Wi-Fi/4G.\n- **Vô Hiệu Hoá Phần Cứng DeviceCheck (DCDevice / DCAppAttest)**: Chặn đứng hành vi định danh phần cứng vật lý qua chip Secure Enclave của Apple.\n- **Bảo Vệ Bộ Nhớ Tạm UIPasteboard**: Chặn Zalo đọc trộm chuỗi Proxy hoặc thông tin công cụ từ clipboard khi khởi động."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.8.4"
+          "text": "5.8.5"
         },
         {
           "class": "DepictionTableTextView",

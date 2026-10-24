@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.8.4 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.8.5 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.8.4: Khắc phục triệt để lỗi crash khi mở lại Acc cũ (bảo toàn SQLite WAL & Keychain on-demand), chặn 100% crash khi dán qua Menu/Bàn phím hệ thống, tự động nhận diện Proxy từ bộ nhớ tạm.
+        Bản phát hành v5.8.5: Đồng bộ 100% thông số phần cứng & OS trong Zalo (chống khoá nick khi reg), ép buộc Proxy tầng thấp CFNetwork ngăn rò rỉ IP gốc, vô hiệu hoá Apple DeviceCheck, bảo vệ bộ nhớ tạm UIPasteboard.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

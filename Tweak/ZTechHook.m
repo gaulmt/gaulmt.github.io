@@ -720,7 +720,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                     *oldlenp = len;
                 }
                 return 0;
-            } else if (gIsAidaProcess && name[1] == HW_MODEL) {
+            } else if (name[1] == HW_MODEL) {
                 if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
                     size_t len = strlen(gBoardIdCStr) + 1;
                     if (oldp != NULL && oldlenp != NULL) {
@@ -732,7 +732,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                     }
                     return 0;
                 }
-            } else if (gIsAidaProcess && name[1] == HW_MEMSIZE) {
+            } else if (name[1] == HW_MEMSIZE) {
                 if (oldlenp != NULL) {
                     if (oldp != NULL) {
                         size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
@@ -741,7 +741,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                     *oldlenp = sizeof(uint64_t);
                     return 0;
                 }
-            } else if (gIsAidaProcess && name[1] == HW_PHYSMEM) {
+            } else if (name[1] == HW_PHYSMEM) {
                 if (oldlenp != NULL) {
                     if (oldp != NULL) {
                         if (*oldlenp >= sizeof(uint64_t)) {
@@ -758,7 +758,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                     }
                     return 0;
                 }
-            } else if (gIsAidaProcess && (name[1] == HW_NCPU || name[1] == HW_AVAILCPU)) {
+            } else if (name[1] == HW_NCPU || name[1] == HW_AVAILCPU) {
                 if (oldlenp != NULL) {
                     if (oldp != NULL) {
                         int cores = 6;
@@ -814,7 +814,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = len;
             }
             return 0;
-        } else if (gIsAidaProcess && (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0)) {
+        } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
             if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
                 size_t len = strlen(gBoardIdCStr) + 1;
                 if (oldp != NULL && oldlenp != NULL) {
@@ -826,7 +826,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 }
                 return 0;
             }
-        } else if (gIsAidaProcess && strcmp(name, "kern.osversion") == 0) {
+        } else if (strcmp(name, "kern.osversion") == 0) {
             const char *build = "22B83";
             size_t len = strlen(build) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -836,7 +836,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             }
             if (oldlenp != NULL) *oldlenp = len;
             return 0;
-        } else if (gIsAidaProcess && strcmp(name, "kern.osproductversion") == 0) {
+        } else if (strcmp(name, "kern.osproductversion") == 0) {
             const char *ver = [gIosVersionObj UTF8String] ?: "18.2.1";
             size_t len = strlen(ver) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -854,7 +854,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
             }
             if (oldlenp != NULL) *oldlenp = len;
             return 0;
-        } else if (gIsAidaProcess && strcmp(name, "hw.memsize") == 0) {
+        } else if (strcmp(name, "hw.memsize") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     size_t copyLen = (*oldlenp < sizeof(uint64_t)) ? *oldlenp : sizeof(uint64_t);
@@ -863,7 +863,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = sizeof(uint64_t);
                 return 0;
             }
-        } else if (gIsAidaProcess && strcmp(name, "hw.physmem") == 0) {
+        } else if (strcmp(name, "hw.physmem") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     if (*oldlenp >= sizeof(uint64_t)) {
@@ -880,7 +880,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 }
                 return 0;
             }
-        } else if (gIsAidaProcess && (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0)) {
+        } else if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
             if (oldlenp != NULL) {
                 if (oldp != NULL) {
                     int cores = 6;
@@ -890,7 +890,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = sizeof(int);
                 return 0;
             }
-        } else if (gIsAidaProcess && strcmp(name, "machdep.cpu.brand_string") == 0) {
+        } else if (strcmp(name, "machdep.cpu.brand_string") == 0) {
             const char *soc = "Apple A18 Pro";
             size_t len = strlen(soc) + 1;
             if (oldp != NULL && oldlenp != NULL) {
@@ -939,17 +939,17 @@ static CFTypeRef ZTechGetSpoofedMGCopyAnswer(CFStringRef prop) {
     if (CFEqual(prop, CFSTR("ProductType")) || CFEqual(prop, CFSTR("hw-machine")) || CFEqual(prop, CFSTR("device-name"))) {
         return (__bridge_retained CFTypeRef)[gMachineIdObj copy];
     }
-    if (gIsAidaProcess && (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel")))) {
+    if (CFEqual(prop, CFSTR("HWModelStr")) || CFEqual(prop, CFSTR("HardwareModel"))) {
         return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] copy];
     }
     if (CFEqual(prop, CFSTR("MarketingNameString")) || CFEqual(prop, CFSTR("marketing-name")) ||
         CFEqual(prop, CFSTR("DeviceName")) || CFEqual(prop, CFSTR("UserAssignedDeviceName"))) {
         return (__bridge_retained CFTypeRef)[gModelNameObj copy];
     }
-    if (gIsAidaProcess && CFEqual(prop, CFSTR("ProductVersion"))) {
+    if (CFEqual(prop, CFSTR("ProductVersion"))) {
         return (__bridge_retained CFTypeRef)[gIosVersionObj copy];
     }
-    if (gIsAidaProcess && CFEqual(prop, CFSTR("BuildVersion"))) {
+    if (CFEqual(prop, CFSTR("BuildVersion"))) {
         return (__bridge_retained CFTypeRef)[@"22B83" copy];
     }
     if (CFEqual(prop, CFSTR("UniqueDeviceID")) || CFEqual(prop, CFSTR("UniqueDeviceIDData"))) {
@@ -1072,14 +1072,11 @@ typedef CFTypeRef (*zt_IORegistryEntryCreateCFProperty_t)(uint32_t entry, CFStri
 static zt_IORegistryEntryCreateCFProperty_t orig_IORegistryEntryCreateCFProperty = NULL;
 
 static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFStringRef key, CFAllocatorRef allocator, uint32_t options) {
-    if (!gIsAidaProcess) {
-        return orig_IORegistryEntryCreateCFProperty ? orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options) : NULL;
-    }
     if (key != NULL && CFGetTypeID(key) == CFStringGetTypeID()) {
         if (CFEqual(key, CFSTR("product-name")) || CFEqual(key, CFSTR("model"))) {
             return (__bridge_retained CFTypeRef)[gMachineIdObj dataUsingEncoding:NSUTF8StringEncoding];
         }
-        if (gIsAidaProcess && CFEqual(key, CFSTR("board-id"))) {
+        if (CFEqual(key, CFSTR("board-id"))) {
             return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] dataUsingEncoding:NSUTF8StringEncoding];
         }
     }
@@ -1168,14 +1165,7 @@ static NSString *swizzled_mobileNetworkCode(id self, SEL _cmd) {
 
 static NSString *(*orig_systemVersion)(id, SEL) = NULL;
 static NSString *swizzled_systemVersion(id self, SEL _cmd) {
-    if (gIsAidaProcess) {
-        return gIosVersionObj ?: @"18.2.1";
-    }
-    // For Zalo: keep real OS version so internal feature checks (@available, floatValue) don't trigger non-existent iOS 16+ APIs on iOS 15
-    if (gRealIosVersionObj.length > 0) {
-        return gRealIosVersionObj;
-    }
-    return gIosVersionObj ?: @"15.8.4";
+    return gIosVersionObj ?: @"18.2.1";
 }
 
 static NSString *(*orig_deviceName)(id, SEL) = NULL;
@@ -1217,16 +1207,6 @@ static NSString *swizzled_osVersionString(id self, SEL _cmd) {
 
 static unsigned long long (*orig_physicalMemory)(id, SEL) = NULL;
 static unsigned long long swizzled_physicalMemory(id self, SEL _cmd) {
-    if (gIsAidaProcess) {
-        return (unsigned long long)gRamBytes;
-    }
-    // For Zalo: never exceed real physical memory to prevent Kernel Jetsam OOM kill on 2GB devices like iPhone 7
-    if (orig_physicalMemory) {
-        unsigned long long realMem = orig_physicalMemory(self, _cmd);
-        if (realMem > 0 && realMem < gRamBytes) {
-            return realMem;
-        }
-    }
     return (unsigned long long)gRamBytes;
 }
 
@@ -1236,17 +1216,17 @@ static id swizzled_deviceInfoForKey(id self, SEL _cmd, NSString *key) {
         if ([key isEqualToString:@"ProductType"] || [key isEqualToString:@"hw-machine"] || [key isEqualToString:@"device-name"]) {
             return gMachineIdObj ?: @"iPhone17,2";
         }
-        if (gIsAidaProcess && ([key isEqualToString:@"HWModelStr"] || [key isEqualToString:@"HardwareModel"])) {
+        if ([key isEqualToString:@"HWModelStr"] || [key isEqualToString:@"HardwareModel"]) {
             return [NSString stringWithUTF8String:gBoardIdCStr];
         }
         if ([key isEqualToString:@"DeviceName"] || [key isEqualToString:@"UserAssignedDeviceName"] ||
             [key isEqualToString:@"MarketingNameString"] || [key isEqualToString:@"marketing-name"]) {
             return gModelNameObj ?: @"iPhone 16 Pro Max";
         }
-        if (gIsAidaProcess && [key isEqualToString:@"ProductVersion"]) {
-            return gIosVersionObj ?: @"18.1.1";
+        if ([key isEqualToString:@"ProductVersion"]) {
+            return gIosVersionObj ?: @"18.2.1";
         }
-        if (gIsAidaProcess && [key isEqualToString:@"BuildVersion"]) {
+        if ([key isEqualToString:@"BuildVersion"]) {
             return @"22B83";
         }
     }
@@ -1380,6 +1360,103 @@ static NSURLSessionConfiguration *swizzled_ephemeralSessionConfig(id self, SEL _
         } @catch (NSException *e) {}
     }
     return cfg;
+}
+
+#pragma mark - CFNetwork Low-Level Proxy Enforcement & Leak Isolation
+
+static CFDictionaryRef (*orig_CFNetworkCopySystemProxySettings)(void) = NULL;
+static CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
+    if (gProxyEnabled && gCachedProxyDict) {
+        return (__bridge_retained CFDictionaryRef)[gCachedProxyDict copy];
+    }
+    if (orig_CFNetworkCopySystemProxySettings) {
+        return orig_CFNetworkCopySystemProxySettings();
+    }
+    return NULL;
+}
+
+static CFArrayRef (*orig_CFNetworkCopyProxiesForURL)(CFURLRef url, CFDictionaryRef proxySettings) = NULL;
+static CFArrayRef hooked_CFNetworkCopyProxiesForURL(CFURLRef url, CFDictionaryRef proxySettings) {
+    if (gProxyEnabled && gCachedCFProxyArray) {
+        return (__bridge_retained CFArrayRef)[gCachedCFProxyArray copy];
+    }
+    if (orig_CFNetworkCopyProxiesForURL) {
+        return orig_CFNetworkCopyProxiesForURL(url, proxySettings);
+    }
+    return NULL;
+}
+
+static CFDictionaryRef (*orig_CNCopyCurrentNetworkInfo)(CFStringRef interfaceName) = NULL;
+static CFDictionaryRef hooked_CNCopyCurrentNetworkInfo(CFStringRef interfaceName) {
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    dict[@"SSID"] = @"Wi-Fi";
+    dict[@"BSSID"] = gWifiMacObj ?: @"3c:06:30:1a:8b:24";
+    return (__bridge_retained CFDictionaryRef)dict;
+}
+
+static int (*orig_getifaddrs)(struct ifaddrs **ifap) = NULL;
+static int hooked_getifaddrs(struct ifaddrs **ifap) {
+    int ret = orig_getifaddrs ? orig_getifaddrs(ifap) : -1;
+    if (ret == 0 && ifap && *ifap) {
+        struct ifaddrs *ifa = *ifap;
+        while (ifa) {
+            if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+                if (ifa->ifa_name && (strcmp(ifa->ifa_name, "en0") == 0 || strcmp(ifa->ifa_name, "pdp_ip0") == 0)) {
+                    struct sockaddr_in *sin = (struct sockaddr_in *)ifa->ifa_addr;
+                    sin->sin_addr.s_addr = gMaskedLocalIPv4;
+                }
+            }
+            ifa = ifa->ifa_next;
+        }
+    }
+    return ret;
+}
+
+#pragma mark - DeviceCheck & Hardware Attestation Neutralization
+
+static BOOL swizzled_DCDevice_isSupported(id self, SEL _cmd) {
+    return NO;
+}
+
+static void swizzled_DCDevice_generateToken(id self, SEL _cmd, void (^completion)(NSData *, NSError *)) {
+    if (completion) {
+        NSError *err = [NSError errorWithDomain:@"com.apple.devicecheck.error" code:1 userInfo:@{NSLocalizedDescriptionKey: @"DeviceCheck unavailable"}];
+        completion(nil, err);
+    }
+}
+
+static BOOL swizzled_DCAppAttest_isSupported(id self, SEL _cmd) {
+    return NO;
+}
+
+#pragma mark - Zalo Clipboard Anti-Spy Filter
+
+static NSString *(*orig_pasteboard_string)(id, SEL) = NULL;
+static NSString *swizzled_pasteboard_string(id self, SEL _cmd) {
+    NSString *val = orig_pasteboard_string ? orig_pasteboard_string(self, _cmd) : nil;
+    if (val && [val isKindOfClass:[NSString class]]) {
+        NSString *lower = [val lowercaseString];
+        if ([lower containsString:@"gaulmt"] || [lower containsString:@"ztech"] ||
+            [lower containsString:@"socks5"] || [lower containsString:@"socks"] ||
+            [lower containsString:@"@"] || [lower containsString:@":14530"] ||
+            [lower containsString:@"j52z"]) {
+            return @"";
+        }
+        NSArray<NSString *> *parts = [val componentsSeparatedByString:@":"];
+        if (parts.count >= 2) {
+            NSArray<NSString *> *ipParts = [parts[0] componentsSeparatedByString:@"."];
+            if (ipParts.count == 4) {
+                BOOL isIP = YES;
+                for (NSString *seg in ipParts) {
+                    if (seg.length == 0 || seg.length > 3 || [seg integerValue] < 0 || [seg integerValue] > 255) {
+                        isIP = NO; break;
+                    }
+                }
+                if (isIP) return @"";
+            }
+        }
+    }
+    return val;
 }
 
 #pragma mark - WebKit In-App Browser Fingerprint & Anti-Leak Engine
@@ -2157,7 +2234,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.4 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.8.5 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2453,22 +2530,45 @@ static void ZTechHookInit(void) {
                 pMSHook(raw_SCHostName, (void *)hooked_SCDynamicStoreCopyLocalHostName, (void **)&orig_SCDynamicStoreCopyLocalHostName);
             }
 
-            if (isAida) {
-                void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
-                if (raw_CFCopySysVer) {
-                    pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
-                }
+            void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
+            if (raw_CFCopySysVer) {
+                pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
             }
 
-            if (isAida) {
-                void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
-                if (!raw_IOReg) {
-                    void *hIO = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_GLOBAL | RTLD_LAZY);
-                    if (hIO) raw_IOReg = dlsym(hIO, "IORegistryEntryCreateCFProperty");
-                }
-                if (raw_IOReg) {
-                    pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
-                }
+            void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
+            if (!raw_IOReg) {
+                void *hIO = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_GLOBAL | RTLD_LAZY);
+                if (hIO) raw_IOReg = dlsym(hIO, "IORegistryEntryCreateCFProperty");
+            }
+            if (raw_IOReg) {
+                pMSHook(raw_IOReg, (void *)hooked_IORegistryEntryCreateCFProperty, (void **)&orig_IORegistryEntryCreateCFProperty);
+            }
+
+            // Hook CFNetwork proxy configuration (prevents real IP leaks on C/C++ sockets, Mars & CFNetwork)
+            void *raw_CFSysProxy = dlsym(RTLD_DEFAULT, "CFNetworkCopySystemProxySettings");
+            if (!raw_CFSysProxy) {
+                void *hCFNet = dlopen("/System/Library/Frameworks/CFNetwork.framework/CFNetwork", RTLD_GLOBAL | RTLD_LAZY);
+                if (hCFNet) raw_CFSysProxy = dlsym(hCFNet, "CFNetworkCopySystemProxySettings");
+            }
+            if (raw_CFSysProxy) {
+                pMSHook(raw_CFSysProxy, (void *)hooked_CFNetworkCopySystemProxySettings, (void **)&orig_CFNetworkCopySystemProxySettings);
+            }
+
+            void *raw_CFProxiesForURL = dlsym(RTLD_DEFAULT, "CFNetworkCopyProxiesForURL");
+            if (raw_CFProxiesForURL) {
+                pMSHook(raw_CFProxiesForURL, (void *)hooked_CFNetworkCopyProxiesForURL, (void **)&orig_CFNetworkCopyProxiesForURL);
+            }
+
+            // Hook CNCopyCurrentNetworkInfo to spoof Wi-Fi router BSSID/MAC
+            void *raw_CNCopy = dlsym(RTLD_DEFAULT, "CNCopyCurrentNetworkInfo");
+            if (raw_CNCopy) {
+                pMSHook(raw_CNCopy, (void *)hooked_CNCopyCurrentNetworkInfo, (void **)&orig_CNCopyCurrentNetworkInfo);
+            }
+
+            // Hook getifaddrs to mask local network IP
+            void *raw_getifaddrs = dlsym(RTLD_DEFAULT, "getifaddrs");
+            if (raw_getifaddrs) {
+                pMSHook(raw_getifaddrs, (void *)hooked_getifaddrs, (void **)&orig_getifaddrs);
             }
 
             if (isZalo) {
@@ -2496,26 +2596,22 @@ static void ZTechHookInit(void) {
         @try {
             Class procCls = objc_getClass("NSProcessInfo");
             if (procCls) {
-                if (isAida) {
-                    Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
-                    if (mOsVer) {
-                        orig_osVersion = (void *)method_getImplementation(mOsVer);
-                        method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
-                    }
-
-                    Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
-                    if (mOsVerStr) {
-                        orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
-                        method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
-                    }
+                Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
+                if (mOsVer) {
+                    orig_osVersion = (void *)method_getImplementation(mOsVer);
+                    method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
                 }
 
-                if (isAida) {
-                    Method mPhysMem = class_getInstanceMethod(procCls, @selector(physicalMemory));
-                    if (mPhysMem) {
-                        orig_physicalMemory = (void *)method_getImplementation(mPhysMem);
-                        method_setImplementation(mPhysMem, (IMP)swizzled_physicalMemory);
-                    }
+                Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
+                if (mOsVerStr) {
+                    orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
+                    method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
+                }
+
+                Method mPhysMem = class_getInstanceMethod(procCls, @selector(physicalMemory));
+                if (mPhysMem) {
+                    orig_physicalMemory = (void *)method_getImplementation(mPhysMem);
+                    method_setImplementation(mPhysMem, (IMP)swizzled_physicalMemory);
                 }
             }
 
@@ -2529,6 +2625,40 @@ static void ZTechHookInit(void) {
                         method_setImplementation(mGpu, (IMP)swizzled_MTLDevice_name);
                     }
                 }
+            }
+
+            // Swizzle DeviceCheck & AppAttest to neutralize physical Secure Enclave hardware tracking
+            @try {
+                Class dcCls = objc_getClass("DCDevice");
+                if (!dcCls) {
+                    dlopen("/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck", RTLD_GLOBAL | RTLD_LAZY);
+                    dcCls = objc_getClass("DCDevice");
+                }
+                if (dcCls) {
+                    Method mSupp = class_getClassMethod(dcCls, @selector(isSupported));
+                    if (mSupp) method_setImplementation(mSupp, (IMP)swizzled_DCDevice_isSupported);
+                    Method mTok = class_getInstanceMethod(dcCls, @selector(generateTokenWithCompletionHandler:));
+                    if (mTok) method_setImplementation(mTok, (IMP)swizzled_DCDevice_generateToken);
+                }
+                Class attCls = objc_getClass("DCAppAttestService");
+                if (attCls) {
+                    Method mAttSupp = class_getInstanceMethod(attCls, @selector(isSupported));
+                    if (mAttSupp) method_setImplementation(mAttSupp, (IMP)swizzled_DCAppAttest_isSupported);
+                }
+            } @catch (NSException *e) {}
+
+            // In Zalo, filter clipboard queries to prevent proxy / tweak string spying
+            if (isZalo) {
+                @try {
+                    Class pbCls = objc_getClass("UIPasteboard");
+                    if (pbCls) {
+                        Method mStr = class_getInstanceMethod(pbCls, @selector(string));
+                        if (mStr) {
+                            orig_pasteboard_string = (void *)method_getImplementation(mStr);
+                            method_setImplementation(mStr, (IMP)swizzled_pasteboard_string);
+                        }
+                    }
+                } @catch (NSException *e) {}
             }
         } @catch (NSException *e) {}
 

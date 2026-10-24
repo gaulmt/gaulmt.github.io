@@ -720,7 +720,7 @@ static int hooked_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
                     *oldlenp = len;
                 }
                 return 0;
-            } else if (name[1] == HW_MODEL) {
+            } else if (gIsAidaProcess && name[1] == HW_MODEL) {
                 if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
                     size_t len = strlen(gBoardIdCStr) + 1;
                     if (oldp != NULL && oldlenp != NULL) {
@@ -832,7 +832,7 @@ static int hooked_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, vo
                 *oldlenp = len;
             }
             return 0;
-        } else if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0) {
+        } else if (gIsAidaProcess && (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.targettype") == 0)) {
             if (!ZTechIsMetalCaller(__builtin_return_address(0))) {
                 size_t len = strlen(gBoardIdCStr) + 1;
                 if (oldp != NULL && oldlenp != NULL) {
@@ -1109,7 +1109,7 @@ static CFTypeRef hooked_IORegistryEntryCreateCFProperty(uint32_t entry, CFString
         if (CFEqual(key, CFSTR("product-name")) || CFEqual(key, CFSTR("model"))) {
             return (__bridge_retained CFTypeRef)[gMachineIdObj dataUsingEncoding:NSUTF8StringEncoding];
         }
-        if (CFEqual(key, CFSTR("board-id"))) {
+        if (gIsAidaProcess && CFEqual(key, CFSTR("board-id"))) {
             return (__bridge_retained CFTypeRef)[[NSString stringWithUTF8String:gBoardIdCStr] dataUsingEncoding:NSUTF8StringEncoding];
         }
     }
@@ -1198,7 +1198,14 @@ static NSString *swizzled_mobileNetworkCode(id self, SEL _cmd) {
 
 static NSString *(*orig_systemVersion)(id, SEL) = NULL;
 static NSString *swizzled_systemVersion(id self, SEL _cmd) {
-    return gIosVersionObj ?: @"18.2.1";
+    if (gIsAidaProcess) {
+        return gIosVersionObj ?: @"18.2.1";
+    }
+    // For Zalo: keep real OS version so internal feature checks (@available, floatValue) don't trigger non-existent iOS 16+ APIs on iOS 15
+    if (gRealIosVersionObj.length > 0) {
+        return gRealIosVersionObj;
+    }
+    return gIosVersionObj ?: @"15.8.4";
 }
 
 static NSString *(*orig_deviceName)(id, SEL) = NULL;
@@ -2136,7 +2143,7 @@ static void ZTechHookInit(void) {
         ZTechInstallSignalHandlers();
         atexit(ZTechAtExitHandler);
 
-        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.8 started in pid:%d (%@ / %@)",
+        ZTechHookTrace([[NSString stringWithFormat:@"[1/6] ZTechHookInit v5.7.9 started in pid:%d (%@ / %@)",
                          getpid(), bundleId ?: @"(nil)", procName ?: @"(nil)"] UTF8String]);
 
         if (uname(&gRealUts) == 0 && gRealUts.machine[0] != '\0') {
@@ -2426,9 +2433,11 @@ static void ZTechHookInit(void) {
                 pMSHook(raw_SCHostName, (void *)hooked_SCDynamicStoreCopyLocalHostName, (void **)&orig_SCDynamicStoreCopyLocalHostName);
             }
 
-            void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
-            if (raw_CFCopySysVer) {
-                pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
+            if (isAida) {
+                void *raw_CFCopySysVer = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
+                if (raw_CFCopySysVer) {
+                    pMSHook(raw_CFCopySysVer, (void *)hooked_CFCopySystemVersionDictionary, (void **)&orig_CFCopySystemVersionDictionary);
+                }
             }
 
             void *raw_IOReg = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
@@ -2454,16 +2463,18 @@ static void ZTechHookInit(void) {
         @try {
             Class procCls = objc_getClass("NSProcessInfo");
             if (procCls) {
-                Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
-                if (mOsVer) {
-                    orig_osVersion = (void *)method_getImplementation(mOsVer);
-                    method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
-                }
+                if (isAida) {
+                    Method mOsVer = class_getInstanceMethod(procCls, @selector(operatingSystemVersion));
+                    if (mOsVer) {
+                        orig_osVersion = (void *)method_getImplementation(mOsVer);
+                        method_setImplementation(mOsVer, (IMP)swizzled_osVersion);
+                    }
 
-                Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
-                if (mOsVerStr) {
-                    orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
-                    method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
+                    Method mOsVerStr = class_getInstanceMethod(procCls, @selector(operatingSystemVersionString));
+                    if (mOsVerStr) {
+                        orig_osVersionString = (void *)method_getImplementation(mOsVerStr);
+                        method_setImplementation(mOsVerStr, (IMP)swizzled_osVersionString);
+                    }
                 }
 
                 if (isAida) {

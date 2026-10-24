@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing (Rootless) v5.7.8 - Tính năng Cứu Hộ Acc Cũ, Chống tràn RAM Jetsam & Đồng bộ cfprefsd"
+          "title": "quang lam marketing (Rootless) v5.7.9 - Tính năng Cứu Hộ Acc Cũ, Chống tràn RAM Jetsam & Đồng bộ cfprefsd"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.8**:\n\n- **Nút Cứu Hộ Acc Zalo 1 chạm (Vault Rescue Engine)**: Khắc phục triệt để lỗi crash / văng khi mở acc cũ đã lưu từ các bản trước. Tự động giải phóng các tệp lock `bak_sm_*`, xoá stale shared memory và đồng bộ lại quyền hạn.\n- **Khắc phục lỗi Kernel Jetsam OOM (Tràn RAM) trên iPhone 7 / thiết bị 2GB RAM**: Hook `physicalMemory` chỉ hiển thị 8GB cho ứng dụng test AIDA64, Zalo được giữ mức RAM thực tế của máy giúp không bị Kernel iOS 15 kill âm thầm vì tràn bộ nhớ cache.\n- **Chế độ Cứu Hộ Sâu (Làm mới DB tin nhắn)**: Đối với các database bị lỗi khoá hoặc thiếu khoá giải mã SQLCipher từ phiên bản cũ, tính năng này cách ly an toàn DB hỏng vào thư mục dự phòng và kích hoạt Zalo tạo mới DB sạch, giữ nguyên 100% phiên đăng nhập và tự động đồng bộ lại tin nhắn từ cloud.\n- **Đồng bộ hóa cfprefsd tự động**: Tự động restart `cfprefsd` để Zalo nạp tức thì token và thông số profile mà không bị đơ/văng do cache daemon hệ thống."
+          "markdown": "Bản phát hành tối thượng **quang lam marketing v5.7.9**:\n\n- **Khắc phục triệt để lỗi Crash / Đơ khi mở Zalo (Cách ly Runtime OS & GPU)**: Khắc phục xung đột kiến trúc nghiêm trọng: Zalo chạy trên iPhone 7 (iOS 15) trước đây bị nhận diện nhầm là iOS 18 và GPU A17 Pro (D84AP), khiến các hàm xử lý đồ họa UIKit/RenderBox và @available kiểm tra tính năng iOS 16+ bị lỗi văng. Trong v5.7.9, toàn bộ cấu trúc phần cứng đồ họa (hw.model, IOKit board-id) và nhân OS (operatingSystemVersion, _CFCopySystemVersionDictionary) được giữ nguyên chuẩn bản địa cho Zalo, chỉ hiển thị số liệu fake cho ứng dụng kiểm tra AIDA64.\n- **Chống văng tuyệt đối khi nạp lại Acc**: Tối ưu bộ giải phóng lock MMKV và đồng bộ hóa quyền hạn 0755/0666 cho DataContainer và 6 AppGroups.\n- **Công cụ Cứu Hộ Acc 1-chạm hoàn thiện**: Hỗ trợ 2 chế độ 'Cứu Hộ An Toàn' và 'Cứu Hộ Sâu' khôi phục 100% tài khoản cũ bị lỗi."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.7.8"
+          "text": "5.7.9"
         },
         {
           "class": "DepictionTableTextView",

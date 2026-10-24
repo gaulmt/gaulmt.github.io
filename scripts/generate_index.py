@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.8 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.9 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.8: Bổ sung công cụ Cứu Hộ Acc Cũ 1-chạm (Vault Rescue), khắc phục lỗi văng do tràn RAM Jetsam OOM trên iPhone 7 / máy 2GB, tự động đồng bộ hoá daemon cfprefsd và dọn dẹp triệt để lock bộ nhớ.
+        Bản phát hành v5.7.9: Khắc phục triệt để lỗi crash / văng mở Zalo (Cách ly Runtime OS & GPU Board ID), giữ nguyên đồ hoạ bản địa và bộ nhớ an toàn cho Zalo, tích hợp Cứu Hộ Acc 1-chạm.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

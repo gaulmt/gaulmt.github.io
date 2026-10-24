@@ -337,7 +337,9 @@ static NSString *ZTechFormatFilePerms(NSString *path, NSFileManager *fm) {
             if ([attrs[NSFileType] isEqualToString:NSFileTypeDirectory]) continue;
             [seenFiles addObject:file];
             NSDate *modDate = attrs[NSFileModificationDate] ?: [NSDate distantPast];
-            [allRecentLogs addObject:@{@"name": file, @"date": modDate, @"path": fullPath}];
+            if (file && fullPath) {
+                [allRecentLogs addObject:@{@"name": file, @"date": (modDate ?: [NSDate distantPast]), @"path": fullPath}];
+            }
 
             NSString *lower = [file lowercaseString];
             if ([lower containsString:@"zalo"] || [lower containsString:@"zingalo"]) {

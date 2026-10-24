@@ -234,7 +234,7 @@ def generate_index(stage_dir):
         <img class="product-icon" src="CydiaIcon@3x.png" alt="ZTech Icon">
         <div>
           <div class="product-title">quang lam marketing (ZTech)</div>
-          <div class="product-version">Phiên bản 5.7.6 · iOS 12.0 - 17.0+</div>
+          <div class="product-version">Phiên bản 5.7.7 · iOS 12.0 - 17.0+</div>
         </div>
       </div>
       <div class="badge-row">
@@ -246,7 +246,7 @@ def generate_index(stage_dir):
         <span class="badge badge-gold">TrollStore</span>
       </div>
       <div class="product-desc">
-        Bản phát hành v5.7.6: Triệt tiêu hoàn toàn hiện tượng crash chập chờn khi mở Zalo (gỡ bỏ hoàn toàn manual GOT rewriting gây lỗi chained fixups dyld4 trên iOS 15, chuyển sang 100% ElleKit native hooks), nâng cấp quy trình làm mới phiên Zalo với đồng bộ filesystem sync() chuẩn kernel.
+        Bản phát hành v5.7.7: Khắc phục triệt để lỗi crash lặp đi lặp lại khi Nạp lại Acc từ Kho (Vault), tái thiết toàn diện cơ chế sao lưu/khôi phục Keychain đa AppGroup (group.vn.com.vng.zingalo), tự động dọn sạch SQLite SHM memory locks và khôi phục cấu trúc container iOS chuẩn.
       </div>
       <div class="product-actions">
         <a class="action-link primary-troll span-2" href="apple-magnifier://install?url=https://gaulmt.github.io/downloads/gaulmt_Tech_TrollStore.tipa">

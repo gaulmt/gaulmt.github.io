@@ -46,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)cleanSafariCookiesAndWebsiteData;
 + (void)launchZaloApp;
 + (void)runFastChownAndChmod:(NSString *)path;
++ (void)removeStaleSqliteShmFilesAtPath:(NSString *)rootPath fileManager:(NSFileManager *)fm;
 
 + (void)setSystemAirplaneMode:(BOOL)enabled;
 + (BOOL)isSystemAirplaneModeEnabled;

@@ -684,6 +684,61 @@ extern char **environ;
     return cleanedItems;
 }
 
++ (NSInteger)cleanResetContainerContentsForRestore {
+    NSInteger cleanedItems = 0;
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    // Guarantee Zalo, Zalo extensions, AIDA64 and Safari are terminated via kernel sysctl and release SQLite/MMKV locks
+    [ZTechVaultManager killZaloProcess];
+    usleep(200000);
+    sync();
+    [ZTechVaultManager cleanSafariCookiesAndWebsiteData];
+    cleanedItems += 5;
+
+    NSMutableSet<NSString *> *zaloContainers = [NSMutableSet set];
+    NSString *mainZalo = [ZTechVaultManager findZaloDataContainerPath];
+    if (mainZalo.length > 0) {
+        [zaloContainers addObject:mainZalo];
+    }
+    NSDictionary<NSString *, NSString *> *groups = [ZTechVaultManager findZaloAppGroupContainers];
+    for (NSString *gPath in groups.allValues) {
+        if (gPath.length > 0) {
+            [zaloContainers addObject:gPath];
+        }
+    }
+
+    for (NSString *containerPath in zaloContainers) {
+        // 1. Clean all interior sub-directories (preserving trace logs and active profile in Documents/Preferences)
+        NSArray<NSString *> *subDirs = @[@"Documents", @"tmp", @"Library/Caches", @"Library/Cookies", @"Library/Preferences", @"Library/WebKit", @"Library/Application Support", @"Library/SplashBoard", @"Library/HTTPStorages", @"Library/Saved Application State"];
+        for (NSString *sub in subDirs) {
+            NSString *targetSub = [containerPath stringByAppendingPathComponent:sub];
+            if ([fm fileExistsAtPath:targetSub]) {
+                cleanedItems += [self cleanDirectoryContents:targetSub fileManager:fm];
+            }
+        }
+        // 2. For AppGroup containers (e.g. group.vn.com.vng.zingalo), also clean root-level MMKV/SQLite/session files
+        if ([containerPath containsString:@"/Shared/AppGroup/"]) {
+            cleanedItems += [self cleanDirectoryContents:containerPath fileManager:fm];
+        }
+        // 3. Reconstruct clean standard iOS container directory tree & permissions (0755 dirs, 0644 metadata.plist)
+        [self repairContainerStructureAtPath:containerPath fileManager:fm];
+        [ZTechVaultManager runFastChownAndChmod:containerPath];
+    }
+
+    // Crucial for Restore: Remove any existing _zt_wipe_keychain.flag and restore trigger so Keychain is NEVER wiped
+    if (mainZalo.length > 0) {
+        NSString *zDocs = [mainZalo stringByAppendingPathComponent:@"Documents"];
+        [fm removeItemAtPath:[zDocs stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
+        [fm removeItemAtPath:[zDocs stringByAppendingPathComponent:@"_zt_restore_trigger.txt"] error:nil];
+    }
+
+    [[NSURLCache sharedURLCache] removeAllCachedResponses];
+    cleanedItems++;
+
+    return cleanedItems;
+}
+
+
 + (void)syncLocationByIPWithCompletion:(void (^)(NSString *city, NSString *isp, NSError *error))completion {
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
     cfg.timeoutIntervalForRequest = 8.0;

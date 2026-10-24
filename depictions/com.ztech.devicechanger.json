@@ -10,11 +10,11 @@
         {
           "class": "DepictionSubheaderView",
           "useBoldText": true,
-          "title": "quang lam marketing v5.7.6 - Fixed Fresh Session Launch Crash & Safe Sysctl"
+          "title": "quang lam marketing v5.7.7 - Khắc phục triệt để lỗi Crash khi Nạp lại Acc từ Kho (Vault)"
         },
         {
           "class": "DepictionMarkdownView",
-          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.6**:\n\n- **Triệt tiêu hoàn toàn hiện tượng crash chập chờn khi mở Zalo**: Gỡ bỏ triệt để cơ chế manual Mach-O GOT rebinding (_dyld_register_func_for_add_image) gây xung đột chained fixups trong dyld4 trên iOS 15 (nguyên nhân gây SIGBUS/EXC_BAD_ACCESS khi khởi chạy Zalo).\n- **100% ElleKit Native Function Hooks**: Chuyển đổi toàn diện sang ElleKit function entry trampolines siêu an toàn, mượt mà và không can thiệp bộ nhớ __DATA_CONST.\n- **Nâng cấp đồng bộ I/O Kernel**: Thêm kernel sync() và tối ưu hóa thời gian giải phóng tiến trình khi làm mới phiên Zalo, đảm bảo không khóa database hay giật lag."
+          "markdown": "Bản phát hành đặc biệt **quang lam marketing v5.7.7**:\n\n- **Khắc phục triệt để 100% lỗi văng/crash khi Nạp lại Acc Zalo (Mở Acc từ Kho)**: Tái cấu trúc cơ chế đồng bộ Keychain toàn diện với hỗ trợ đầy đủ AppGroup (group.vn.com.vng.zingalo, group.zgroups, group.zcontacts... và kSecClassKey), khôi phục nguyên vẹn token đăng nhập và khóa giải mã cơ sở dữ liệu SQLite.\n- **Bảo vệ toàn vẹn SQLite WAL**: Tự động dọn dẹp các tệp Shared Memory (-shm) bị khóa cũ khi phục hồi dữ liệu để SQLite tự phục hồi phân đoạn WAL an toàn, không gây crash SHMOPEN hay CORRUPT.\n- **Tái tạo khung thư mục chuẩn iOS**: Tự động thiết lập lại Library/Caches, Library/SplashBoard, WebKit và chuẩn hóa quyền sở hữu mobile (0755/0666) cho DataContainer và tất cả AppGroups.\n- **Tự động lưu dự phòng Keychain liên tục**: Kích hoạt snapshot tự động ngay sau 3s/10s khi đăng nhập thành công và khi ứng dụng chuyển nền/tắt."
         },
         {
           "class": "DepictionTableTextView",
@@ -24,7 +24,7 @@
         {
           "class": "DepictionTableTextView",
           "title": "Phiên bản",
-          "text": "5.7.6"
+          "text": "5.7.7"
         },
         {
           "class": "DepictionTableTextView",

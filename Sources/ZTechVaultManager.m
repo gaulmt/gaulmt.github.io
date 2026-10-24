@@ -569,6 +569,19 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
     }
 }
 
+
++ (void)removeStaleSqliteShmFilesAtPath:(NSString *)rootPath fileManager:(NSFileManager *)fm {
+    if (!rootPath || ![fm fileExistsAtPath:rootPath]) return;
+    NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:rootPath];
+    NSString *sub = nil;
+    while ((sub = [enumerator nextObject])) {
+        if ([sub hasSuffix:@"-shm"] || [sub hasSuffix:@".sqlite-shm"] || [sub hasSuffix:@".db-shm"]) {
+            NSString *full = [rootPath stringByAppendingPathComponent:sub];
+            [fm removeItemAtPath:full error:nil];
+        }
+    }
+}
+
 + (void)copyDirectoryContentsFrom:(NSString *)srcDir to:(NSString *)dstDir fileManager:(NSFileManager *)fm fixMobileOwner:(BOOL)fixOwner {
     if (![fm fileExistsAtPath:srcDir]) return;
     if (![fm fileExistsAtPath:dstDir]) {
@@ -658,6 +671,11 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
         [fm removeItemAtPath:[dataBackupDir stringByAppendingPathComponent:sk] error:nil];
     }
 
+    // Clean trigger flags and stale SQLite shared memory files from backup DataContainer
+    [fm removeItemAtPath:[dataBackupDir stringByAppendingPathComponent:@"Documents/_zt_wipe_keychain.flag"] error:nil];
+    [fm removeItemAtPath:[dataBackupDir stringByAppendingPathComponent:@"Documents/_zt_restore_trigger.txt"] error:nil];
+    [self removeStaleSqliteShmFilesAtPath:dataBackupDir fileManager:fm];
+
     // Copy ALL Zalo AppGroup containers (including root-level MMKV/SQLite files in group.vn.com.vng.zingalo!)
     NSDictionary<NSString *, NSString *> *appGroups = [self findZaloAppGroupContainers];
     for (NSString *groupId in appGroups) {
@@ -668,6 +686,7 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
         for (NSString *sk in skipLibDirs) {
             [fm removeItemAtPath:[dstGroup stringByAppendingPathComponent:sk] error:nil];
         }
+        [self removeStaleSqliteShmFilesAtPath:dstGroup fileManager:fm];
     }
 
     ZTechVaultAccount *newAcc = [[ZTechVaultAccount alloc] init];
@@ -715,10 +734,11 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
 
     // 1. Kill Zalo first so SQLite databases are flushed and unlocked
     [self killZaloProcess];
-    usleep(150000); // 150ms
+    usleep(200000); // 200ms
+    sync();
 
-    // 2. Clean current Zalo DataContainer & AppGroups completely before restoring
-    [ZTechDeviceDatabase cleanResetAllProfileDataAndCache];
+    // 2. Clean current active container safely WITHOUT writing _zt_wipe_keychain.flag
+    [ZTechDeviceDatabase cleanResetContainerContentsForRestore];
 
     // 3. Restore Device Profile
     ZTechDeviceProfile *restoredProfile = [ZTechDeviceProfile fromDictionary:account.deviceProfileDict];
@@ -745,7 +765,21 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
         }
     }
 
-    // 6. Write active profile files & fix permissions safely (never creating .GlobalPreferences symlink!)
+    // 6. Remove stale SQLite shared memory (.shm) files to prevent memory-mapping lock corruption
+    [self removeStaleSqliteShmFilesAtPath:zaloContainer fileManager:fm];
+    for (NSString *groupId in appGroups) {
+        NSString *liveGroupPath = appGroups[groupId];
+        [self removeStaleSqliteShmFilesAtPath:liveGroupPath fileManager:fm];
+    }
+
+    // 7. Reconstruct standard directory skeleton (ensures Library/Caches, Library/SplashBoard, etc. exist)
+    [ZTechDeviceDatabase repairContainerStructureAtPath:zaloContainer fileManager:fm];
+    for (NSString *groupId in appGroups) {
+        NSString *liveGroupPath = appGroups[groupId];
+        [ZTechDeviceDatabase repairContainerStructureAtPath:liveGroupPath fileManager:fm];
+    }
+
+    // 8. Write active profile files & fix permissions safely
     [ZTechDeviceDatabase writeProfileFiles:restoredProfile error:nil];
     [[NSUserDefaults standardUserDefaults] setObject:[restoredProfile toDictionary] forKey:@"ZTechCurrentProfile"];
     [[NSUserDefaults standardUserDefaults] setObject:account.accountId forKey:@"ZTechActiveVaultAccountId"];
@@ -753,26 +787,34 @@ static void ZTechNativeRecursiveChownAndChmod(const char *cpath, uid_t uid, gid_
 
     NSString *docsDir = [zaloContainer stringByAppendingPathComponent:@"Documents"];
     [fm createDirectoryAtPath:docsDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+    // Explicitly guarantee no wipe flag exists
     [fm removeItemAtPath:[docsDir stringByAppendingPathComponent:@"_zt_wipe_keychain.flag"] error:nil];
 
+    // Write restore trigger
     NSString *restoreTrigger = [docsDir stringByAppendingPathComponent:@"_zt_restore_trigger.txt"];
     [@"1" writeToFile:restoreTrigger atomically:YES encoding:NSUTF8StringEncoding error:nil];
     chmod([restoreTrigger UTF8String], 0666);
 
-    if (restoredProfile.identifier.length > 0) {
-        NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
-        [restoredProfile.identifier writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        chmod([boundUuidFile UTF8String], 0666);
-    }
+    // Write full signature (UUID:MachineId) to bound UUID file so signature always matches perfectly
+    NSString *fullSig = [NSString stringWithFormat:@"%@:%@", restoredProfile.identifier ?: @"", restoredProfile.machineId ?: @""];
+    NSString *boundUuidFile = [docsDir stringByAppendingPathComponent:@"_zt_bound_uuid.txt"];
+    [fullSig writeToFile:boundUuidFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    chmod([boundUuidFile UTF8String], 0666);
 
     NSString *markerFile = [docsDir stringByAppendingPathComponent:@"_zt_zalo_marker.txt"];
     [@"vn.com.vng.zalo" writeToFile:markerFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
     chmod([markerFile UTF8String], 0666);
 
     [self runFastChownAndChmod:zaloContainer];
+    for (NSString *groupId in appGroups) {
+        NSString *liveGroupPath = appGroups[groupId];
+        [self runFastChownAndChmod:liveGroupPath];
+    }
+    sync();
 
-    // 7. Launch Zalo
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.20 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 9. Launch Zalo with slight delay so buffers are flushed to flash storage
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self launchZaloApp];
     });
 

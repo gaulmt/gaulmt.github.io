@@ -46,6 +46,8 @@ typedef NS_ENUM(NSInteger, ZTechModelTierFilter) {
                                              currentCity:(NSString *)currentCity;
 + (BOOL)writeProfileFiles:(ZTechDeviceProfile *)profile error:(NSError **)error;
 + (NSInteger)cleanResetAllProfileDataAndCache;
++ (NSInteger)cleanResetContainerContentsForRestore;
++ (void)repairContainerStructureAtPath:(NSString *)containerPath fileManager:(NSFileManager *)fm;
 + (void)syncLocationByIPWithCompletion:(void (^)(NSString *city, NSString *isp, NSError *error))completion;
 + (void)performRespringIfPossible;
 
